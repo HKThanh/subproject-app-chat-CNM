@@ -58,8 +58,8 @@ const UserSchema = new Schema({
     },
 }, {
     statics: {
-        async get(username) {
-            return await this.findOne({ username: username });
+        async get(phone) {
+            return await this.findOne({ phone: phone });
         }
     }
 });

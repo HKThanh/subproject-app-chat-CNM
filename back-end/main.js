@@ -5,7 +5,9 @@ const bodyParser = require("body-parser");
 const { createServer } = require("node:http");
 const cors = require("cors");
 const connectDB = require("./config/connectMongo");
+
 const authRoutes = require("./routes/authRoute");
+const userRoutes = require("./routes/userRoute");
 
 app.use(cors());
 app.use(express.json());
@@ -14,6 +16,7 @@ app.use(bodyParser.json());
 connectDB();
 
 app.use("/auth", authRoutes);
+app.use("/user", userRoutes);
 
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);

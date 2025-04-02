@@ -4,12 +4,6 @@ const multer = require('multer');
 const upload = multer();
 const userController = require('../controllers/userController');
 
-router.post('/request-otp', userController.requestOTP);
-
-router.post('/verify-otp', userController.verifyOTP);
-
-router.post('/register', userController.register);
-
-router.post('/login', userController.login);
+router.get('/get-all', userController.getAllUsers);
 
 module.exports = router;
