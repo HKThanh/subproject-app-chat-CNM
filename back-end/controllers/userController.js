@@ -138,4 +138,23 @@ userController.login = async (req, res) => {
     });
 };
 
+userController.refreshToken = async (req, res) => {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+        return res.status(400).json({ message: 'Refresh token is required' });
+    }
+
+    const JWT_REFRESH_SECRET = process.env.JWT_REFRESH;
+
+    jwt.verify(refreshToken, JWT_REFRESH_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ message: 'Invalid refresh token' });
+        }
+
+        const token = jwt.sign({ phone: user.phone }, JWT_SECRET, { expiresIn: '1h' });
+        res.status(200).json({ accessToken: token });
+    });
+};
+
 module.exports = userController;
