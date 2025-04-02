@@ -35,12 +35,12 @@ userController.requestOTP = async (req, res) => {
     const { phone } = req.body;
 
     if (!phone) {
-        return res.status(400).json({ message: 'Phone number is required' });
+        return res.status(400).json({ message: 'Hãy nhập số điện thoại' });
     }
 
     const existingUser = await UserModel.get(phone);
     if (existingUser) {
-        return res.status(400).json({ message: 'Phone number already registered' });
+        return res.status(400).json({ message: 'Số điện thoại đã tồn tại' });
     }
 
     const otp = generateOTP();
@@ -58,18 +58,18 @@ userController.verifyOTP = async (req, res) => {
     const { phone, otp } = req.body;
 
     if (!phone || !otp) {
-        return res.status(400).json({ message: 'Phone and OTP are required' });
+        return res.status(400).json({ message: 'Hãy nhập OTP' });
     }
 
     const storedData = await redisClient.get(phone);
 
     if (!storedData) {
-        return res.status(400).json({ message: 'OTP expired or invalid' });
+        return res.status(400).json({ message: 'OTP đã hết hạn' });
     }
 
     const { otp: storedOtp } = JSON.parse(storedData);
     if (storedOtp !== otp) {
-        return res.status(400).json({ message: 'Invalid OTP' });
+        return res.status(400).json({ message: 'Nhập sai OTP' });
     }
 
     res.status(200).json({ message: 'OTP verified', phone: phone });
@@ -79,22 +79,23 @@ userController.register = async (req, res) => {
     const { phone, password, repassword } = req.body;
 
     if (!phone || !password) {
-        return res.status(400).json({ message: 'Phone number and password are required' });
+        return res.status(400).json({ message: 'Hãy nhập cả số điện thoại và mật khẩu' });
     }
 
     if (password !== repassword) {
-        return res.status(400).json({ message: 'Passwords do not match' });
+        return res.status(400).json({ message: 'Nhập lại sai mật khẩu' });
     }
 
     const existingUser = await UserModel.get(phone);
     if (existingUser) {
-        return res.status(400).json({ message: 'Phone number already registered' });
+        return res.status(400).json({ message: 'Tài khoản đã có người đăng ký' });
     }
 
     bcrypt.hash(password, 10).then(async (hash) => {
         try {
             const newUser = await UserModel.create({
                 id: uuidv4(),
+                username: phone,
                 phone: phone,
                 password: hash,
             });
@@ -113,7 +114,7 @@ userController.login = async (req, res) => {
     const { phone, password } = req.body;
 
     if (!phone || !password) {
-        return res.status(400).json({ message: 'Phone number and password are required' });
+        return res.status(400).json({ message: 'Hãy nhập cả sdt và mật khẩu' });
     }
 
     const user = await UserModel.get(phone);
@@ -125,7 +126,7 @@ userController.login = async (req, res) => {
         if (result) {
             const JWT_SECRET = process.env.JWT_SECRET;
             const JWT_REFRESH_SECRET = process.env.JWT_REFRESH;
-            const token = jwt.sign({ phone: user.phone }, JWT_SECRET, { expiresIn: '1h' });
+            const token = jwt.sign({ phone: user.phone }, JWT_SECRET, { expiresIn: '30m' });
             const refreshToken = jwt.sign({ phone: user.phone }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
             res.status(200).json({ 
                 message: 'Login successful', 
@@ -133,7 +134,7 @@ userController.login = async (req, res) => {
                 refreshToken: refreshToken, 
             });
         } else {
-            res.status(400).json({ message: 'Invalid password' });
+            res.status(400).json({ message: 'Nhập sai password' });
         }
     });
 };
@@ -155,6 +156,24 @@ userController.refreshToken = async (req, res) => {
         const token = jwt.sign({ phone: user.phone }, JWT_SECRET, { expiresIn: '1h' });
         res.status(200).json({ accessToken: token });
     });
+};
+
+userController.logout = async (req, res) => {
+    const { phone } = req.body;
+    const { authorization } = req.headers;
+
+    if (!authorization) {
+        return res.status(401).json({ message: 'Bạn đã hết phiên đăng nhập' });
+    }
+
+    const token = authorization.split(' ')[1];
+    const decoded = jwt.decode(token);
+
+    if (phone !== decoded.phone) {
+        return res.status(403).json({ message: 'Invalid phone number' });
+    }
+
+    res.status(200).json({ message: 'Bạn đã đăng xuất' });
 };
 
 module.exports = userController;

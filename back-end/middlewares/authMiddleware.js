@@ -8,7 +8,7 @@ const authenticateToken = (req, res, next) => {
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
-        return res.status(401).json({ message: 'Access token is required' });
+        return res.status(401).json({ message: 'Bạn đã hết phiên đăng nhập' });
     }
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
