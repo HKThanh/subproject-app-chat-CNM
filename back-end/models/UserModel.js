@@ -2,6 +2,14 @@ const dynamoose = require("dynamoose");
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
+const generateBirthdate = () => {
+    const randomDate = new Date();
+    randomDate.setFullYear(Math.floor(Math.random() * (2003 - 1950 + 1)) + 1950);
+    randomDate.setMonth(Math.floor(Math.random() * 12));
+    randomDate.setDate(Math.floor(Math.random() * 31));
+    return randomDate.toISOString().split("T")[0];
+}
+
 // This is for AWS
 // const UserSchema = new dynamoose.Schema({
 //     id: {
@@ -39,11 +47,23 @@ const UserSchema = new Schema({
     },
     username: String,
     password: String,
-    fullname: String,
-    ismale: Boolean,
+    fullname: {
+        type: String,
+        default: "Người dùng mới",
+    },
+    ismale: {
+        type: Boolean,
+        default: true,
+    },
     phone: String,
-    urlavatar: String,
-    birthday: String,
+    urlavatar: {
+        type: String,
+        default: "",
+    },
+    birthday: {
+        type: String,
+        default: generateBirthdate,
+    },
     friendList: {
         type: Array,
         schema: [String],

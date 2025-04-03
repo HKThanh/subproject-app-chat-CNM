@@ -112,6 +112,8 @@ userController.register = async (req, res) => {
 
 userController.login = async (req, res) => {
     const { phone, password } = req.body;
+    const { authorization } = req.headers;
+
 
     if (!phone || !password) {
         return res.status(400).json({ message: 'Hãy nhập cả sdt và mật khẩu' });
@@ -119,22 +121,50 @@ userController.login = async (req, res) => {
 
     const user = await UserModel.get(phone);
     if (!user) {
-        return res.status(400).json({ message: 'User not found' });
+        return res.status(400).json({ message: 'Sai tên đăng nhập' });
     }
 
-    bcrypt.compare(password, user.password, (err, result) => {
+    bcrypt.compare(password, user.password, async (err, result) => {
         if (result) {
-            const JWT_SECRET = process.env.JWT_SECRET;
-            const JWT_REFRESH_SECRET = process.env.JWT_REFRESH;
-            const token = jwt.sign({ phone: user.phone }, JWT_SECRET, { expiresIn: '30m' });
-            const refreshToken = jwt.sign({ phone: user.phone }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
-            res.status(200).json({ 
-                message: 'Login successful', 
-                accessToken: token,
-                refreshToken: refreshToken, 
-            });
+            const data = {
+                phone: user.phone,
+                username: user.username,
+                fullname: user.fullname,
+                urlavatar: user.urlavatar,
+                birthday: user.birthday,
+                friendList: user.friendList,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt,
+            }
+
+            const tokenInRedis = await redisClient.get(user.phone);
+            if (!tokenInRedis) {
+                
+                const JWT_SECRET = process.env.JWT_SECRET;
+                const JWT_REFRESH_SECRET = process.env.JWT_REFRESH;
+                const token = jwt.sign(data, JWT_SECRET, { expiresIn: '30m' });
+                const refreshToken = jwt.sign(data, JWT_REFRESH_SECRET, { expiresIn: '1d' });
+
+                // store token in redis
+                redisClient.setEx(user.phone, 1800, token);
+                redisClient.setEx(`${user.phone}-refresh`, 86400, refreshToken);
+
+                return res.status(200).json({ 
+                    message: 'Đăng nhập thành công', 
+                    accessToken: token,
+                    refreshToken: refreshToken, 
+                });
+            }
+
+            const testToken = await redisClient.get(user.phone);
+
+            if (testToken === authorization.split(' ')[1]) {
+                return res.status(401).json({ message: 'Bạn đã đăng nhập' });
+            }
+
+            
         } else {
-            res.status(400).json({ message: 'Nhập sai password' });
+            res.status(400).json({ message: 'Nhập sai mật khẩu' });
         }
     });
 };
@@ -162,16 +192,16 @@ userController.logout = async (req, res) => {
     const { phone } = req.body;
     const { authorization } = req.headers;
 
+    // check if user still login
     if (!authorization) {
-        return res.status(401).json({ message: 'Bạn đã hết phiên đăng nhập' });
+        return res.status(401).json({ message: 'Authorization missed' });
     }
 
-    const token = authorization.split(' ')[1];
-    const decoded = jwt.decode(token);
+    // remove token from redis
+    await redisClient.del(phone);
 
-    if (phone !== decoded.phone) {
-        return res.status(403).json({ message: 'Invalid phone number' });
-    }
+    // remove refresh token from redis
+    await redisClient.del(`${phone}-refresh`);
 
     res.status(200).json({ message: 'Bạn đã đăng xuất' });
 };

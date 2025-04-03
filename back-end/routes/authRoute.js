@@ -12,6 +12,8 @@ router.post('/register', userController.register);
 
 router.post('/login', userController.login);
 
+router.post('/logout', userController.logout);
+
 router.post('/refresh-token', userController.refreshToken);
 
 module.exports = router;
