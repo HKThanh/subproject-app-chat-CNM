@@ -1,9 +1,11 @@
 require('dotenv').config();
-const UserModel = require('../models/UserModel');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = process.env;
 const { v4: uuidv4 } = require("uuid");
+const qrcode = require('qrcode');
+
+const UserModel = require('../models/UserModel');
 const redisClient = require('../services/redisClient');
 const { generateOTP, sendOTP } = require('../services/otpServices');
 
@@ -134,7 +136,6 @@ userController.login = async (req, res) => {
                 birthday: user.birthday,
                 friendList: user.friendList,
                 createdAt: user.createdAt,
-                updatedAt: user.updatedAt,
             }
 
             const tokenInRedis = await redisClient.get(user.phone);
@@ -205,5 +206,63 @@ userController.logout = async (req, res) => {
 
     res.status(200).json({ message: 'Bạn đã đăng xuất' });
 };
+
+const pendingLogins = new Map();
+
+userController.generateQR = async (req, res, io, socket) => {
+    const tempToken = jwt.sign({socketId: socket.id}, JWT_SECRET, { expiresIn: '5m' });
+    pendingLogins.set(tempToken, socket.id);
+    console.log('Pending logins: ', pendingLogins);
+
+    try {
+        const qrURL = await qrcode.toDataURL(tempToken);
+        socket.emit('qrCode', qrURL);
+    } catch (err) {
+        console.error('Error generating QR code: ', err);
+        socket.emit('error', { message: 'Không thể tạo mã QR' });
+    }
+}
+
+userController.verifyToken = async (io, socket, data) => {
+    const { qrToken, mobileToken } = data;
+    const socketId = pendingLogins.get(qrToken);
+
+    if (!socketId || !mobileToken) {
+        socket.emit('loginFailed', { message: 'Mã QR đã hết hạn' });
+        return;
+    }
+
+    try {
+        const qrDecoded = jwt.verify(qrToken, JWT_SECRET);
+        if (qrDecoded.socketId !== socket.id) {
+            socket.emit('loginFailed', { message: 'Mã QR không hợp lệ' });
+            return;
+        }
+
+        const mobileDecoded = jwt.verify(mobileToken, JWT_SECRET);
+        const user = await UserModel.get(mobileDecoded.phone);
+
+        if (!user) {
+            socket.emit('loginFailed', { message: 'Người dùng không tồn tại' });
+            return;
+        } 
+
+        const token = jwt.sign({ phone: user.phone }, JWT_SECRET, { expiresIn: '30m' });
+        const refreshToken = jwt.sign({ phone: user.phone }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
+
+        // store token in redis
+        redisClient.setEx(user.phone, 1800, token);
+        redisClient.setEx(`${user.phone}-refresh`, 86400, refreshToken);
+
+        io.to(socketId).emit('loginSuccess', {
+            message: 'Đăng nhập thành công',
+            accessToken: token,
+            refreshToken: refreshToken,
+        });
+    } catch (err) {
+        console.error('Error verifying token: ', err);
+        socket.emit('loginFailed', { message: 'Xác thực thất bại' });
+    }
+}   
 
 module.exports = userController;
