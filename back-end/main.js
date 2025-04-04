@@ -7,6 +7,7 @@ const cors = require("cors");
 const connectDB = require("./config/connectMongo");
 const { Server } = require("socket.io");
 
+const authController = require("./controllers/authController")
 const authRoutes = require("./routes/authRoute");
 const userRoutes = require("./routes/userRoute");
 
@@ -30,10 +31,10 @@ app.use("/user", userRoutes);
 
 io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
-    AuthController.generateQR(null, null, io, socket);
+    authController.generateQR(null, null, io, socket);
 
     socket.on('verifyToken', (token) => {
-        AuthController.verifyToken(io, socket, token);
+        authController.verifyToken(io, socket, token);
     });
 
     socket.on('disconnect', () => {
