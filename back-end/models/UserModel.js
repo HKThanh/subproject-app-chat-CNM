@@ -68,6 +68,10 @@ const UserSchema = new Schema({
         type: Array,
         schema: [String],
     },
+    isLoggedin: {
+        type: Boolean,
+        default: false,
+    },
     createdAt: {
         type: Date,
         default: Date.now,
