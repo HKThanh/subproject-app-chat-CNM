@@ -1,7 +1,7 @@
 // API connection configuration
 
 // Base URLs for development and production environments
-const DEV_API_URL = 'http://localhost:3000/api';
+const DEV_API_URL = 'http://localhost:3000';
 const PROD_API_URL = 'https://wavechat-api.example.com/api'; // Replace with your actual production API URL
 
 // API version
@@ -19,12 +19,12 @@ export const REQUEST_TIMEOUT = 15000;
 // Endpoint paths
 export const ENDPOINTS = {
   AUTH: {
-    LOGIN: '/auth/login',
-    REGISTER: '/auth/register',
-    REQUEST_OTP: '/auth/request-otp',
-    VERIFY_OTP: '/auth/verify-otp',
-    REFRESH_TOKEN: '/auth/refresh-token',
-    LOGOUT: '/auth/logout',
+    LOGIN: '/login',
+    REGISTER: '/register',
+    REQUEST_OTP: '/request-otp',
+    VERIFY_OTP: '/verify-otp',
+    REFRESH_TOKEN: '/refresh-token',
+    LOGOUT: '/logout',
   },
   USER: {
     PROFILE: '/user/profile',

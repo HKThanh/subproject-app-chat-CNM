@@ -40,8 +40,7 @@ const SignUp: React.FC<SignUpProps> = ({ navigation }) => {
     }
 
     // Validate password strength
-    const passwordRegex = 
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
     
     if (!passwordRegex.test(password)) {
       Alert.alert(
