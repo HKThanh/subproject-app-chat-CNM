@@ -1,7 +1,7 @@
 require('dotenv').config();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { JWT_SECRET } = process.env;
+const { JWT_SECRET, JWT_REFRESH } = process.env;
 const { v4: uuidv4 } = require("uuid");
 const qrcode = require('qrcode');
 
@@ -58,14 +58,10 @@ authController.verifyOTP = async (req, res) => {
 };
 
 authController.register = async (req, res) => {
-    const { phone, password, repassword } = req.body;
+    const { phone, password, fullname } = req.body;
 
     if (!phone || !password) {
         return res.status(400).json({ message: 'Hãy nhập cả số điện thoại và mật khẩu' });
-    }
-
-    if (password !== repassword) {
-        return res.status(400).json({ message: 'Nhập lại sai mật khẩu' });
     }
 
     const existingUser = await UserModel.get(phone);
@@ -80,6 +76,7 @@ authController.register = async (req, res) => {
                 username: phone,
                 phone: phone,
                 password: hash,
+                fullname: fullname,
             });
             res.status(200).json({ phone: newUser.phone });
 
@@ -109,12 +106,9 @@ authController.login = async (req, res) => {
     bcrypt.compare(password, user.password, async (err, result) => {
         if (result) {
             const data = {
-                phone: user.phone,
-                username: user.username,
                 fullname: user.fullname,
                 urlavatar: user.urlavatar,
                 birthday: user.birthday,
-                friendList: user.friendList,
                 createdAt: user.createdAt,
             }
 
@@ -123,17 +117,20 @@ authController.login = async (req, res) => {
                 
                 const JWT_SECRET = process.env.JWT_SECRET;
                 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH;
-                const token = jwt.sign(data, JWT_SECRET, { expiresIn: '30m' });
-                const refreshToken = jwt.sign(data, JWT_REFRESH_SECRET, { expiresIn: '1d' });
+                const token = jwt.sign({ phone: user.phone }, JWT_SECRET, { expiresIn: '30m' });
+                const refreshToken = jwt.sign({ phone: user.phone }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
 
                 // store token in redis
                 redisClient.setEx(user.phone, 1800, token);
                 redisClient.setEx(`${user.phone}-refresh`, 86400, refreshToken);
+                
+                user.isLoggedin = true;
 
                 return res.status(200).json({ 
                     message: 'Đăng nhập thành công', 
                     accessToken: token,
                     refreshToken: refreshToken, 
+                    user: data,
                 });
             }
 
@@ -170,13 +167,25 @@ authController.refreshToken = async (req, res) => {
 };
 
 authController.logout = async (req, res) => {
-    const { phone } = req.body;
     const { authorization } = req.headers;
 
     // check if user still login
     if (!authorization) {
         return res.status(401).json({ message: 'Authorization missed' });
     }
+
+    const token = authorization.split(' ')[1];
+    
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const phone = decoded.phone;
+        const user = await UserModel.get(phone);
+
+        if (!user) {
+            return res.status(404).json({ message: 'Người dùng không tồn tại' });
+        }
+
+        user.isLoggedin = false;
 
     // remove token from redis
     await redisClient.del(phone);
@@ -185,6 +194,9 @@ authController.logout = async (req, res) => {
     await redisClient.del(`${phone}-refresh`);
 
     res.status(200).json({ message: 'Bạn đã đăng xuất' });
+    } catch (err) {
+        return res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn' });
+    }
 };
 
 authController.generateQR = async (req, res, io, socket) => {
