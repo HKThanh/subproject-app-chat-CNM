@@ -186,14 +186,14 @@ authController.logout = async (req, res) => {
         }
 
         user.isLoggedin = false;
-
-    // remove token from redis
-    await redisClient.del(phone);
-
-    // remove refresh token from redis
-    await redisClient.del(`${phone}-refresh`);
-
-    res.status(200).json({ message: 'Bạn đã đăng xuất' });
+    
+        // remove token from redis
+        await redisClient.del(phone);
+    
+        // remove refresh token from redis
+        await redisClient.del(`${phone}-refresh`);
+    
+        res.status(200).json({ message: 'Bạn đã đăng xuất' });
     } catch (err) {
         return res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn' });
     }
