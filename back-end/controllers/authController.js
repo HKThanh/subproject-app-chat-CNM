@@ -135,12 +135,6 @@ authController.login = async (req, res) => {
             }
 
             const testToken = await redisClient.get(user.phone);
-
-            if (testToken === authorization.split(' ')[1]) {
-                return res.status(401).json({ message: 'Bạn đã đăng nhập' });
-            }
-
-            
         } else {
             res.status(400).json({ message: 'Nhập sai mật khẩu' });
         }
