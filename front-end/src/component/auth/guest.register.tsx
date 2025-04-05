@@ -8,6 +8,9 @@ import { Eye, EyeOff, Github, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Toaster, toast } from "sonner";
 import * as z from "zod";
+
+import { signUpUser } from "@/actions/authActions";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -15,14 +18,16 @@ import {
   FormControl,
   FormField,
   FormItem,
-  FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
 const formSchema = z.object({
-  sdt: z.string()
+  name: z.string().min(2, {
+    message: "Họ tên phải có ít nhất 2 ký tự.",
+  }),
+  phone: z.string()
     .min(10, { message: "Số điện thoại không hợp lệ" })
     .max(11, { message: "Số điện thoại không hợp lệ" })
     .regex(/^(0|84|\+84)(3[2-9]|5[689]|7[06-9]|8[1-9]|9[0-9])[0-9]{7}$/, {
@@ -33,7 +38,7 @@ const formSchema = z.object({
   }),
 });
 
-export default function LoginForm() {
+export default function RegisterForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +47,8 @@ export default function LoginForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      sdt: "",
+      name: "",
+      phone: "",
       password: "",
     },
   });
@@ -50,8 +56,31 @@ export default function LoginForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     setError(null);
+    const { phone, password, name } = values;
+    console.log("Check values>>>> ", values);
 
-    const { sdt, password } = values;
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate a delay
+      const result = await signUpUser(phone, password, name);
+      console.log("Check result>>> ", result);
+
+      toast.success("Đăng ký thành công!");
+      if (result.error) {
+        console.log("Login error>>> ", result.message);
+        toast.error(result.message);
+        setError(result.message);
+      } else if (result.success) {
+        if (result.redirectTo) {
+          router.push(result.redirectTo);
+        }
+      }
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      setError("Đã xảy ra lỗi không xác định. Vui lòng thử lại sau.");
+      toast.error("An unexpected error occurred. Please try again later.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   const togglePasswordVisibility = () => {
@@ -62,23 +91,40 @@ export default function LoginForm() {
     <div className="min-h-screen flex items-center justify-center p-6 relative">
       <Toaster richColors position="top-right" />
       <Card className="w-full max-w-md bg-white/30 backdrop-blur-sm rounded-xl shadow-lg border-white/50">
-        <CardHeader className="text-center">
+        <CardHeader className="text-center pt-8 pb-2">
           <h2 className="text-2xl font-bold text-gray-800">
-            WeChat - kết nối ngay!
+            Edu Forge – Mở cửa tri thức{"\n"}ghi danh ngay!
           </h2>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 pb-8">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
               <FormField
                 control={form.control}
-                name="sdt"
+                name="name"
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
                       <Input
-                        placeholder="Nhập số điện thoại"
+                        placeholder="Full Name"
                         className="rounded-full h-12 px-4 border-white/50 bg-white/50 backdrop-blur-sm focus:bg-white/70 transition-all"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter phone"
+                        type="phone"
+                        className="rounded-full h-12 px-4 border-input"
                         {...field}
                       />
                     </FormControl>
@@ -95,8 +141,8 @@ export default function LoginForm() {
                       <div className="relative">
                         <Input
                           type={showPassword ? "text" : "password"}
-                          placeholder="Passcode"
-                          className="rounded-full h-12 px-4 border-white/50 bg-white/50 backdrop-blur-sm focus:bg-white/70 transition-all pr-10"
+                          placeholder="Create Password"
+                          className="rounded-full h-12 px-4 border-input pr-10"
                           {...field}
                         />
                         <Button
@@ -117,28 +163,10 @@ export default function LoginForm() {
                         </Button>
                       </div>
                     </FormControl>
-                    <FormMessage>
-                      <a
-                        href="#"
-                        className="ml-auto text-sm underline-offset-2 hover:underline text-gray-700"
-                      >
-                        Forgot your password?
-                      </a>
-                    </FormMessage>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
-              {/* <div className="text-center">
-                <Button
-                  variant="link"
-                  className="text-sm text-muted-foreground p-0 h-auto"
-                >
-                  Having trouble in sign in?
-                </Button>
-              </div> */}
-              {error && (
-                <p className="text-destructive text-sm text-center">{error}</p>
-              )}
               <Button
                 type="submit"
                 className="w-full h-12 rounded-full bg-orange-500/80 hover:bg-orange-500 text-white backdrop-blur-sm transition-all"
@@ -147,8 +175,11 @@ export default function LoginForm() {
                 {isLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                Đăng nhập
+                Create Account
               </Button>
+              {error && (
+                <p className="text-destructive text-sm text-center">{error}</p>
+              )}
             </form>
           </Form>
 
@@ -158,7 +189,7 @@ export default function LoginForm() {
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-white/30 backdrop-blur-sm px-2 text-gray-700">
-                Or continue with
+                Or Sign up with
               </span>
             </div>
           </div>
@@ -166,10 +197,8 @@ export default function LoginForm() {
           <div className="grid grid-cols-3 gap-3">
             <Button
               variant="outline"
-              className="rounded-lg h-12 border-white/50 bg-white/30 hover:bg-white/50 backdrop-blur-sm transition-all"
-              onClick={() => {
-                toast.info("Google login coming soon");
-              }}
+              className="rounded-lg border-white/50 bg-white/30 hover:bg-white/50 backdrop-blur-sm transition-all"
+              onClick={() => toast.info("Google sign up coming soon")}
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
@@ -192,10 +221,10 @@ export default function LoginForm() {
             </Button>
             <Button
               variant="outline"
-              className="rounded-lg h-12 border-input hover:bg-main-50"
+              className="rounded-md border-input hover:bg-main-50"
               onClick={() => {
                 // Add Facebook OAuth logic
-                toast.info("Facebook login coming soon");
+                toast.info("Facebook sign up coming soon");
               }}
             >
               <svg className="w-5 h-5" fill="#1877F2" viewBox="0 0 24 24">
@@ -204,24 +233,24 @@ export default function LoginForm() {
             </Button>
             <Button
               variant="outline"
-              className="rounded-lg h-12 border-input hover:bg-main-50"
+              className="rounded-md border-input hover:bg-main-50"
               onClick={() => {
                 // Add GitHub OAuth logic
-                toast.info("GitHub login coming soon");
+                toast.info("GitHub sign up coming soon");
               }}
             >
               <Github className="w-5 h-5" />
             </Button>
           </div>
-          {/* Add the new account request section */}
-          <div className="mt-8 text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
+
+          <div className="mt-8 text-center text-sm text-gray-700">
+            Already have an account?{" "}
             <Button
               variant="link"
-              className="p-0 h-auto font-semibold text-main-900 hover:text-main-800"
-              onClick={() => router.push("/auth/register")}
+              className="p-0 h-auto font-semibold text-orange-600 hover:text-orange-700"
+              onClick={() => router.push("/auth/login")}
             >
-              Request Now
+              Sign in
             </Button>
           </div>
         </CardContent>
