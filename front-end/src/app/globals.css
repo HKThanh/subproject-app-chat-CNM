@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -115,8 +117,22 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    --font-sans: "Inter", system-ui;
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+@layer components {
+  /* Add your custom component classes here */
+  .btn-primary {
+    @apply px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700;
+  }
+}
+
+@layer utilities {
+  /* Add your custom utility classes here */
+  .text-balance {
+    text-wrap: balance;
   }
 }

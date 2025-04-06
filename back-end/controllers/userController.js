@@ -76,15 +76,15 @@ userController.verifyOTP = async (req, res) => {
 };
 
 userController.register = async (req, res) => {
-    const { phone, password, repassword } = req.body;
+    const { phone, password, fullname } = req.body;
 
     if (!phone || !password) {
         return res.status(400).json({ message: 'Hãy nhập cả số điện thoại và mật khẩu' });
     }
 
-    if (password !== repassword) {
-        return res.status(400).json({ message: 'Nhập lại sai mật khẩu' });
-    }
+    // if (password !== repassword) {
+    //     return res.status(400).json({ message: 'Nhập lại sai mật khẩu' });
+    // }
 
     const existingUser = await UserModel.get(phone);
     if (existingUser) {
@@ -97,6 +97,7 @@ userController.register = async (req, res) => {
                 id: uuidv4(),
                 username: phone,
                 phone: phone,
+                fullname: fullname,
                 password: hash,
             });
             res.status(200).json({ phone: newUser.phone });
@@ -132,6 +133,13 @@ userController.login = async (req, res) => {
                 message: 'Login successful', 
                 accessToken: token,
                 refreshToken: refreshToken, 
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    phone: user.phone,
+                    fullname: user.fullname,
+                    
+                }
             });
         } else {
             res.status(400).json({ message: 'Nhập sai password' });

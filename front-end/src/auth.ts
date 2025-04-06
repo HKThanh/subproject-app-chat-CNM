@@ -50,7 +50,6 @@ export const {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({ phone, password }),
-                        credentials: 'include',
                     }).then(res => res.json());
                     console.log("Authorize response:", response);
                 } catch (error) {
@@ -89,36 +88,32 @@ export const {
     },
     session: {
         strategy: "jwt",
+        maxAge: 30 * 24 * 60 * 60, // 30 days
     },
     callbacks: {
         async jwt({ token, user }: { token: any; user: any }) {
             if (user) {
-                // Cập nhật token với thông tin user theo interface IUser
-                token.id = user.id;
-                token.username = user.username;
-                token.phone = user.phone;
-                token.fullname = user.fullname;
-                // Lưu accessToken riêng, không nằm trong interface IUser
-                token.accessToken = user.accessToken;
+                // Store complete user object in token
+                return {
+                    ...token,
+                    ...user,
+                    accessToken: user.accessToken
+                };
             }
             return token;
         },
-        async session({ session, token }: { session: any; token: any }) {
-            // Cập nhật session.user theo interface IUser
-            session.user = {
-                id: token.id,
-                username: token.username,
-                phone: token.phone,
-                fullname: token.fullname,
-                session: token.session,
+        async session({ session, token }) {
+            // Ensure all user data is passed to the session
+            return {
+                ...session,
+                user: {
+                    id: token.id,
+                    username: token.username,
+                    phone: token.phone,
+                    fullname: token.fullname,
+                },
+                accessToken: token.accessToken
             };
-            // Lưu accessToken ở cấp session, không phải trong user
-            session.accessToken = token.accessToken;
-            return session;
-        },
-        authorized: async ({ auth }) => {
-            // Logged in users are authenticated, otherwise redirect to login page
-            return !!auth;
         },
     },
     secret: process.env.AUTH_SECRET,

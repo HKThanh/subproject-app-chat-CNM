@@ -9,7 +9,15 @@ const connectDB = require("./config/connectMongo");
 const authRoutes = require("./routes/authRoute");
 const userRoutes = require("./routes/userRoute");
 
-app.use(cors());
+// const corsOptions = {
+//     origin: ['http://localhost:3000', 'http://localhost:3001'], // Add your frontend URLs
+//     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+//     allowedHeaders: ['Content-Type', 'Authorization'],
+//     credentials: true,
+//     optionsSuccessStatus: 200
+// };
+
+// app.use(cors(corsOptions));
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
