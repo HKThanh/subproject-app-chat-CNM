@@ -10,11 +10,12 @@ router.get("/get-all", authMiddleware, userController.getAllUsers)
 router.get("/:phone", authMiddleware, userController.getUserByPhone)
 router.put(
   "/:phone/avatar/upload",
+  authMiddleware,
   fileService.uploadAvatar.single("avatar"),
   fileService.processAvatar,
   userController.updateAvatar,
 )
 
-router.put("/:phone/profile", userController.updateProfile)
+router.put("/:phone/profile", authMiddleware, userController.updateProfile)
 
 module.exports = router
