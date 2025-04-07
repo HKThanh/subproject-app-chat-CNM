@@ -64,6 +64,14 @@ const UserSchema = new Schema({
         type: String,
         default: generateBirthdate,
     },
+    bio: {
+        type: String,
+        default: "",
+    },
+    coverPhoto: {
+        type: String,
+        default: "",
+    },
     friendList: {
         type: Array,
         schema: [String],
