@@ -132,9 +132,19 @@ authController.login = async (req, res) => {
                     refreshToken: refreshToken, 
                     user: data,
                 });
+            } else {
+                const decoded = jwt.verify(tokenInRedis, JWT_SECRET);
+                if (decoded.phone === phone) {
+                    return res.status(200).json({ 
+                        message: 'Đăng nhập thành công', 
+                        accessToken: tokenInRedis,
+                        refreshToken: tokenInRedis, 
+                        user: data,
+                    });
+                } else {
+                    return res.status(400).json({ message: 'Người dùng không tồn tại' });
+                }
             }
-
-            const testToken = await redisClient.get(user.phone);
         } else {
             res.status(400).json({ message: 'Nhập sai mật khẩu' });
         }
