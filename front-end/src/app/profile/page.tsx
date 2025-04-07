@@ -1,16 +1,9 @@
-"use client";
-
-import useUserStore from "@/stores/useUserStoree";
+import ProfileModal from "@/component/user/profile-modal";
 
 export default function TestUserStore() {
-  const user = useUserStore((state) => state.user);
-  const accessToken = useUserStore((state) => state.accessToken);
-
   return (
-    <div>
-      <pre>
-        {JSON.stringify({ user, accessToken }, null, 2)}
-      </pre>
+    <div className="flex min-h-screen flex-col items-center justify-center p-24">
+    <ProfileModal />
     </div>
   );
 }
