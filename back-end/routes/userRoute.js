@@ -18,4 +18,11 @@ router.put(
 
 router.put("/:phone/profile", authMiddleware, userController.updateProfile)
 
+router.post("/send", authMiddleware, userController.sendFriendRequest);
+
+router.post("/handle", authMiddleware, userController.handleFriendRequest);
+
+// Lấy tất cả lời mời đang chờ của người dùng đang đăng nhập
+router.get("/pending", authMiddleware, userController.getAllFriendRequests);
+
 module.exports = router

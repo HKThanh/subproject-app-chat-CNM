@@ -6,6 +6,7 @@ const { v4: uuidv4 } = require("uuid")
 const qrcode = require("qrcode")
 
 const UserModel = require("../models/UserModel")
+const FriendRequestModel = require("../models/FriendRequestModel")
 const redisClient = require("../services/redisClient")
 const { generateOTP, sendOTP } = require("../services/otpServices")
 const fileService = require("../services/fileService")
@@ -140,5 +141,99 @@ userController.updateProfile = async (req, res) => {
     return res.status(500).json({ message: "Lỗi khi cập nhật thông tin" })
   }
 }
+
+userController.sendFriendRequest = async (req, res) => {
+  const senderId = req.user.phone;
+  const { receiverId } = req.body;
+
+  if (senderId === receiverId) {
+    return res.status(400).json({ code: -2, message: "Gửi cho bản thân làm gì" });
+  }
+
+  const existing = await FriendRequestModel.findOne({ senderId, receiverId });
+
+  // const existing = await FriendRequestModel.scan({
+  //   senderId,
+  //   receiverId,
+  // }).exec();
+
+  // if (existing.length > 0) {
+  //   if (existing[0].status === "ACCEPTED") {
+  //     return res.json({ code: 2, message: "Already friends" });
+  //   }
+  //   return res.json({ code: 0, message: "Request already sent" });
+  // }
+
+  // const newRequest = new FriendRequestModel({
+  //   id: uuidv4(),
+  //   senderId,
+  //   receiverId,
+  //   status: "PENDING",
+  // });
+
+  // await newRequest.save();
+
+  if (existing) {
+    if (existing.status === "ACCEPTED") {
+      return res.json({ code: 2, message: "Hai bạn đã kết bạn" });
+    }
+    return res.json({ code: 0, message: "Yêu cầu đã được gửi" });
+  }
+
+  await FriendRequestModel.create({ senderId, receiverId, status: "PENDING" });
+  return res.json({ code: 1, message: "Request sent", data: { senderId, receiverId } });
+};
+
+userController.handleFriendRequest = async (req, res) => {
+  const { id, type } = req.body;
+
+  // const requests = await FriendRequestModel.scan({ id, status: "PENDING" }).exec();
+  // if (requests.length === 0) {
+  //   return res.json({ code: 0, message: "Không tìm thấy yêu cầu kết bạn" });
+  // }
+
+  // const request = requests[0];
+
+  const request = await FriendRequestModel.findOne({ id: id, status: "PENDING" });
+  if (!request) return res.json({ code: 0, message: "Không tìm thấy yêu cầu kết bạn" });
+
+  request.status = type;
+  await request.save();
+
+  if (type === "ACCEPTED") {
+    await this.addToFriendList(request.senderId, request.receiverId);
+  }
+
+  return res.json({ code: 1, message: `Friend request ${type.toLowerCase()} successfully` });
+};
+
+userController.addToFriendList = async (senderId, receiverId) => {
+  const sender = await UserModel.get(senderId);
+  const receiver = await UserModel.get(receiverId);
+
+  sender.friendList = sender.friendList || [];
+  receiver.friendList = receiver.friendList || [];
+
+  if (!sender.friendList.includes(receiverId)) {
+    sender.friendList.push(receiverId);
+  }
+  if (!receiver.friendList.includes(senderId)) {
+    receiver.friendList.push(senderId);
+  }
+
+  await Promise.all([sender.save(), receiver.save()]);
+};
+
+userController.getAllFriendRequests = async (req, res) => {
+  const receiverId = req.user.phone;
+  const requests = await FriendRequestModel.find({ receiverId, status: "PENDING" });
+  // const requests = await FriendRequestModel.scan({ receiverId, status: "PENDING" }).exec();
+
+  for (let req of requests) {
+    req.sender = await User.findById(req.senderId);
+  }
+
+  res.json(requests);
+};
 
 module.exports = userController

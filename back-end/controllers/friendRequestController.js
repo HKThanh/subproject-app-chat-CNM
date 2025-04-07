@@ -17,11 +17,10 @@ FriendRequestController.checkRequestExists = async (req, res) => {
         });
     }
 
-    const token = authorization.split(" ")[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const phone = decoded.phone;
-    const user = await UserModel.get(phone);
-    const senderId = user.id;
+    const senderId = req.user.phone;
+
+    console.log(senderId);
+    
 
     try {
         // const request = await FriendRequestModel.scan({
