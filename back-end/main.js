@@ -10,6 +10,7 @@ const { Server } = require("socket.io");
 const authController = require("./controllers/authController")
 const authRoutes = require("./routes/authRoute");
 const userRoutes = require("./routes/userRoute");
+const friendRequestRoutes = require("./routes/friendRequestRoute");
 
 app.use(cors());
 app.use(express.json());
@@ -28,6 +29,8 @@ const io = new Server(server, {
 app.use(express.json());
 app.use("/auth", authRoutes);
 app.use("/user", userRoutes);
+app.use("/friend-request", friendRequestRoutes);
+
 
 io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);

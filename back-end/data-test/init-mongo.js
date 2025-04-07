@@ -74,3 +74,31 @@ db.users.insertMany([
         "updatedAt": "2025-04-02T14:20:00Z"
     }
 ])
+
+db.createCollection("friendrequests");
+db.friendrequests.insertMany([
+    {
+        "id": "request001",
+        "senderId": "user001",
+        "receiverId": "user002",
+        "status": "PENDING",
+        "createdAt": "2025-04-02T10:00:00Z",
+        "updatedAt": "2025-04-02T10:00:00Z"
+    },
+    {
+        "id": "request002",
+        "senderId": "user002",
+        "receiverId": "user003",
+        "status": "ACCEPTED",
+        "createdAt": "2025-04-02T12:30:00Z",
+        "updatedAt": "2025-04-02T12:30:00Z"
+    },
+    {
+        "id": "request003",
+        "senderId": "user003",
+        "receiverId": "user004",
+        "status": "DECLINED",
+        "createdAt": "2025-04-02T15:15:00Z",
+        "updatedAt": "2025-04-02T15:15:00Z"
+    }
+])
