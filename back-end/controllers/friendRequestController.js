@@ -1,9 +1,28 @@
 const FriendRequestModel = require("../models/FriendRequestModel");
+const UserModel = require("../models/UserModel");
+const jwt = require('jsonwebtoken');
+const { JWT_SECRET, JWT_REFRESH } = process.env;
 
 const FriendRequestController = {}
 
 FriendRequestController.checkRequestExists = async (req, res) => {
-    const { senderId, receiverId } = req.body;
+    const { receiverId } = req.body;
+
+    const { authorization } = req.headers;
+
+    if (!authorization) {
+        return res.status(401).json({
+            code: 1,
+            message: "Unauthorized",
+        });
+    }
+
+    const token = authorization.split(" ")[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const phone = decoded.phone;
+    const user = await UserModel.get(phone);
+    const senderId = user.id;
+
     try {
         // const request = await FriendRequestModel.scan({
         //     senderId: receiverId,

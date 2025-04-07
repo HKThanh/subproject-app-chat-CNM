@@ -72,7 +72,7 @@ authController.register = async (req, res) => {
     bcrypt.hash(password, 10).then(async (hash) => {
         try {
             const newUser = await UserModel.create({
-                id: uuidv4(),
+                id: phone,
                 username: phone,
                 phone: phone,
                 password: hash,

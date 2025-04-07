@@ -4,7 +4,7 @@ db.createCollection("users");
 
 db.users.insertMany([
     {
-        "id": "user001",
+        "id": "0912345678",
         "username": "0912345678",
         "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
         "fullname": "John Doe",
@@ -18,7 +18,7 @@ db.users.insertMany([
         "updatedAt": "2025-04-02T10:00:00Z"
     },
     {
-        "id": "user002",
+        "id": "0987654321",
         "username": "0987654321",
         "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
         "fullname": "Jane Doe",
@@ -32,7 +32,7 @@ db.users.insertMany([
         "updatedAt": "2025-04-02T12:30:00Z"
     },
     {
-        "id": "user003",
+        "id": "0933445566",
         "username": "0933445566",
         "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
         "fullname": "Bob Smith",
@@ -46,7 +46,7 @@ db.users.insertMany([
         "updatedAt": "2025-04-02T15:15:00Z"
     },
     {
-        "id": "user004",
+        "id": "0977889900",
         "username": "0977889900",
         "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
         "fullname": "Alice Wong",
@@ -60,7 +60,7 @@ db.users.insertMany([
         "updatedAt": "2025-04-02T09:45:00Z"
     },
     {
-        "id": "user005",
+        "id": "0944556677",
         "username": "0944556677",
         "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
         "fullname": "Mike Brown",
