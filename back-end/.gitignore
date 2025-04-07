@@ -49,4 +49,11 @@ socket.io.js.map
 *.tmp
 temp/
 
+
 data-test/mongodb
+
+# Postman files
+postman/*.json
+*.postman_collection.json
+*.postman_environment.json
+
