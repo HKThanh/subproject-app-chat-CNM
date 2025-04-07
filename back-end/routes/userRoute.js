@@ -6,23 +6,23 @@ const userController = require("../controllers/userController")
 const authMiddleware = require("../middlewares/authMiddleware")
 const fileService = require("../services/fileService")
 
-router.get("/get-all", authMiddleware, userController.getAllUsers)
-router.get("/:phone", authMiddleware, userController.getUserByPhone)
+router.get("/get-all", authMiddleware, userController.getAllUsers);
+router.get("/:phone", authMiddleware, userController.getUserByPhone);
+router.post("/friend-requests", authMiddleware, userController.getAllFriendRequests);
+
 router.put(
   "/:phone/avatar/upload",
   authMiddleware,
   fileService.uploadAvatar.single("avatar"),
   fileService.processAvatar,
   userController.updateAvatar,
-)
+);
 
-router.put("/:phone/profile", authMiddleware, userController.updateProfile)
+router.put("/:phone/profile", authMiddleware, userController.updateProfile);
 
 router.post("/send", authMiddleware, userController.sendFriendRequest);
 
 router.post("/handle", authMiddleware, userController.handleFriendRequest);
 
-// Lấy tất cả lời mời đang chờ của người dùng đang đăng nhập
-router.get("/pending", authMiddleware, userController.getAllFriendRequests);
 
-module.exports = router
+module.exports = router;

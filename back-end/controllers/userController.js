@@ -201,7 +201,12 @@ userController.handleFriendRequest = async (req, res) => {
   await request.save();
 
   if (type === "ACCEPTED") {
-    await this.addToFriendList(request.senderId, request.receiverId);
+    await userController.addToFriendList(request.senderId, request.receiverId);
+  }
+
+  if (type === "DECLINED") {
+    await FriendRequestModel.updateOne({ id: id }, { status: "DECLINED" });
+    // await FriendRequestModel.update({ id: id }, { status: "DECLINED" }).exec();
   }
 
   return res.json({ code: 1, message: `Friend request ${type.toLowerCase()} successfully` });
@@ -225,15 +230,20 @@ userController.addToFriendList = async (senderId, receiverId) => {
 };
 
 userController.getAllFriendRequests = async (req, res) => {
-  const receiverId = req.user.phone;
-  const requests = await FriendRequestModel.find({ receiverId, status: "PENDING" });
-  // const requests = await FriendRequestModel.scan({ receiverId, status: "PENDING" }).exec();
-
-  for (let req of requests) {
-    req.sender = await User.findById(req.senderId);
+  try {
+    const phone = req.user.phone
+    const friendRequests = await FriendRequestModel.find({ receiverId: phone, status: "PENDING" })
+    const requestsWithSenderInfo = await Promise.all(
+      friendRequests.map(async (request) => {
+        const sender = await UserModel.get(request.senderId)
+        return { ...request.toObject(), sender }
+      }),
+    )
+    res.status(200).json(requestsWithSenderInfo)
+  } catch (error) {
+    console.error("Error fetching friend requests:", error)
+    res.status(500).json({ message: "Failed to fetch friend requests" })
   }
-
-  res.json(requests);
 };
 
 module.exports = userController
