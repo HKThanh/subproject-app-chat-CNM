@@ -14,7 +14,7 @@ const authController = {};
 const pendingLogins = new Map();
 
 authController.requestOTP = async (req, res) => {
-    const { phone } = req.body;
+    const { phone, email } = req.body;
 
     if (!phone) {
         return res.status(400).json({ message: 'Hãy nhập số điện thoại' });
@@ -28,7 +28,7 @@ authController.requestOTP = async (req, res) => {
     const otp = generateOTP();
 
     try {
-        await sendOTP(phone, otp);
+        await sendOTP(email, otp);
         await redisClient.setEx(phone, 300, JSON.stringify({ otp }));
         res.status(200).json({ message: 'OTP sent successfully', otp: otp });
     } catch (error) {
