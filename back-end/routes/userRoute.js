@@ -15,8 +15,14 @@ router.put(
   fileService.processAvatar,
   userController.updateAvatar
 );
-router.put("/:phone/profile", authMiddleware, userController.updateProfile);
-router.put("/:phone/bio", authMiddleware, userController.updateBio);
-router.put("/:phone/cover", authMiddleware, userController.updateCoverPhoto); 
+router.put("/:phone/profile", authMiddleware, userController.updateProfile); 
+router.put("/:phone/bio", userController.updateBio);
+router.put(
+  "/:phone/cover/upload",
+  authMiddleware,
+  fileService.uploadAvatar.single("coverPhoto"),
+  fileService.processAvatar,
+  userController.updateCoverPhoto
+);
 
 module.exports = router;
