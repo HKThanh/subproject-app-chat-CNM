@@ -1,9 +1,11 @@
 require('dotenv').config();
-const UserModel = require('../models/UserModel');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = process.env;
 const { v4: uuidv4 } = require("uuid");
+const qrcode = require('qrcode');
+
+const UserModel = require('../models/UserModel');
 const redisClient = require('../services/redisClient');
 const { generateOTP, sendOTP } = require('../services/otpServices');
 
@@ -31,9 +33,10 @@ userController.getUserByPhone = async (req, res) => {
     }
 };
 
-userController.requestOTP = async (req, res) => {
-    const { phone } = req.body;
+userController.updatePassword = async (req, res) => {
+    const { phone, oldpassword, repassword, newPassword } = req.body;
 
+<<<<<<< HEAD
     if (!phone) {
         return res.status(400).json({ message: 'Hãy nhập số điện thoại' });
     }
@@ -116,13 +119,19 @@ userController.login = async (req, res) => {
 
     if (!phone || !password) {
         return res.status(400).json({ message: 'Hãy nhập cả sdt và mật khẩu' });
+=======
+    if (!oldpassword || !repassword || !newPassword) {
+        return res.status(400).json({ message: 'Hãy nhập cả mật khẩu cũ và mới' });
+>>>>>>> origin/main
     }
 
     const user = await UserModel.get(phone);
-    if (!user) {
-        return res.status(400).json({ message: 'User not found' });
+
+    if (oldpassword !== user.password) {
+        return res.status(400).json({ message: 'Sai mật khẩu cũ' });
     }
 
+<<<<<<< HEAD
     bcrypt.compare(password, user.password, (err, result) => {
         if (result) {
             const JWT_SECRET = process.env.JWT_SECRET;
@@ -143,45 +152,23 @@ userController.login = async (req, res) => {
             });
         } else {
             res.status(400).json({ message: 'Nhập sai password' });
+=======
+    if (newPassword !== repassword) {
+        return res.status(400).json({ message: 'Nhập lại sai mật khẩu' });
+    }
+
+    bcrypt.hash(newPassword, 10).then(async (hash) => {
+        try {
+            user.password = hash;
+            // update password using mongoose
+            user.save();
+            res.status(200).json({ message: 'Cập nhật mật khẩu thành công' });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Cập nhật mật khẩu thất bại' });
+>>>>>>> origin/main
         }
     });
-};
-
-userController.refreshToken = async (req, res) => {
-    const { refreshToken } = req.body;
-
-    if (!refreshToken) {
-        return res.status(400).json({ message: 'Refresh token is required' });
-    }
-
-    const JWT_REFRESH_SECRET = process.env.JWT_REFRESH;
-
-    jwt.verify(refreshToken, JWT_REFRESH_SECRET, (err, user) => {
-        if (err) {
-            return res.status(403).json({ message: 'Invalid refresh token' });
-        }
-
-        const token = jwt.sign({ phone: user.phone }, JWT_SECRET, { expiresIn: '1h' });
-        res.status(200).json({ accessToken: token });
-    });
-};
-
-userController.logout = async (req, res) => {
-    const { phone } = req.body;
-    const { authorization } = req.headers;
-
-    if (!authorization) {
-        return res.status(401).json({ message: 'Bạn đã hết phiên đăng nhập' });
-    }
-
-    const token = authorization.split(' ')[1];
-    const decoded = jwt.decode(token);
-
-    if (phone !== decoded.phone) {
-        return res.status(403).json({ message: 'Invalid phone number' });
-    }
-
-    res.status(200).json({ message: 'Bạn đã đăng xuất' });
-};
+}
 
 module.exports = userController;

@@ -48,3 +48,5 @@ socket.io.js.map
 # Temporary files
 *.tmp
 temp/
+
+data-test/mongodb
