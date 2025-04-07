@@ -98,4 +98,4 @@ db.users.insertMany([
         "createdAt": "2025-04-02T14:20:00Z",
         "updatedAt": "2025-04-02T14:20:00Z"
     }
-])
+]);
