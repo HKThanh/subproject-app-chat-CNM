@@ -1,174 +1,144 @@
-require('dotenv').config();
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const { JWT_SECRET } = process.env;
-const { v4: uuidv4 } = require("uuid");
-const qrcode = require('qrcode');
+require("dotenv").config()
+const bcrypt = require("bcrypt")
+const jwt = require("jsonwebtoken")
+const { JWT_SECRET } = process.env
+const { v4: uuidv4 } = require("uuid")
+const qrcode = require("qrcode")
 
-const UserModel = require('../models/UserModel');
-const redisClient = require('../services/redisClient');
-const { generateOTP, sendOTP } = require('../services/otpServices');
+const UserModel = require("../models/UserModel")
+const redisClient = require("../services/redisClient")
+const { generateOTP, sendOTP } = require("../services/otpServices")
+const fileService = require("../services/fileService")
 
-const userController = {};
+const userController = {}
 
 userController.getAllUsers = async (req, res) => {
-    try {
-        const users = await UserModel.find();
-        res.status(200).json(users);
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to get users' });
-    }
-};
+  try {
+    const users = await UserModel.find()
+    res.status(200).json(users)
+  } catch (error) {
+    res.status(500).json({ message: "Failed to get users" })
+  }
+}
 
 userController.getUserByPhone = async (req, res) => {
-    const { phone } = req.params;
-    try {
-        const user = await UserModel.get(phone);
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-        res.status(200).json(user);
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to get user' });
+  const { phone } = req.params
+  try {
+    const user = await UserModel.get(phone)
+    if (!user) {
+      return res.status(404).json({ message: "User not found" })
     }
-};
+    res.status(200).json(user)
+  } catch (error) {
+    res.status(500).json({ message: "Failed to get user" })
+  }
+}
 
 userController.updatePassword = async (req, res) => {
-    const { phone, oldpassword, repassword, newPassword } = req.body;
+  const { phone, oldpassword, repassword, newPassword } = req.body
 
-<<<<<<< HEAD
-    if (!phone) {
-        return res.status(400).json({ message: 'Hãy nhập số điện thoại' });
-    }
+  if (!oldpassword || !repassword || !newPassword) {
+    return res.status(400).json({ message: "Hãy nhập cả mật khẩu cũ và mới" })
+  }
 
-    const existingUser = await UserModel.get(phone);
-    if (existingUser) {
-        return res.status(400).json({ message: 'Số điện thoại đã tồn tại' });
-    }
+  const user = await UserModel.get(phone)
 
-    const otp = generateOTP();
+  if (oldpassword !== user.password) {
+    return res.status(400).json({ message: "Sai mật khẩu cũ" })
+  }
 
+  if (newPassword !== repassword) {
+    return res.status(400).json({ message: "Nhập lại sai mật khẩu" })
+  }
+
+  bcrypt.hash(newPassword, 10).then(async (hash) => {
     try {
-        await sendOTP(phone, otp);
-        await redisClient.setEx(phone, 300, JSON.stringify({ otp }));
-        res.status(200).json({ message: 'OTP sent successfully', otp: otp });
+      user.password = hash
+      // update password using mongoose
+      user.save()
+      res.status(200).json({ message: "Cập nhật mật khẩu thành công" })
     } catch (error) {
-        res.status(500).json({ message: 'Failed to send OTP' });
+      console.error(error)
+      res.status(500).json({ message: "Cập nhật mật khẩu thất bại" })
     }
+  })
 }
 
-userController.verifyOTP = async (req, res) => {
-    const { phone, otp } = req.body;
+userController.updateAvatar = async (req, res) => {
+    try {
+      const { phone } = req.params
+      const { urlavatar } = req.body
+      
+      if (!urlavatar) {
+        return res.status(400).json({ message: "URL avatar không được để trống" })
+      }
+  
+      const user = await UserModel.get(phone)
+  
+      if (!user) {
+        return res.status(404).json({ message: "Không tìm thấy người dùng" })
+      }
+  
+      // Cập nhật avatar và thời gian cập nhật
+      user.urlavatar = urlavatar
+      user.updatedAt = new Date()
+  
+      await user.save()
+  
+      return res.status(200).json({
+        message: "Cập nhật avatar thành công",
+        user: {
+          id: user.id,
+          phone: user.phone,
+          urlavatar: user.urlavatar,
+        },
+      })
+    } catch (error) {
+      console.error("Error updating avatar:", error)
+      return res.status(500).json({ message: "Lỗi khi cập nhật avatar" })
+    }
+  }
 
-    if (!phone || !otp) {
-        return res.status(400).json({ message: 'Hãy nhập OTP' });
+userController.updateProfile = async (req, res) => {
+  try {
+    const { phone } = req.params
+    const { fullname, ismale, birthday } = req.body
+
+    // Validate input
+    if (!fullname && ismale === undefined && !birthday) {
+      return res.status(400).json({ message: "Cần cung cấp ít nhất một thông tin để cập nhật" })
     }
 
-    const storedData = await redisClient.get(phone);
+    const user = await UserModel.get(phone)
 
-    if (!storedData) {
-        return res.status(400).json({ message: 'OTP đã hết hạn' });
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" })
     }
 
-    const { otp: storedOtp } = JSON.parse(storedData);
-    if (storedOtp !== otp) {
-        return res.status(400).json({ message: 'Nhập sai OTP' });
-    }
+    // Update only allowed fields
+    if (fullname) user.fullname = fullname
+    if (ismale !== undefined) user.ismale = ismale
+    if (birthday) user.birthday = birthday
 
-    res.status(200).json({ message: 'OTP verified', phone: phone });
-};
+    // Update timestamp
+    user.updatedAt = new Date()
 
-userController.register = async (req, res) => {
-    const { phone, password, fullname } = req.body;
+    await user.save()
 
-    if (!phone || !password) {
-        return res.status(400).json({ message: 'Hãy nhập cả số điện thoại và mật khẩu' });
-    }
-
-    // if (password !== repassword) {
-    //     return res.status(400).json({ message: 'Nhập lại sai mật khẩu' });
-    // }
-
-    const existingUser = await UserModel.get(phone);
-    if (existingUser) {
-        return res.status(400).json({ message: 'Tài khoản đã có người đăng ký' });
-    }
-
-    bcrypt.hash(password, 10).then(async (hash) => {
-        try {
-            const newUser = await UserModel.create({
-                id: uuidv4(),
-                username: phone,
-                phone: phone,
-                fullname: fullname,
-                password: hash,
-            });
-            res.status(200).json({ phone: newUser.phone });
-
-            // delete OTP from redis
-            await redisClient.del(phone);
-        } catch (error) {
-            console.error(error);
-            res.status(500).json({ message: 'Failed to create user' });
-        }
-    });
-};
-
-userController.login = async (req, res) => {
-    const { phone, password } = req.body;
-
-    if (!phone || !password) {
-        return res.status(400).json({ message: 'Hãy nhập cả sdt và mật khẩu' });
-=======
-    if (!oldpassword || !repassword || !newPassword) {
-        return res.status(400).json({ message: 'Hãy nhập cả mật khẩu cũ và mới' });
->>>>>>> origin/main
-    }
-
-    const user = await UserModel.get(phone);
-
-    if (oldpassword !== user.password) {
-        return res.status(400).json({ message: 'Sai mật khẩu cũ' });
-    }
-
-<<<<<<< HEAD
-    bcrypt.compare(password, user.password, (err, result) => {
-        if (result) {
-            const JWT_SECRET = process.env.JWT_SECRET;
-            const JWT_REFRESH_SECRET = process.env.JWT_REFRESH;
-            const token = jwt.sign({ phone: user.phone }, JWT_SECRET, { expiresIn: '30m' });
-            const refreshToken = jwt.sign({ phone: user.phone }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
-            res.status(200).json({ 
-                message: 'Login successful', 
-                accessToken: token,
-                refreshToken: refreshToken, 
-                user: {
-                    id: user.id,
-                    username: user.username,
-                    phone: user.phone,
-                    fullname: user.fullname,
-                    
-                }
-            });
-        } else {
-            res.status(400).json({ message: 'Nhập sai password' });
-=======
-    if (newPassword !== repassword) {
-        return res.status(400).json({ message: 'Nhập lại sai mật khẩu' });
-    }
-
-    bcrypt.hash(newPassword, 10).then(async (hash) => {
-        try {
-            user.password = hash;
-            // update password using mongoose
-            user.save();
-            res.status(200).json({ message: 'Cập nhật mật khẩu thành công' });
-        } catch (error) {
-            console.error(error);
-            res.status(500).json({ message: 'Cập nhật mật khẩu thất bại' });
->>>>>>> origin/main
-        }
-    });
+    return res.status(200).json({
+      message: "Cập nhật thông tin thành công",
+      user: {
+        id: user.id,
+        fullname: user.fullname,
+        ismale: user.ismale,
+        birthday: user.birthday,
+        phone: user.phone
+      },
+    })
+  } catch (error) {
+    console.error("Error updating profile:", error)
+    return res.status(500).json({ message: "Lỗi khi cập nhật thông tin" })
+  }
 }
 
-module.exports = userController;
+module.exports = userController

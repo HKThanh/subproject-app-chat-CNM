@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import ProfileView from "./profile-view"
 import ProfileEdit from "./profile-edit"
@@ -33,7 +33,7 @@ export default function ProfileModal() {
     birthMonth: "03",
     birthYear: "2003",
     phone: "+84 327 410 155",
-    avatarUrl: "/placeholder.svg?height=100&width=100",
+    avatarUrl:"",
     coverUrl: "/placeholder.svg?height=200&width=500",
   })
 
@@ -57,6 +57,7 @@ export default function ProfileModal() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden">
+          <DialogTitle className="sr-only">Thông tin tài khoản</DialogTitle>
           <AnimatePresence mode="wait" initial={false}>
             {isEditing ? (
               <ProfileEdit
