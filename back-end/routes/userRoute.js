@@ -24,6 +24,8 @@ router.post("/send", authMiddleware, userController.sendFriendRequest);
 
 router.post("/handle", authMiddleware, userController.handleFriendRequest);
 
+router.post("/cancel/:receiverId", authMiddleware, userController.cancelFriendRequest);
+
 router.put("/:phone/profile", authMiddleware, userController.updateProfile); 
 router.put("/:phone/bio", userController.updateBio);
 router.put(

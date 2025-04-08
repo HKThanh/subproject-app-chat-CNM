@@ -242,7 +242,6 @@ userController.getAllFriendRequests = async (req, res) => {
   }
 };
 
-module.exports = userController
 userController.updateBio = async (req, res) => {
   try {
     const { phone } = req.params
@@ -310,5 +309,34 @@ userController.updateCoverPhoto = async (req, res) => {
     return res.status(500).json({ message: "Lỗi khi cập nhật cover photo" })
   }
 }
+
+userController.cancelFriendRequest = async (req, res) => {
+  const senderId = req.user.id;
+  const { receiverId } = req.params;
+  
+
+  try {
+    // const request = await FriendRequestModel.scan({
+    //   senderId,
+    //   receiverId,
+    //   status: "PENDING",
+    // }).exec();
+
+    const request = await FriendRequestModel.findOne({
+      senderId,
+      receiverId,
+      status: "PENDING",
+    })
+
+    // if (request.length === 0) {
+    //   return res.status(404).json({ message: "No pending request found" });
+    // }
+
+    await FriendRequestModel.delete(request[0].id);
+    return res.json({ message: "Friend request cancelled successfully" });
+  } catch (e) {
+    return res.status(500).json({ message: "Server error", error: e });
+  }
+};
 module.exports = userController
 
