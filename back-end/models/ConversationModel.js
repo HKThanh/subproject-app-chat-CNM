@@ -2,7 +2,7 @@ const dynamoose = require("dynamoose");
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
-const ConversationSchema = new Schema({
+const ConversationSchema = new dynamoose.Schema({
     idConversation: {
         type: String,
         hashKey: true,
@@ -36,6 +36,6 @@ const ConversationSchema = new Schema({
     }
 })
 
-const Conversation = mongoose.model("Conversation", ConversationSchema);
+const Conversation = dynamoose.model("Conversation", ConversationSchema);
 
 module.exports = Conversation;

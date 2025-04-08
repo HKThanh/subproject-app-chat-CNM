@@ -2,7 +2,7 @@ const dynamoose = require("dynamoose");
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
-const MessageSchema = new Schema({
+const MessageSchema = new dynamoose.Schema({
     idMessage: {
         type: String,
         required: true,
@@ -34,6 +34,6 @@ const MessageSchema = new Schema({
     },
 })
 
-const Message = dynamoose.model("MessageDetail", schema);
+const Message = dynamoose.model("MessageDetail", MessageSchema);
 
 module.exports = Message;
