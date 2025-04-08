@@ -1,4 +1,4 @@
-import RegisterForm from "@/component/auth/guest.register";
+import RegisterForm from "@/components/auth/guest.register";
 import { BackgroundLines } from "@/components/ui/background-lines";
 
 const Register = () => {

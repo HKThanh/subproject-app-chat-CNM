@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import Image from "next/image";
-import RotatingText from "../component/react-bits/text-animations/RotatingText";
+import RotatingText from "../components/react-bits/text-animations/RotatingText";
 
 export default function Home() {
   return (

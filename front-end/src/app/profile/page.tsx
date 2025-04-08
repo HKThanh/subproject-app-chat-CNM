@@ -1,4 +1,4 @@
-import ProfileModal from "@/component/user/profile-modal";
+import ProfileModal from "@/components/user/profile-modal";
 
 export default function TestUserStore() {
   return (

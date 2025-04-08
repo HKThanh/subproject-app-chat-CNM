@@ -19,20 +19,6 @@ export async function loginUser(phone: string, password: string) {
       password,
       redirect: false, // Không redirect tự động, xử lý bằng FE
     });
-    // If login successful, get session to check user role
-    // const session = await auth();
-    // // console.log("check session in action>>> ", session);
-
-    // // Redirect based on user role
-    // if (session?.user?.role === "ADMIN") {
-    //   return {
-    //     error: false,
-    //     success: true,
-    //     message: "Đăng nhập thành công!",
-    //     redirectTo: "/admin",
-    //     status: 200,
-    //   };
-    // }
 
     // Default successful login response
     return {
@@ -43,6 +29,7 @@ export async function loginUser(phone: string, password: string) {
       status: 200,
     };
   } catch (error: any) {
+
     // Handle specific error types
     if (error.name === "AccountNotActivatedError") {
       // Try to get user ID from error or response
@@ -56,6 +43,7 @@ export async function loginUser(phone: string, password: string) {
         redirectTo: `/verify/${userId}`,
       };
     } else if (error.name === "InvalidPhonePasswordError") {
+      
       return {
         error: true,
         success: false,
