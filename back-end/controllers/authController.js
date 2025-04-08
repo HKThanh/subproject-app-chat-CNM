@@ -91,8 +91,6 @@ authController.register = async (req, res) => {
 
 authController.login = async (req, res) => {
     const { phone, password } = req.body;
-    const { authorization } = req.headers;
-
 
     if (!phone || !password) {
         return res.status(400).json({ message: 'Hãy nhập cả sdt và mật khẩu' });
@@ -102,14 +100,16 @@ authController.login = async (req, res) => {
     if (!user) {
         return res.status(400).json({ message: 'Sai tên đăng nhập' });
     }
-
     bcrypt.compare(password, user.password, async (err, result) => {
         if (result) {
             const data = {
+                id: user.id,
                 fullname: user.fullname,
                 urlavatar: user.urlavatar,
                 birthday: user.birthday,
                 createdAt: user.createdAt,
+                email: user.email,
+                phone: user.phone,
             }
 
             const tokenInRedis = await redisClient.get(user.phone);
@@ -152,7 +152,6 @@ authController.login = async (req, res) => {
                     user: data,
                 });
             }
-
         } else {
             res.status(400).json({ message: 'Nhập sai mật khẩu' });
         }
