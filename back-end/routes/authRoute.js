@@ -20,4 +20,6 @@ router.post('/refresh-token', authController.refreshToken);
 
 router.post('/update-password', userController.updatePassword);
 
+router.post('/update-pass-request', userController.updatePasswordRequest);
+
 module.exports = router;
