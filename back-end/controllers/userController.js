@@ -54,8 +54,7 @@ userController.updatePassword = async (req, res) => {
   bcrypt.hash(newPassword, 10).then(async (hash) => {
     try {
       user.password = hash
-      // update password using mongoose
-      user.save()
+      await user.save()
       res.status(200).json({ message: "Cập nhật mật khẩu thành công" })
     } catch (error) {
       console.error(error)
@@ -65,46 +64,45 @@ userController.updatePassword = async (req, res) => {
 }
 
 userController.updateAvatar = async (req, res) => {
-    try {
-      const { phone } = req.params
-      const { urlavatar } = req.body
-      
-      if (!urlavatar) {
-        return res.status(400).json({ message: "URL avatar không được để trống" })
-      }
-  
-      const user = await UserModel.get(phone)
-  
-      if (!user) {
-        return res.status(404).json({ message: "Không tìm thấy người dùng" })
-      }
-  
-      // Cập nhật avatar và thời gian cập nhật
-      user.urlavatar = urlavatar
-      user.updatedAt = new Date()
-  
-      await user.save()
-  
-      return res.status(200).json({
-        message: "Cập nhật avatar thành công",
-        user: {
-          id: user.id,
-          phone: user.phone,
-          urlavatar: user.urlavatar,
-        },
-      })
-    } catch (error) {
-      console.error("Error updating avatar:", error)
-      return res.status(500).json({ message: "Lỗi khi cập nhật avatar" })
+  try {
+    const { phone } = req.params
+    const fileUrl = req.body.fileUrl
+    console.log(req.body)
+
+    if (!fileUrl) {
+      return res.status(400).json({ message: "File avatar không được để trống" })
     }
+
+    const user = await UserModel.get(phone)
+
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" })
+    }
+
+    user.urlavatar = fileUrl // Lưu URL từ S3
+    user.updatedAt = new Date()
+
+    await user.save()
+
+    return res.status(200).json({
+      message: "Cập nhật avatar thành công",
+      user: {
+        id: user.id,
+        phone: user.phone,
+        urlavatar: user.urlavatar,
+      },
+    })
+  } catch (error) {
+    console.error("Error updating avatar:", error)
+    return res.status(500).json({ message: "Lỗi khi cập nhật avatar" })
   }
+}
 
 userController.updateProfile = async (req, res) => {
   try {
     const { phone } = req.params
     const { fullname, ismale, birthday } = req.body
 
-    // Validate input
     if (!fullname && ismale === undefined && !birthday) {
       return res.status(400).json({ message: "Cần cung cấp ít nhất một thông tin để cập nhật" })
     }
@@ -115,12 +113,10 @@ userController.updateProfile = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy người dùng" })
     }
 
-    // Update only allowed fields
     if (fullname) user.fullname = fullname
     if (ismale !== undefined) user.ismale = ismale
     if (birthday) user.birthday = birthday
 
-    // Update timestamp
     user.updatedAt = new Date()
 
     await user.save()
@@ -132,7 +128,7 @@ userController.updateProfile = async (req, res) => {
         fullname: user.fullname,
         ismale: user.ismale,
         birthday: user.birthday,
-        phone: user.phone
+        phone: user.phone,
       },
     })
   } catch (error) {
@@ -141,4 +137,72 @@ userController.updateProfile = async (req, res) => {
   }
 }
 
+userController.updateBio = async (req, res) => {
+  try {
+    const { phone } = req.params
+    const { bio } = req.body
+
+    if (!bio && bio !== "") {
+      return res.status(400).json({ message: "Bio không được để trống" })
+    }
+
+    const user = await UserModel.get(phone)
+
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" })
+    }
+
+    user.bio = bio
+    user.updatedAt = new Date()
+
+    await user.save()
+
+    return res.status(200).json({
+      message: "Cập nhật bio thành công",
+      user: {
+        id: user.id,
+        phone: user.phone,
+        bio: user.bio,
+      },
+    })
+  } catch (error) {
+    console.error("Error updating bio:", error)
+    return res.status(500).json({ message: "Lỗi khi cập nhật bio" })
+  }
+}
+
+userController.updateCoverPhoto = async (req, res) => {
+  try {
+    const { phone } = req.params
+    const fileUrl = req.body.fileUrl
+
+    if (!fileUrl) {
+      return res.status(400).json({ message: "Cover photo không được để trống" })
+    }
+
+    const user = await UserModel.get(phone)
+
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" })
+    }
+
+    user.coverPhoto = fileUrl
+    user.updatedAt = new Date()
+
+    await user.save()
+
+    return res.status(200).json({
+      message: "Cập nhật cover photo thành công",
+      user: {
+        id: user.id,
+        phone: user.phone,
+        coverPhoto: user.coverPhoto,
+      },
+    })
+  } catch (error) {
+    console.error("Error updating cover photo:", error)
+    return res.status(500).json({ message: "Lỗi khi cập nhật cover photo" })
+  }
+}
 module.exports = userController
+

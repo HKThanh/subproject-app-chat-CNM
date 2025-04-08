@@ -16,7 +16,9 @@ db.users.insertMany([
         "phone": "0912345678",
         "urlavatar": "https://example.com/avatars/john.jpg",
         "birthday": "1990-05-15",
-        "friendList": ["user002", "user003"],
+        "bio": "",
+        "coverPhoto": "",
+        "friendList": ["0987654321", "0933445566"],
         "createdAt": "2025-04-02T10:00:00Z",
         "updatedAt": "2025-04-02T10:00:00Z"
     },
@@ -33,7 +35,9 @@ db.users.insertMany([
         "phone": "0987654321",
         "urlavatar": "https://example.com/avatars/jane.jpg",
         "birthday": "1992-08-22",
-        "friendList": ["user001", "user004"],
+        "bio": "",
+        "coverPhoto": "",
+        "friendList": ["0912345678", "0977889900"],
         "createdAt": "2025-04-02T12:30:00Z",
         "updatedAt": "2025-04-02T12:30:00Z"
     },
@@ -50,7 +54,9 @@ db.users.insertMany([
         "phone": "0933445566",
         "urlavatar": "https://example.com/avatars/bob.jpg",
         "birthday": "1988-12-01",
-        "friendList": ["user001", "user005"],
+        "bio": "",
+        "coverPhoto": "",
+        "friendList": ["0912345678", "0944556677"],
         "createdAt": "2025-04-02T15:15:00Z",
         "updatedAt": "2025-04-02T15:15:00Z"
     },
@@ -67,7 +73,9 @@ db.users.insertMany([
         "phone": "0977889900",
         "urlavatar": "https://example.com/avatars/alice.jpg",
         "birthday": "1995-03-10",
-        "friendList": ["user002"],
+        "bio": "",
+        "coverPhoto": "",
+        "friendList": ["0987654321"],
         "createdAt": "2025-04-02T09:45:00Z",
         "updatedAt": "2025-04-02T09:45:00Z"
     },
@@ -84,8 +92,10 @@ db.users.insertMany([
         "phone": "0944556677",
         "urlavatar": "https://example.com/avatars/mike.jpg",
         "birthday": "1993-07-25",
-        "friendList": ["user003"],
+        "bio": "",
+        "coverPhoto": "",
+        "friendList": ["0933445566"],
         "createdAt": "2025-04-02T14:20:00Z",
         "updatedAt": "2025-04-02T14:20:00Z"
     }
-])
+]);
