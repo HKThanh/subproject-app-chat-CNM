@@ -1,15 +1,16 @@
 db = db.getSiblingDB("chat-app");
-
+db.dropDatabase(); // Drop the database if it exists
 db.createCollection("users");
 
 db.users.insertMany([
     {
-        "id": "0912345678",
+        "id": "user001",
         "username": "0912345678",
         "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
         "fullname": "John Doe",
         "ismale": true,
         "isLoggedin": false,
+        "isVerified": true,
         "email": "example@gmail.com",
         "bio": "Hello, I am John!",
         "coverPhoto": "",
@@ -18,85 +19,45 @@ db.users.insertMany([
         "birthday": "1990-05-15",
         "bio": "",
         "coverPhoto": "",
-        "friendList": ["0987654321", "0933445566"],
+        "friendList": ["user003"],
         "createdAt": "2025-04-02T10:00:00Z",
         "updatedAt": "2025-04-02T10:00:00Z"
     },
     {
-        "id": "0987654321",
+        "id": "user002",
         "username": "0987654321",
         "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
-        "fullname": "Jane Doe",
+        "fullname": "Jane Smith",
         "ismale": false,
-        "isLoggedin": false,
-        "email": "example1@gmail.com",
-        "bio": "Hello, I am Jane!",
-        "coverPhoto": "",
+        "isLoggedin": true,
+        "isVerified": true,
+        "email": "jane.smith@example.com",
+        "bio": "Loving life and coding!",
+        "coverPhoto": "https://example.com/covers/jane.jpg",
         "phone": "0987654321",
         "urlavatar": "https://example.com/avatars/jane.jpg",
-        "birthday": "1992-08-22",
-        "bio": "",
-        "coverPhoto": "",
-        "friendList": ["0912345678", "0977889900"],
-        "createdAt": "2025-04-02T12:30:00Z",
-        "updatedAt": "2025-04-02T12:30:00Z"
+        "birthday": "1992-08-25",
+        "friendList": ["user003"],
+        "createdAt": "2025-04-02T11:00:00Z",
+        "updatedAt": "2025-04-02T11:00:00Z"
     },
     {
-        "id": "0933445566",
+        "id": "user003",
         "username": "0933445566",
         "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
-        "fullname": "Bob Smith",
-        "ismale": true,
-        "isLoggedin": false,
-        "email": "example2@gmail.com",
-        "bio": "Hello, I am Bob!",
-        "coverPhoto": "",
-        "phone": "0933445566",
-        "urlavatar": "https://example.com/avatars/bob.jpg",
-        "birthday": "1988-12-01",
-        "bio": "",
-        "coverPhoto": "",
-        "friendList": ["0912345678", "0944556677"],
-        "createdAt": "2025-04-02T15:15:00Z",
-        "updatedAt": "2025-04-02T15:15:00Z"
-    },
-    {
-        "id": "0977889900",
-        "username": "0977889900",
-        "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
-        "fullname": "Alice Wong",
+        "fullname": "Alice Johnson",
         "ismale": false,
         "isLoggedin": false,
-        "email": "example3@gmail.com",
-        "bio": "Hello, I am Alice!",
-        "coverPhoto": "",
-        "phone": "0977889900",
+        "isVerified": true,
+        "email": "alice.johnson@example.com",
+        "bio": "Exploring the world one step at a time.",
+        "coverPhoto": "https://example.com/covers/alice.jpg",
+        "phone": "0933445566",
         "urlavatar": "https://example.com/avatars/alice.jpg",
-        "birthday": "1995-03-10",
-        "bio": "",
-        "coverPhoto": "",
-        "friendList": ["0987654321"],
-        "createdAt": "2025-04-02T09:45:00Z",
-        "updatedAt": "2025-04-02T09:45:00Z"
-    },
-    {
-        "id": "0944556677",
-        "username": "0944556677",
-        "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
-        "fullname": "Mike Brown",
-        "ismale": true,
-        "isLoggedin": false,
-        "email": "example4@gmail.com",
-        "bio": "Hello, I am Mike!",
-        "coverPhoto": "",
-        "phone": "0944556677",
-        "urlavatar": "https://example.com/avatars/mike.jpg",
-        "birthday": "1993-07-25",
-        "bio": "",
-        "coverPhoto": "",
-        "friendList": ["0933445566"],
-        "createdAt": "2025-04-02T14:20:00Z",
-        "updatedAt": "2025-04-02T14:20:00Z"
+        "birthday": "1988-12-10",
+        "friendList": ["user002", "user001"],
+        "createdAt": "2025-04-02T12:00:00Z",
+        "updatedAt": "2025-04-02T12:00:00Z"
     }
 ])
 
@@ -104,24 +65,24 @@ db.createCollection("friendrequests");
 db.friendrequests.insertMany([
     {
         "id": "request001",
-        "senderId": "0912345678",
-        "receiverId": "0987654321",
+        "senderId": "user001",
+        "receiverId": "user002",
         "status": "PENDING",
         "createdAt": "2025-04-02T10:00:00Z",
         "updatedAt": "2025-04-02T10:00:00Z"
     },
     {
         "id": "request002",
-        "senderId": "0987654321",
-        "receiverId": "0933445566",
+        "senderId": "user002",
+        "receiverId": "user003",
         "status": "ACCEPTED",
         "createdAt": "2025-04-02T12:30:00Z",
         "updatedAt": "2025-04-02T12:30:00Z"
     },
     {
         "id": "request003",
-        "senderId": "0933445566",
-        "receiverId": "0977889900",
+        "senderId": "user003",
+        "receiverId": "user001",
         "status": "DECLINED",
         "createdAt": "2025-04-02T15:15:00Z",
         "updatedAt": "2025-04-02T15:15:00Z"

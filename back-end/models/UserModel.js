@@ -80,6 +80,10 @@ const UserSchema = new Schema({
         type: Boolean,
         default: false,
     },
+    isVerified: {
+        type: Boolean,
+        default: false,
+    },
     email: {
         type: String,
         default: "",
@@ -102,8 +106,8 @@ const UserSchema = new Schema({
     },
 }, {
     statics: {
-        async get(phone) {
-            return await this.findOne({ phone: phone });
+        async get(id) {
+            return await this.findOne({ id }).exec();
         }
     }
 });

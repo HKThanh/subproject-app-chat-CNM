@@ -11,7 +11,7 @@ const authenticateToken = async (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await UserModel.get(decoded.phone);
+        const user = await UserModel.get(decoded.id);
 
         console.log('Decoded token:', decoded);
         console.log('User from token:', user);

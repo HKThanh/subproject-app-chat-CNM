@@ -23,9 +23,11 @@ userController.getAllUsers = async (req, res) => {
 }
 
 userController.getUserByPhone = async (req, res) => {
-  const { phone } = req.params
+  const id = req.user.id;
+  
   try {
-    const user = await UserModel.get(phone)
+    const user = await UserModel.get(id);
+    
     if (!user) {
       return res.status(404).json({ message: "User not found" })
     }
@@ -66,7 +68,7 @@ userController.updatePassword = async (req, res) => {
 
 userController.updateAvatar = async (req, res) => {
   try {
-    const { phone } = req.params
+    const id = req.user.id
     const fileUrl = req.body.fileUrl
     console.log(req.body)
 
@@ -74,7 +76,7 @@ userController.updateAvatar = async (req, res) => {
       return res.status(400).json({ message: "File avatar không được để trống" })
     }
 
-    const user = await UserModel.get(phone)
+    const user = await UserModel.get(id)
 
     if (!user) {
       return res.status(404).json({ message: "Không tìm thấy người dùng" })
@@ -101,14 +103,14 @@ userController.updateAvatar = async (req, res) => {
 
 userController.updateProfile = async (req, res) => {
   try {
-    const { phone } = req.params
+    const id = req.user.id
     const { fullname, ismale, birthday } = req.body
 
     if (!fullname && ismale === undefined && !birthday) {
       return res.status(400).json({ message: "Cần cung cấp ít nhất một thông tin để cập nhật" })
     }
 
-    const user = await UserModel.get(phone)
+    const user = await UserModel.get(id)
 
     if (!user) {
       return res.status(404).json({ message: "Không tìm thấy người dùng" })
@@ -139,7 +141,7 @@ userController.updateProfile = async (req, res) => {
 }
 
 userController.sendFriendRequest = async (req, res) => {
-  const senderId = req.user.phone;
+  const senderId = req.user.id;
   const { receiverId } = req.body;
 
   if (senderId === receiverId) {
@@ -244,14 +246,14 @@ userController.getAllFriendRequests = async (req, res) => {
 
 userController.updateBio = async (req, res) => {
   try {
-    const { phone } = req.params
+    const id = req.user.id
     const { bio } = req.body
 
     if (!bio && bio !== "") {
       return res.status(400).json({ message: "Bio không được để trống" })
     }
 
-    const user = await UserModel.get(phone)
+    const user = await UserModel.get(id)
 
     if (!user) {
       return res.status(404).json({ message: "Không tìm thấy người dùng" })
@@ -278,14 +280,14 @@ userController.updateBio = async (req, res) => {
 
 userController.updateCoverPhoto = async (req, res) => {
   try {
-    const { phone } = req.params
+    const id = req.user.id
     const fileUrl = req.body.fileUrl
 
     if (!fileUrl) {
       return res.status(400).json({ message: "Cover photo không được để trống" })
     }
 
-    const user = await UserModel.get(phone)
+    const user = await UserModel.get(id)
 
     if (!user) {
       return res.status(404).json({ message: "Không tìm thấy người dùng" })
