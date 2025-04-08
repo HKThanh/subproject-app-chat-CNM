@@ -7,6 +7,7 @@ import useUserStore from "@/stores/useUserStoree";
 export default function AuthSync() {
   const { data: session, status } = useSession();
   const setUser = useUserStore((state) => state.setUser);
+  const setTokens = useUserStore((state) => state.setTokens);
   const clearUser = useUserStore((state) => state.clearUser);
 
   useEffect(() => {
@@ -20,13 +21,15 @@ export default function AuthSync() {
 
     const user: IUser = {
       id: session.user.id,
-      username: session.user.username,
-      phone: session.user.phone,
       fullname: session.user.fullname,
+      urlavatar: session.user.urlavatar,
+      birthday: session.user.birthday,
+      createdAt: session.user.createdAt,
     };
 
     console.log("Syncing user to store:", user);
     setUser(user, session.accessToken);
+    // setTokens(session.accessToken, session.refreshToken)
   }, [session, status, setUser, clearUser]);
 
   return null;

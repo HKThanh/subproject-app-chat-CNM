@@ -73,10 +73,12 @@ export const {
                 else {
                     const user = {
                         id: response.user.id,
-                        username: response.user.username,
+                        urlavatar: response.user.urlavatar,
                         fullname: response.user.fullname,
-                        phone: response.user.phone,
+                        birthday: response.user.birthday,
+                        createdAt: response.user.createdAt,
                         accessToken: response.access_token, // Add access token directly to user object
+                        refreshToken: response.refreshToken,
                     };
                     return user;
                 }
@@ -97,7 +99,8 @@ export const {
                 return {
                     ...token,
                     ...user,
-                    accessToken: user.accessToken
+                    accessToken: user.accessToken,
+                    refreshToken: user.refreshToken,
                 };
             }
             return token;
@@ -107,12 +110,17 @@ export const {
             return {
                 ...session,
                 user: {
-                    id: token.id,
-                    username: token.username,
-                    phone: token.phone,
-                    fullname: token.fullname,
+                    id: String(token.id),
+                    urlavatar: String(token.urlavatar || ''),
+                    birthday: String(token.birthday || ''),
+                    createdAt: String(token.createdAt || ''),
+                    fullname: String(token.fullname || ''),
+                    email: '',
+                    name: String(token.fullname || ''),
+                    image: String(token.urlavatar || ''),
                 },
-                accessToken: token.accessToken
+                refreshToken: String(token.refreshToken || ''),
+                accessToken: String(token.accessToken || '')
             };
         },
     },

@@ -7,6 +7,7 @@ import ProfileView from "./profile-view"
 import ProfileEdit from "./profile-edit"
 import ImageViewer from "./image-viewer"
 import { AnimatePresence } from "framer-motion"
+import useUserStore from "@/stores/useUserStoree"
 
 export type UserProfile = {
   name: string
@@ -24,16 +25,19 @@ export default function ProfileModal() {
   const [open, setOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [viewingImage, setViewingImage] = useState<string | null>(null)
+  
+  // Get user from Zustand store
+  const user = useUserStore((state) => state.user)
 
   const [profile, setProfile] = useState<UserProfile>({
-    name: "Nguyễn Đức Thịnh",
+    name: user?.fullname.toString() || "",
     bio: "Hello là chào cậu 👋",
     gender: "Nam",
-    birthDay: "02",
-    birthMonth: "03",
-    birthYear: "2003",
+    birthDay: user?.birthday?.split('-')[2] || "",
+    birthMonth: user?.birthday?.split('-')[1] || "",
+    birthYear: user?.birthday?.split('-')[0] || "",
     phone: "+84 327 410 155",
-    avatarUrl:"",
+    avatarUrl: user?.urlavatar?.toString() || "",
     coverUrl: "/placeholder.svg?height=200&width=500",
   })
 

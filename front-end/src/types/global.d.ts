@@ -4,9 +4,10 @@ import { DefaultSession, DefaultUser, JWT } from "next-auth";
 declare global {
   interface IUser {
     id: string;
-    username: String,
     fullname: String,
-    phone: String,
+    urlavatar: String,
+    birthday: String,
+    createdAt: String,
   }
 
   interface IAuthResponse {
