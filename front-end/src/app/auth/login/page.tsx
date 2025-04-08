@@ -1,5 +1,5 @@
 import { BackgroundLines } from "@/components/ui/background-lines";
-import GuestLogin from "../../../component/auth/guest.login";
+import GuestLogin from "../../../components/auth/guest.login";
 
 const LoginPage = () => {
   return (
