@@ -18,23 +18,53 @@ const generateBirthdate = () => {
 //     },
 //     username: String,
 //     password: String,
-//     fullname: String,
-//     ismale: Boolean,
+//     fullname: {
+//         type: String,
+//         default: "Người dùng mới",
+//     },
+//     ismale: {
+//         type: Boolean,
+//         default: true,
+//     },
+//     isVerified: {
+//         type: Boolean,
+//         default: false,
+//     },
 //     phone: String,
 //     urlavatar: String,
 //     birthday: String,
+//     urlavatar: {
+//         type: String,
+//         default: "",
+//     },
+//     birthday: {
+//         type: String,
+//         default: generateBirthdate,
+//     },
+//     bio: {
+//         type: String,
+//         default: "",
+//     },
+//     coverPhoto: {
+//         type: String,
+//         default: "",
+//     },
 //     friendList: {
 //         type: Array,
 //         schema: [String],
 //     },
+//     isLoggedin: {
+//         type: Boolean,
+//         default: false,
+//     },
 //     createdAt: {
-//         type: Date,
-//         default: Date.now,
+//         type: String,
+//         default: Date.now.toString(),
 //     },
 //     updatedAt: {
-//         type: Date,
-//         default: Date.now,
-//     }
+//         type: String,
+//         default: Date.now.toString(),
+//     },
 // })
 
 // const User = dynamoose.model("User", UserSchema);
@@ -113,6 +143,5 @@ const UserSchema = new Schema({
 });
 
 const User = mongoose.model("User", UserSchema);
-
 
 module.exports = User;

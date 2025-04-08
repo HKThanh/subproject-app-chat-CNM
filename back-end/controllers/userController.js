@@ -83,7 +83,7 @@ userController.updateAvatar = async (req, res) => {
     }
 
     user.urlavatar = fileUrl // Lưu URL từ S3
-    user.updatedAt = new Date()
+    user.updatedAt = new Date().toString()
 
     await user.save()
 
@@ -105,7 +105,7 @@ userController.updateProfile = async (req, res) => {
   try {
     const id = req.user.id
     const { fullname, ismale, birthday } = req.body
-
+    console.log(phone, fullname, ismale, birthday)
     if (!fullname && ismale === undefined && !birthday) {
       return res.status(400).json({ message: "Cần cung cấp ít nhất một thông tin để cập nhật" })
     }
@@ -117,21 +117,27 @@ userController.updateProfile = async (req, res) => {
     }
 
     if (fullname) user.fullname = fullname
-    if (ismale !== undefined) user.ismale = ismale
+    if (ismale !== undefined) user.ismale = Boolean(ismale)
     if (birthday) user.birthday = birthday
 
-    user.updatedAt = new Date()
+    user.updatedAt = new Date().toString()
 
     await user.save()
+    console.log("check user >>>. ", user);
 
     return res.status(200).json({
       message: "Cập nhật thông tin thành công",
       user: {
         id: user.id,
         fullname: user.fullname,
-        ismale: user.ismale,
+        urlavatar: user.urlavatar,
         birthday: user.birthday,
+        createdAt: user.createdAt,
+        email: user.email,
+        bio: user.bio,
         phone: user.phone,
+        coverPhoto: user.coverPhoto,
+        ismale: user.ismale
       },
     })
   } catch (error) {
@@ -260,7 +266,7 @@ userController.updateBio = async (req, res) => {
     }
 
     user.bio = bio
-    user.updatedAt = new Date()
+    user.updatedAt = new Date().toString()
 
     await user.save()
 
@@ -294,7 +300,7 @@ userController.updateCoverPhoto = async (req, res) => {
     }
 
     user.coverPhoto = fileUrl
-    user.updatedAt = new Date()
+    user.updatedAt = new Date().toString()
 
     await user.save()
 

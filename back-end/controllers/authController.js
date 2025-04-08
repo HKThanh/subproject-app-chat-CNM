@@ -151,7 +151,10 @@ authController.login = async (req, res) => {
                 birthday: user.birthday,
                 createdAt: user.createdAt,
                 email: user.email,
+                bio: user.bio,
                 phone: user.phone,
+                coverPhoto: user.coverPhoto,
+                ismale: user.ismale
             }
 
             const tokenInRedis = await redisClient.get(user.phone);
@@ -283,7 +286,7 @@ authController.verifyToken = async (io, socket, data) => {
         }
 
         const mobileDecoded = jwt.verify(mobileToken, JWT_SECRET);
-        const user = await UserModel.get(mobileDecoded.phone);
+        const user = await UserModel.get(mobileDecoded.id);
 
         if (!user) {
             socket.emit('loginFailed', { message: 'Người dùng không tồn tại' });
