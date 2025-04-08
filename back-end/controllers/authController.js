@@ -62,9 +62,9 @@ authController.verifyOTP = async (req, res) => {
         return res.status(400).json({ message: 'Nhập sai OTP' });
     } else {
         //const user = await UserModel.scan({email: email}).exec();
-        const user = await UserModel.findOne({email: email});
+        const user = await UserModel.findOne({ email: email });
         if (!user) {
-            return res.status(400).json({ message: 'Email không tồn tại', status: 400});
+            return res.status(400).json({ message: 'Email không tồn tại', status: 400 });
         }
 
         user.isVerified = true;
@@ -73,8 +73,6 @@ authController.verifyOTP = async (req, res) => {
         await redisClient.del(email); // Remove OTP from Redis after verification
         res.status(200).json({ message: 'OTP verified successfully', email: email });
     }
-
-    res.status(200).json({ message: 'OTP verified', email: email });
 };
 
 authController.register = async (req, res) => {
@@ -110,18 +108,18 @@ authController.register = async (req, res) => {
                 email: email,
                 isVerified: false,
             });
-            res.status(200).json({ phone: newUser.phone });
-
             // Send OTP to the user's email
             const otp = generateOTP();
 
-            try {
-                await sendOTP(email, otp);
-                await redisClient.setEx(email, 300, JSON.stringify({ otp }));
-                res.status(200).json({ message: 'OTP sent successfully', otp: otp });
-            } catch (error) {
-                res.status(500).json({ message: 'Failed to send OTP' });
-            }
+
+            await sendOTP(email, otp);
+            await redisClient.setEx(email, 300, JSON.stringify({ otp }));
+            return res.status(200).json({ 
+                message: 'User registered and OTP sent successfully',
+                phone: newUser.phone,
+                otp: otp 
+            });
+
         } catch (error) {
             console.error(error);
             res.status(500).json({ message: 'Failed to create user' });
@@ -137,10 +135,10 @@ authController.login = async (req, res) => {
     }
 
     // const user = await UserModel.scan("phone").contains(phone).exec();
-    
-    const user = await UserModel.findOne({phone: phone});
+
+    const user = await UserModel.findOne({ phone: phone });
     if (!user) {
-        return res.status(400).json({ message: 'Sai tên đăng nhập' });
+        return res.status(400).json({ message: 'Nhập sai tài khoản hoặc mật khẩu' });
     }
     bcrypt.compare(password, user.password, async (err, result) => {
         if (result) {
@@ -198,7 +196,7 @@ authController.login = async (req, res) => {
                 });
             }
         } else {
-            res.status(400).json({ message: 'Nhập sai mật khẩu' });
+            res.status(400).json({ message: 'Nhập sai tài khoản hoặc mật khẩu' });
         }
     });
 };

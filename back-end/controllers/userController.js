@@ -24,10 +24,10 @@ userController.getAllUsers = async (req, res) => {
 
 userController.getUserByPhone = async (req, res) => {
   const id = req.user.id;
-  
+
   try {
     const user = await UserModel.get(id);
-    
+
     if (!user) {
       return res.status(404).json({ message: "User not found" })
     }
@@ -37,14 +37,17 @@ userController.getUserByPhone = async (req, res) => {
   }
 }
 
-userController.updatePassword = async (req, res) => {
-  const { phone, oldpassword, repassword, newPassword } = req.body
+userController.updatePasswordRequest = async (req, res) => {
+  const { email, phone } = req.body
 
-  if (!oldpassword || !repassword || !newPassword) {
+  if (!oldpassword || !newPassword) {
     return res.status(400).json({ message: "Hãy nhập cả mật khẩu cũ và mới" })
   }
 
-  const user = await UserModel.get(phone)
+  const user = await UserModel.findOne({ email, phone })
+  if (!user) {
+    return res.status(404).json({ message: "Không tìm thấy người dùng" })
+  }
 
   if (oldpassword !== user.password) {
     return res.status(400).json({ message: "Sai mật khẩu cũ" })
@@ -54,16 +57,64 @@ userController.updatePassword = async (req, res) => {
     return res.status(400).json({ message: "Nhập lại sai mật khẩu" })
   }
 
-  bcrypt.hash(newPassword, 10).then(async (hash) => {
-    try {
-      user.password = hash
-      await user.save()
-      res.status(200).json({ message: "Cập nhật mật khẩu thành công" })
-    } catch (error) {
-      console.error(error)
-      res.status(500).json({ message: "Cập nhật mật khẩu thất bại" })
+  const otp = generateOTP();
+
+  try {
+    await sendOTP(email, otp);
+    await redisClient.setEx(otp, 300, JSON.stringify({ otp }));
+    await redisClient.setEx(email, 300, JSON.stringify({ email }));
+    await redisClient.setEx(phone, 300, JSON.stringify({ phone }));
+    res.status(200).json({ message: 'OTP sent successfully', otp: otp });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to send OTP' });
+  }
+}
+
+userController.updatePassword = async (req, res) => {
+  const { oldpassword, newPassword } = req.body;
+
+  if (!oldpassword || !newPassword) {
+    return res.status(400).json({ message: "Hãy nhập cả mật khẩu cũ và mới" })
+  }
+
+  const redisData = await redisClient.get(otp);
+  const redisPhone = await redisClient.get(phone);
+  const redisEmail = await redisClient.get(email);
+  if (!redisData) {
+    return res.status(400).json({ message: "OTP đã hết hạn" })
+  }
+
+  const { otp: storedOtp } = JSON.parse(redisData)
+
+  if (otp !== storedOtp) {
+    return res.status(400).json({ message: "Sai mã OTP" })
+  }
+
+  const { phone: storedPhone } = JSON.parse(redisPhone)
+  const { email: storedEmail } = JSON.parse(redisEmail)
+  const user = await UserModel.findOne({ email: storedEmail, phone: storedPhone })
+
+  if (!user) {
+    return res.status(404).json({ message: "Không tìm thấy người dùng" })
+  }
+
+  const oldPasswordCrypted = bcrypt.hashSync(oldpassword, 10);
+  
+  if (oldPasswordCrypted !== user.password) {
+    return res.status(400).json({ message: "Nhập sai mật khẩu" })
+  }
+
+  bcrypt.hash(newPassword, 10, async (err, hash) => {
+    if (err) {
+      return res.status(500).json({ message: "Lỗi khi mã hóa mật khẩu" })
     }
-  })
+
+    user.password = hash
+    await user.save()
+  });
+
+  res.status(200).json({ message: "Cập nhật mật khẩu thành công" })
+
 }
 
 userController.updateAvatar = async (req, res) => {
@@ -321,7 +372,7 @@ userController.updateCoverPhoto = async (req, res) => {
 userController.cancelFriendRequest = async (req, res) => {
   const senderId = req.user.id;
   const { receiverId } = req.params;
-  
+
 
   try {
     // const request = await FriendRequestModel.scan({
