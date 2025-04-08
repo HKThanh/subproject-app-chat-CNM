@@ -102,7 +102,8 @@ authController.login = async (req, res) => {
     if (!user) {
         return res.status(400).json({ message: 'Sai tên đăng nhập' });
     }
-
+    console.log("Password:", password);
+    console.log("User passs:", user.password);
     bcrypt.compare(password, user.password, async (err, result) => {
         if (result) {
             const data = {
