@@ -25,7 +25,7 @@ import { Separator } from "@/components/ui/separator";
 import { ShineBorder } from "@/components/magicui/shine-border";
 
 const formSchema = z.object({
-  name: z.string().min(2, {
+  fullname: z.string().min(2, {
     message: "Họ tên phải có ít nhất 2 ký tự.",
   }),
   phone: z.string()
@@ -48,7 +48,7 @@ export default function RegisterForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
+      fullname: "",
       phone: "",
       password: "",
     },
@@ -57,12 +57,12 @@ export default function RegisterForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     setError(null);
-    const { phone, password, name } = values;
+    const { phone, password, fullname } = values;
     console.log("Check values>>>> ", values);
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate a delay
-      const result = await signUpUser(phone, password, name);
+      const result = await signUpUser(phone, password, fullname);
       console.log("Check result>>> ", result);
 
       toast.success("Đăng ký thành công!");
@@ -104,7 +104,7 @@ export default function RegisterForm() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
               <FormField
                 control={form.control}
-                name="name"
+                name="fullname"
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>

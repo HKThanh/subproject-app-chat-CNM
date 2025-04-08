@@ -8,6 +8,11 @@ declare global {
     urlavatar: String,
     birthday: String,
     createdAt: String,
+    email: String,
+    phone: String,
+    bio: String,
+    coverPhoto: String,
+    ismale: Boolean
   }
 
   interface IAuthResponse {

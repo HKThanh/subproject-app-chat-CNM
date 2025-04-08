@@ -66,7 +66,7 @@ export default function ProfileEdit({ profile, onUpdate, onCancel }: ProfileEdit
           transition={{ delay: 0.1 }}
         >
           <Label htmlFor="name">Tên hiển thị</Label>
-          <Input id="name" value={formData.name} onChange={(e) => handleChange("name", e.target.value)} />
+          <Input id="name" value={formData.fullname} onChange={(e) => handleChange("fullname", e.target.value)} />
         </motion.div>
 
         {/* Bio */}
@@ -109,7 +109,7 @@ export default function ProfileEdit({ profile, onUpdate, onCancel }: ProfileEdit
           className="space-y-2"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.2 }}
         >
           <Label>Ngày sinh</Label>
           <div className="flex gap-2">

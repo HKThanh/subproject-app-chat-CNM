@@ -31,7 +31,7 @@ export default function ProfileView({ profile, onEdit, onViewImage }: ProfileVie
 
       {/* Cover photo */}
       <div className="relative h-40 w-full cursor-pointer" onClick={() => onViewImage(profile.coverUrl)}>
-<Image src={profile.coverUrl || `https://ui-avatars.com/api/?name=${profile.name}`} alt="Cover photo" fill className="object-cover" />
+<Image src={profile.coverUrl || `https://ui-avatars.com/api/?name=${profile.fullname}`} alt="Cover photo" fill className="object-cover" />
       </div>
 
       {/* Profile picture */}
@@ -41,7 +41,7 @@ export default function ProfileView({ profile, onEdit, onViewImage }: ProfileVie
           onClick={() => onViewImage(profile.avatarUrl)}
         >
           <div className="relative h-24 w-24">
-            <Image src={profile.avatarUrl || `https://ui-avatars.com/api/?name=${profile.name}`} alt="Profile picture" fill className="object-cover" />
+            <Image src={profile.avatarUrl || `https://ui-avatars.com/api/?name=${profile.fullname}`} alt="Profile picture" fill className="object-cover" />
           </div>
           <div className="absolute bottom-0 right-0 bg-gray-100 rounded-full p-1">
             <Camera className="h-4 w-4" />
@@ -52,7 +52,7 @@ export default function ProfileView({ profile, onEdit, onViewImage }: ProfileVie
       {/* User name */}
       <div className="mt-16 px-4">
         <div className="flex items-center">
-          <h1 className="text-xl font-bold">{profile.name}</h1>
+          <h1 className="text-xl font-bold">{profile.fullname}</h1>
           <PenSquare className="h-4 w-4 ml-2 text-gray-500" />
         </div>
       </div>

@@ -77,8 +77,14 @@ export const {
                         fullname: response.user.fullname,
                         birthday: response.user.birthday,
                         createdAt: response.user.createdAt,
+                        email: response.user.email,
+                        phone: response.user.phone,
+                        bio: response.user.bio,
+                        coverPhoto: response.user.coverPhoto,
+                        ismale: response.user.ismale,
                         accessToken: response.access_token, // Add access token directly to user object
                         refreshToken: response.refreshToken,
+                        
                     };
                     return user;
                 }
@@ -115,9 +121,11 @@ export const {
                     birthday: String(token.birthday || ''),
                     createdAt: String(token.createdAt || ''),
                     fullname: String(token.fullname || ''),
-                    email: '',
-                    name: String(token.fullname || ''),
-                    image: String(token.urlavatar || ''),
+                    email: String(token.email|| ''),
+                    phone: String(token.phone|| ''),
+                    bio:String(token.bio || ''),
+                    coverPhoto:String(token.coverPhoto || ''),
+                    ismale:Boolean(token.ismale || ''),
                 },
                 refreshToken: String(token.refreshToken || ''),
                 accessToken: String(token.accessToken || '')

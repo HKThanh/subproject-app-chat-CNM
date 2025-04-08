@@ -80,7 +80,7 @@ userController.updateAvatar = async (req, res) => {
     }
 
     user.urlavatar = fileUrl // Lưu URL từ S3
-    user.updatedAt = new Date()
+    user.updatedAt = new Date().toString()
 
     await user.save()
 
@@ -102,13 +102,13 @@ userController.updateProfile = async (req, res) => {
   try {
     const { phone } = req.params
     const { fullname, ismale, birthday } = req.body
-
+    console.log(phone, fullname, ismale, birthday)
     if (!fullname && ismale === undefined && !birthday) {
       return res.status(400).json({ message: "Cần cung cấp ít nhất một thông tin để cập nhật" })
     }
-
+    
     const user = await UserModel.get(phone)
-
+    console.log(user)
     if (!user) {
       return res.status(404).json({ message: "Không tìm thấy người dùng" })
     }
@@ -117,7 +117,7 @@ userController.updateProfile = async (req, res) => {
     if (ismale !== undefined) user.ismale = ismale
     if (birthday) user.birthday = birthday
 
-    user.updatedAt = new Date()
+    user.updatedAt = new Date().toString()
 
     await user.save()
 
@@ -153,7 +153,7 @@ userController.updateBio = async (req, res) => {
     }
 
     user.bio = bio
-    user.updatedAt = new Date()
+    user.updatedAt = new Date().toString()
 
     await user.save()
 
@@ -187,7 +187,7 @@ userController.updateCoverPhoto = async (req, res) => {
     }
 
     user.coverPhoto = fileUrl
-    user.updatedAt = new Date()
+    user.updatedAt = new Date().toString()
 
     await user.save()
 

@@ -4,7 +4,7 @@ const port = 3000;
 const bodyParser = require("body-parser");
 const { createServer } = require("node:http");
 const cors = require("cors");
-const connectDB = require("./config/connectMongo");
+const connectDB = require("./config/connectDynamodb");
 const { Server } = require("socket.io");
 
 const authController = require("./controllers/authController")

@@ -109,7 +109,10 @@ authController.login = async (req, res) => {
                 birthday: user.birthday,
                 createdAt: user.createdAt,
                 email: user.email,
+                bio: user.bio,
                 phone: user.phone,
+                coverPhoto: user.coverPhoto,
+                ismale: user.ismale
             }
 
             const tokenInRedis = await redisClient.get(user.phone);
