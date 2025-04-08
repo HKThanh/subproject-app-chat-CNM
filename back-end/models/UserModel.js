@@ -11,21 +11,92 @@ const generateBirthdate = () => {
 }
 
 // This is for AWS
-// const UserSchema = new dynamoose.Schema({
+const UserSchema = new dynamoose.Schema({
+    id: {
+        type: String,
+        hashKey: true,
+    },
+    username: String,
+    password: String,
+    fullname: {
+                type: String,
+                default: "Người dùng mới",
+            },
+            ismale: {
+                type: Boolean,
+                default: true,
+            },
+    phone: String,
+    urlavatar: String,
+    birthday: String,
+    urlavatar: {
+                type: String,
+                default: "",
+            },
+            birthday: {
+                type: String,
+                default: generateBirthdate,
+            },
+            friendList: {
+                        type: Array,
+                        schema: [String],
+                    },
+                    isLoggedin: {
+                        type: Boolean,
+                        default: false,
+                    },
+                    createdAt: {
+                        type: Date,
+                        default: Date.now,
+                    },
+                    updatedAt: {
+                        type: Date,
+                        default: Date.now,
+                    },
+})
+
+const User = dynamoose.model("User", UserSchema);
+
+// This is for mongoDB
+// const UserSchema = new Schema({
 //     id: {
 //         type: String,
 //         hashKey: true,
 //     },
 //     username: String,
 //     password: String,
-//     fullname: String,
-//     ismale: Boolean,
+//     fullname: {
+//         type: String,
+//         default: "Người dùng mới",
+//     },
+//     ismale: {
+//         type: Boolean,
+//         default: true,
+//     },
 //     phone: String,
-//     urlavatar: String,
-//     birthday: String,
+//     urlavatar: {
+//         type: String,
+//         default: "",
+//     },
+//     birthday: {
+//         type: String,
+//         default: generateBirthdate,
+//     },
+//     bio: {
+//         type: String,
+//         default: "",
+//     },
+//     coverPhoto: {
+//         type: String,
+//         default: "",
+//     },
 //     friendList: {
 //         type: Array,
 //         schema: [String],
+//     },
+//     isLoggedin: {
+//         type: Boolean,
+//         default: false,
 //     },
 //     createdAt: {
 //         type: Date,
@@ -34,69 +105,16 @@ const generateBirthdate = () => {
 //     updatedAt: {
 //         type: Date,
 //         default: Date.now,
+//     },
+// }, {
+//     statics: {
+//         async get(phone) {
+//             return await this.findOne({ phone: phone });
+//         }
 //     }
-// })
+// });
 
-// const User = dynamoose.model("User", UserSchema);
-
-// This is for mongoDB
-const UserSchema = new Schema({
-    id: {
-        type: String,
-        hashKey: true,
-    },
-    username: String,
-    password: String,
-    fullname: {
-        type: String,
-        default: "Người dùng mới",
-    },
-    ismale: {
-        type: Boolean,
-        default: true,
-    },
-    phone: String,
-    urlavatar: {
-        type: String,
-        default: "",
-    },
-    birthday: {
-        type: String,
-        default: generateBirthdate,
-    },
-    bio: {
-        type: String,
-        default: "",
-    },
-    coverPhoto: {
-        type: String,
-        default: "",
-    },
-    friendList: {
-        type: Array,
-        schema: [String],
-    },
-    isLoggedin: {
-        type: Boolean,
-        default: false,
-    },
-    createdAt: {
-        type: Date,
-        default: Date.now,
-    },
-    updatedAt: {
-        type: Date,
-        default: Date.now,
-    },
-}, {
-    statics: {
-        async get(phone) {
-            return await this.findOne({ phone: phone });
-        }
-    }
-});
-
-const User = mongoose.model("User", UserSchema);
+// const User = mongoose.model("User", UserSchema);
 
 
 module.exports = User;
