@@ -41,7 +41,6 @@ export default function ProfileModal() {
     coverUrl: "",
   })
 
-  // Update profile when user data changes
   useEffect(() => {
     if (user) {
       setProfile({
@@ -54,64 +53,89 @@ export default function ProfileModal() {
         phone: user.phone?.toString() || "",
         avatarUrl: user.urlavatar?.toString() || "",
         coverUrl: user.coverPhoto?.toString() || "",
-      })
+      });
     }
   }, [user])
 
-  const { update: updateSession } = useSession()
+  useEffect(() => {
+    console.log("Profile updated:", profile);
+  }, [profile]);
+
+  const { data: session, update} = useSession()
   const setUser = useUserStore((state) => state.setUser)
 
   const handleUpdateProfile = async (updatedProfile: Partial<UserProfile>) => {
-    // Construct birthday only if all date parts are provided
     const birthday = updatedProfile.birthYear && updatedProfile.birthMonth && updatedProfile.birthDay
       ? `${updatedProfile.birthYear}-${updatedProfile.birthMonth}-${updatedProfile.birthDay}`
       : profile.birthYear && profile.birthMonth && profile.birthDay
       ? `${profile.birthYear}-${profile.birthMonth}-${profile.birthDay}`
       : user?.birthday || '';
-  
+
     const result = await updateProfile(
-      profile.phone,
+      updatedProfile.phone || profile.phone,
       updatedProfile.fullname || profile.fullname,
       (updatedProfile.gender || profile.gender) === "Nam" ? "true" : "false",
       birthday.toString()
-    )
-    console.log("check data in modal>> ", result);
-    if (result.success) {
-      // Only update the fields that were changed
-      setProfile((prev) => ({
-        ...prev,
-        fullname: result.user.fullname,
-        gender: result.user.ismale === true ? "Nam" : "Nữ",
-        birthDay: result.user.birthday.split('-')[2],
-        birthMonth: result.user.birthday.split('-')[1],
-        birthYear: result.user.birthday.split('-')[0],
-        bio: result.user.bio,
-        phone: result.user.phone,
-        avatarUrl: result.user.urlavatar || prev.avatarUrl,
-        coverUrl: result.user.coverPhoto || prev.coverUrl,
-      }))
-      
-      // Update Zustand store
-      setUser(result.user, "")
-      
-      // Update NextAuth session
-      await updateSession({
-        user: result.user
-      })
+    );
 
-      setIsEditing(false)
+    console.log("Result from updateProfile:", result);
+
+    if (result.success && result.user) {
+      const newProfile = {
+        fullname: result.user.fullname || "",
+        bio: result.user.bio || "Hello là chào cậu 👋",
+        gender: result.user.ismale === true ? "Nam" : "Nữ",
+        birthDay: result.user.birthday?.split('-')[2] || "",
+        birthMonth: result.user.birthday?.split('-')[1] || "",
+        birthYear: result.user.birthday?.split('-')[0] || "",
+        phone: result.user.phone || "",
+        avatarUrl: result.user.urlavatar || profile.avatarUrl,
+        coverUrl: result.user.coverPhoto || profile.coverUrl,
+      };
+      setProfile(newProfile as UserProfile);
+
+      setUser({
+        ...result.user,
+        birthday: result.user.birthday || birthday,
+        urlavatar: result.user.urlavatar || profile.avatarUrl,
+        coverPhoto: result.user.coverPhoto || profile.coverUrl,
+      }, "");
+      console.log("Zustand user after update:", useUserStore.getState().user);
+
+      await update({
+        user: {
+          id: result.user.id,
+          fullname: result.user.fullname,
+          bio: result.user.bio,
+          birthday: result.user.birthday || birthday,
+          phone: result.user.phone,
+          urlavatar: result.user.urlavatar || profile.avatarUrl,
+          coverPhoto: result.user.coverPhoto || profile.coverUrl,
+          ismale: result.user.ismale === true || result.user.ismale === "true",
+          // email: user?.email || result.user.email || "",
+          createdAt: user?.createdAt || result.user.createdAt || "",
+        },
+        accessToken: session?.accessToken || "",
+        refreshToken: session?.refreshToken || "",
+      });
+      console.log("Zustand session after update:", session);
+      // Làm mới session thủ công
+      // const updatedSession = await fetch("/api/auth/session").then((res) => res.json());
+      // console.log("Updated session:", updatedSession);
+
+      setIsEditing(false);
     } else {
-      console.error('Failed to update profile:', result.error)
+      console.error('Failed to update profile:', result.error);
     }
   }
 
   const handleUpdateImage = (type: "avatar" | "cover", url: string) => {
     if (type === "avatar") {
-      setProfile((prev) => ({ ...prev, avatarUrl: url }))
+      setProfile((prev) => ({ ...prev, avatarUrl: url }));
     } else {
-      setProfile((prev) => ({ ...prev, coverUrl: url }))
+      setProfile((prev) => ({ ...prev, coverUrl: url }));
     }
-    setViewingImage(null)
+    setViewingImage(null);
   }
 
   return (
@@ -150,4 +174,3 @@ export default function ProfileModal() {
     </>
   )
 }
-

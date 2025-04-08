@@ -18,23 +18,26 @@ export default function AuthSync() {
       clearUser();
       return;
     }
+    console.log("check status >>> ", status);
+    
+    if (status === "authenticated" && session?.user) {
+      const user: IUser = {
+        id: session.user.id,
+        fullname: session.user.fullname,
+        urlavatar: session.user.urlavatar,
+        birthday: session.user.birthday,
+        createdAt: session.user.createdAt,
+        phone: session.user.phone,
+        email: session.user.email,
+        bio: session.user.bio,
+        coverPhoto: session.user.coverPhoto,
+        ismale: session.user.ismale,
+      };
 
-    const user: IUser = {
-      id: session.user.id,
-      fullname: session.user.fullname,
-      urlavatar: session.user.urlavatar,
-      birthday: session.user.birthday,
-      createdAt: session.user.createdAt,
-      phone: session.user.phone,
-      email: session.user.email,
-      bio: session.user.bio,
-      coverPhoto: session.user.coverPhoto,
-      ismale: session.user.ismale,
-    };
-
-    console.log("Syncing user to store:", user);
-    setUser(user, session.accessToken);
-    // setTokens(session.accessToken, session.refreshToken)
+      console.log("Syncing user to store:", user);
+      setUser(user, session.accessToken);
+      setTokens(session.accessToken, session.refreshToken)
+    }
   }, [session, status, setUser, clearUser]);
 
   return null;

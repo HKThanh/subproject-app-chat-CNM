@@ -15,20 +15,25 @@ export async function updateProfile(phone: string, fullname: string, ismale: str
         birthday,
       }),
     });
-    console.log("check response in update profile>>> ", response);
     if (!response.ok) {
       throw new Error('Failed to update profile');
     }
 
     const data = await response.json();
-    
+    console.log("check data in update profile>>> ", data);
+
     if (data.message === "Cập nhật thông tin thành công") {
-        
-      return { 
-        success: true, 
-        message: data.message,
-        user: data.user 
-      };
+        return { 
+            success: true, 
+            message: data.message,
+            user: {
+                ...data.user,
+                bio: data.user.bio || '',
+                urlavatar: data.user.urlavatar || '',
+                coverPhoto: data.user.coverPhoto || '',
+                ismale: data.user.ismale === "true" || data.user.ismale === true
+            }
+        };
     }
     
     throw new Error('Unexpected response format');

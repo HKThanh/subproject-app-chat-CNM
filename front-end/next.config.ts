@@ -5,7 +5,8 @@ const nextConfig: NextConfig = {
   images: {
     domains: [
       'ui-avatars.com',
-      'nodebucketcnm203.s3.ap-southeast-1.amazonaws.com'
+      'nodebucketcnm203.s3.ap-southeast-1.amazonaws.com',
+      'example.com'
     ],
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',

@@ -82,9 +82,9 @@ export const {
                         bio: response.user.bio,
                         coverPhoto: response.user.coverPhoto,
                         ismale: response.user.ismale,
-                        accessToken: response.access_token, // Add access token directly to user object
+                        accessToken: response.accessToken, // Add access token directly to user object
                         refreshToken: response.refreshToken,
-                        
+
                     };
                     return user;
                 }
@@ -99,20 +99,57 @@ export const {
         maxAge: 30 * 24 * 60 * 60, // 30 days
     },
     callbacks: {
-        async jwt({ token, user }: { token: any; user: any }) {
-            if (user) {
-                // Store complete user object in token
-                return {
-                    ...token,
-                    ...user,
-                    accessToken: user.accessToken,
-                    refreshToken: user.refreshToken,
-                };
+        async jwt({ token, user, session, trigger }: { session?: any, token: any; user?: any; trigger?: string }) {
+            console.log("Session callback jwt:", session);
+            console.log("Session trigger jwt:", trigger);
+            console.log("User in jwt callback:", user); // Add this to debug
+
+            if (trigger === 'update' && session?.user) {
+                // When updating via session, use session.user instead of user
+                const userData = session.user;
+                
+                // Only iterate if userData exists
+                if (userData) {
+                    Object.keys(userData).forEach(key => {
+                        if (userData[key] !== undefined) {
+                            token[key] = userData[key];
+                        }
+                    });
+                    
+                    // Ensure critical fields are set
+                    token.sub = userData.id || token.sub;
+                    token.id = userData.id || token.id;
+                    token.fullname = userData.fullname || token.fullname;
+                    token.bio = userData.bio || token.bio;
+                    token.ismale = userData.ismale || token.ismale;
+                    token.birthday = userData.birthday || token.birthday;
+                    token.phone = userData.phone || token.phone;
+                    token.urlavatar = userData.urlavatar || token.urlavatar;
+                    token.coverPhoto = userData.coverPhoto || token.coverPhoto;
+                }
             }
+            
+            // Initial sign in
+            if (user) {
+                token.sub = user.id;
+                token.id = user.id;
+                token.fullname = user.fullname;
+                token.bio = user.bio;
+                token.ismale = user.ismale;
+                token.birthday = user.birthday;
+                token.phone = user.phone;
+                token.urlavatar = user.urlavatar;
+                token.coverPhoto = user.coverPhoto;
+                token.accessToken = user.accessToken;
+                token.refreshToken = user.refreshToken;
+                token.email = user.email;
+                token.createdAt = user.createdAt;
+            }
+            
             return token;
         },
         async session({ session, token }) {
-            // Ensure all user data is passed to the session
+            console.log("Session callback token:", token);
             return {
                 ...session,
                 user: {
@@ -121,11 +158,11 @@ export const {
                     birthday: String(token.birthday || ''),
                     createdAt: String(token.createdAt || ''),
                     fullname: String(token.fullname || ''),
-                    email: String(token.email|| ''),
-                    phone: String(token.phone|| ''),
-                    bio:String(token.bio || ''),
-                    coverPhoto:String(token.coverPhoto || ''),
-                    ismale:Boolean(token.ismale || ''),
+                    email: String(token.email || ''),
+                    phone: String(token.phone || ''),
+                    bio: String(token.bio || ''),
+                    coverPhoto: String(token.coverPhoto || ''),
+                    ismale: Boolean(token.ismale || ''),
                 },
                 refreshToken: String(token.refreshToken || ''),
                 accessToken: String(token.accessToken || '')

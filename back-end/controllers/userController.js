@@ -106,29 +106,34 @@ userController.updateProfile = async (req, res) => {
     if (!fullname && ismale === undefined && !birthday) {
       return res.status(400).json({ message: "Cần cung cấp ít nhất một thông tin để cập nhật" })
     }
-    
+
     const user = await UserModel.get(phone)
-    console.log(user)
     if (!user) {
       return res.status(404).json({ message: "Không tìm thấy người dùng" })
     }
 
     if (fullname) user.fullname = fullname
-    if (ismale !== undefined) user.ismale = ismale
+    if (ismale !== undefined) user.ismale = Boolean(ismale)
     if (birthday) user.birthday = birthday
 
     user.updatedAt = new Date().toString()
 
     await user.save()
+    console.log("check user >>>. ", user);
 
     return res.status(200).json({
       message: "Cập nhật thông tin thành công",
       user: {
         id: user.id,
         fullname: user.fullname,
-        ismale: user.ismale,
+        urlavatar: user.urlavatar,
         birthday: user.birthday,
+        createdAt: user.createdAt,
+        email: user.email,
+        bio: user.bio,
         phone: user.phone,
+        coverPhoto: user.coverPhoto,
+        ismale: user.ismale
       },
     })
   } catch (error) {
