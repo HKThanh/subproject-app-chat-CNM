@@ -46,7 +46,7 @@ const UserSchema = new dynamoose.Schema({
                         default: false,
                     },
                     createdAt: {
-                        type: Date,
+                        type: String,
                         default: Date.now,
                     },
                     updatedAt: {
