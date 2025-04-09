@@ -170,7 +170,6 @@ export const {
             return token;
         },
         async session({ session, token }) {
-            console.log("Session callback token:", token);
             return {
                 ...session,
                 user: {

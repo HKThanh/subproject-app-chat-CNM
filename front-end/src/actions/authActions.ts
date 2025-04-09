@@ -43,7 +43,7 @@ export async function loginUser(email: string, password: string) {
         redirectTo: `/verify/${userId}`,
       };
     } else if (error.name === "InvalidPhonePasswordError") {
-      
+
       return {
         error: true,
         success: false,
@@ -77,7 +77,7 @@ export async function signUpUser(
       body: JSON.stringify({ email, password, fullname, otp }),
     }).then(res => res.json());
     console.log("check result in register>>> ", result);
-    
+
     // Nếu thành công, trả về thông tin để FE xử lý chuyển hướng
     if (result.message === "Người dùng đã tồn tại") {
         return {
@@ -259,3 +259,36 @@ export async function sendOtp(email: string) {
 //     };
 //   }
 // }
+
+export async function logoutUser(accessToken: string) {
+  try {
+    const response = await fetch(`${API_URL}/auth/logout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Đăng xuất thất bại');
+    }
+
+    const result = await response.json();
+
+    return {
+      error: false,
+      success: true,
+      message: result.message || "Đăng xuất thành công!",
+      status: 200,
+    };
+  } catch (error) {
+    console.error("Logout error:", error);
+    return {
+      error: true,
+      success: false,
+      message: "Đã xảy ra lỗi khi đăng xuất. Vui lòng thử lại sau.",
+      status: 500,
+    };
+  }
+}

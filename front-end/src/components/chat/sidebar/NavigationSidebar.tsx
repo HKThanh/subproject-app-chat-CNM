@@ -1,7 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { useSession, signOut } from "next-auth/react"
+import { toast } from "sonner"
 import ProfileModalWrapper from "@/components/user/profile-modal-wrapper"
+import { logoutUser } from "@/actions/authActions"
+import { getAuthToken } from "@/utils/auth-utils"
 import { Avatar, AvatarImage } from "@/components/ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
@@ -24,9 +29,51 @@ import {
 import useUserStore from "@/stores/useUserStoree"
 
 export default function NavigationSidebar() {
+  const router = useRouter()
+  useSession() // Đảm bảo session được load
   const [activeItem, setActiveItem] = useState('messages')
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const user = useUserStore((state) => state.user)
+  const clearUser = useUserStore((state) => state.clearUser)
+
+  // Hàm xử lý đăng xuất
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+
+      // Lấy token xác thực
+      const token = await getAuthToken();
+
+      if (!token) {
+        throw new Error('Không tìm thấy token xác thực');
+      }
+
+      // Gọi API đăng xuất
+      const result = await logoutUser(token);
+
+      if (result.success) {
+        // Xóa dữ liệu người dùng trong Zustand
+        clearUser();
+
+        // Đăng xuất khỏi NextAuth
+        await signOut({ redirect: false });
+
+        // Thông báo thành công
+        toast.success(result.message || 'Đăng xuất thành công!');
+
+        // Chuyển hướng về trang đăng nhập
+        router.push('/auth/login');
+      } else {
+        throw new Error(result.message || 'Đăng xuất thất bại');
+      }
+    } catch (error) {
+      console.error('Lỗi đăng xuất:', error);
+      toast.error(error instanceof Error ? error.message : 'Đã xảy ra lỗi khi đăng xuất');
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   const navigationItems = [
     { id: 'messages', icon: MessageSquare, label: 'Tin nhắn', badge: 5 },
@@ -65,9 +112,13 @@ export default function NavigationSidebar() {
                 Cài đặt
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600">
+              <DropdownMenuItem
+                className="text-red-600"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+              >
                 <LogOut className="mr-2 h-4 w-4" />
-                Đăng xuất
+                {isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

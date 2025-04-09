@@ -1,5 +1,6 @@
 const express = require("express");
 const app = express();
+;
 const port = 3000;
 const bodyParser = require("body-parser");
 const { createServer } = require("node:http");
@@ -11,16 +12,16 @@ const { redisClient } = require("./services/redisClient");
 const authRoutes = require("./routes/authRoute");
 const userRoutes = require("./routes/userRoute");
 const friendRequestRoutes = require("./routes/friendRequestRoute");
+const cors = require("cors")
+const corsOptions = {
+    origin: ['http://localhost:3000', 'http://localhost:3001'], // Add your frontend URLs
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+    optionsSuccessStatus: 200
+};
 
-// const corsOptions = {
-//     origin: ['http://localhost:3000', 'http://localhost:3001'], // Add your frontend URLs
-//     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-//     allowedHeaders: ['Content-Type', 'Authorization'],
-//     credentials: true,
-//     optionsSuccessStatus: 200
-// };
-
-// app.use(cors(corsOptions));
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
