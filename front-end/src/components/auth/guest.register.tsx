@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Github, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Toaster, toast } from "sonner";
 import * as z from "zod";
@@ -21,7 +21,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import { ShineBorder } from "@/components/magicui/shine-border";
 
 const formSchema = z.object({
@@ -34,6 +34,13 @@ const formSchema = z.object({
   password: z.string().min(6, {
     message: "Mật khẩu phải có ít nhất 6 ký tự.",
   }),
+  verificationCode: z.string().min(6, {
+    message: "Mã xác thực phải có 6 ký tự.",
+  })
+  .max(6, {
+    message: "Mã xác thực phải có 6 ký tự.",
+  })
+  .optional(),
 });
 
 export default function RegisterForm() {
@@ -41,6 +48,9 @@ export default function RegisterForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [isEmailValid, setIsEmailValid] = useState(false);
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0); // 0-100
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -48,6 +58,7 @@ export default function RegisterForm() {
       fullname: "",
       email: "",
       password: "",
+      verificationCode: "",
     },
   });
 
@@ -83,6 +94,44 @@ export default function RegisterForm() {
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const password = e.target.value;
+    // Đánh giá độ mạnh của mật khẩu
+    let strength = 0;
+    if (password.length > 0) strength += 20; // Có ký tự
+    if (password.length >= 6) strength += 20; // Đủ độ dài tối thiểu
+    if (/[A-Z]/.test(password)) strength += 20; // Có chữ hoa
+    if (/[0-9]/.test(password)) strength += 20; // Có số
+    if (/[^A-Za-z0-9]/.test(password)) strength += 20; // Có ký tự đặc biệt
+
+    setPasswordStrength(strength);
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const email = e.target.value;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    setIsEmailValid(emailRegex.test(email));
+  };
+
+  const sendVerificationCode = async () => {
+    const email = form.getValues('email');
+    if (!email || !isEmailValid) {
+      toast.error("Vui lòng nhập email hợp lệ");
+      return;
+    }
+
+    setIsSendingCode(true);
+    try {
+      // Giả lập gửi mã xác thực
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      toast.success("Mã xác thực đã được gửi đến email của bạn");
+    } catch (error) {
+      toast.error("Không thể gửi mã xác thực. Vui lòng thử lại sau.");
+    } finally {
+      setIsSendingCode(false);
+    }
   };
 
   return (
@@ -121,12 +170,31 @@ export default function RegisterForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <Input
-                        placeholder="Nhập email"
-                        type="email"
-                        className="rounded-full h-12 px-4 border-white/30 bg-white/30 backdrop-blur-lg focus:bg-white/40 transition-all font-medium text-gray-900 placeholder:text-gray-500"
-                        {...field}
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Nhập email"
+                          type="email"
+                          className="rounded-full h-12 px-4 border-white/30 bg-white/30 backdrop-blur-lg focus:bg-white/40 transition-all font-medium text-gray-900 placeholder:text-gray-500"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            handleEmailChange(e);
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          onClick={sendVerificationCode}
+                          disabled={!isEmailValid || isSendingCode}
+                          className="rounded-full whitespace-nowrap"
+                        >
+                          {isSendingCode ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Mail className="h-4 w-4 mr-2" />
+                          )}
+                          Gửi mã
+                        </Button>
+                      </div>
                     </FormControl>
                     <FormMessage className="font-medium" />
                   </FormItem>
@@ -144,6 +212,19 @@ export default function RegisterForm() {
                           placeholder="Mật khẩu"
                           className="rounded-full h-12 px-4 border-white/30 bg-white/30 backdrop-blur-lg focus:bg-white/40 transition-all pr-10 font-medium text-gray-900 placeholder:text-gray-500"
                           {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            handlePasswordChange(e);
+                          }}
+                        />
+                        <Progress
+                          value={passwordStrength}
+                          className="h-1 mt-1"
+                          indicatorColor={
+                            passwordStrength < 40 ? "bg-red-500" :
+                            passwordStrength < 60 ? "bg-yellow-500" :
+                            passwordStrength < 80 ? "bg-blue-500" : "bg-green-500"
+                          }
                         />
                         <Button
                           type="button"
@@ -159,6 +240,22 @@ export default function RegisterForm() {
                           )}
                         </Button>
                       </div>
+                    </FormControl>
+                    <FormMessage className="font-medium" />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="verificationCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        placeholder="Mã xác thực"
+                        className="rounded-full h-12 px-4 border-white/30 bg-white/30 backdrop-blur-lg focus:bg-white/40 transition-all font-medium text-gray-900 placeholder:text-gray-500"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage className="font-medium" />
                   </FormItem>
