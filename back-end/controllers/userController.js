@@ -156,7 +156,7 @@ userController.updateProfile = async (req, res) => {
   try {
     const id = req.user.id
     const { fullname, ismale, birthday } = req.body
-    console.log(phone, fullname, ismale, birthday)
+    console.log( fullname, ismale, birthday)
     if (!fullname && ismale === undefined && !birthday) {
       return res.status(400).json({ message: "Cần cung cấp ít nhất một thông tin để cập nhật" })
     }

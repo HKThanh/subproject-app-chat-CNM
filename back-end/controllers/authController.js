@@ -134,12 +134,11 @@ authController.login = async (req, res) => {
         return res.status(400).json({ message: 'Hãy nhập cả sdt và mật khẩu' });
     }
 
-    // const user = await UserModel.scan("phone").contains(phone).exec();
-
     const user = await UserModel.findOne({ phone: phone });
     if (!user) {
         return res.status(400).json({ message: 'Nhập sai tài khoản hoặc mật khẩu' });
     }
+
     bcrypt.compare(password, user.password, async (err, result) => {
         if (result) {
             const data = {
@@ -155,9 +154,7 @@ authController.login = async (req, res) => {
                 ismale: user.ismale
             }
 
-            const tokenInRedis = await redisClient.get(user.phone);
-            if (!tokenInRedis) {
-
+            if (!user.isLoggedin) {
                 const JWT_SECRET = process.env.JWT_SECRET;
                 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH;
                 const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30m' });
@@ -168,6 +165,7 @@ authController.login = async (req, res) => {
                 redisClient.setEx(`${user.phone}-refresh`, 86400, refreshToken);
 
                 user.isLoggedin = true;
+                await user.save();
 
                 return res.status(200).json({
                     message: 'Đăng nhập thành công',
@@ -176,24 +174,7 @@ authController.login = async (req, res) => {
                     user: data,
                 });
             } else {
-                const decoded = jwt.verify(tokenInRedis, JWT_SECRET);
-                if (decoded.id !== user.id) {
-                    return res.status(401).json({ message: 'Token không hợp lệ' });
-                }
-
-                // check if user is logged in
-                if (user.isLoggedin) {
-                    return res.status(400).json({ message: 'Người dùng đã đăng nhập' });
-                }
-
-                user.isLoggedin = true;
-
-                return res.status(200).json({
-                    message: 'Đăng nhập thành công',
-                    accessToken: tokenInRedis,
-                    refreshToken: tokenInRedis,
-                    user: data,
-                });
+                return res.status(400).json({ message: 'Tài khoản đã đăng nhập' });
             }
         } else {
             res.status(400).json({ message: 'Nhập sai tài khoản hoặc mật khẩu' });
