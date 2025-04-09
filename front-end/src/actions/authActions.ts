@@ -43,7 +43,7 @@ export async function loginUser(email: string, password: string) {
         redirectTo: `/verify/${userId}`,
       };
     } else if (error.name === "InvalidPhonePasswordError") {
-      
+
       return {
         error: true,
         success: false,
@@ -66,25 +66,42 @@ export async function signUpUser(
   email: string,
   password: string,
   fullname: string,
+  verificationCode: string,
 ) {
   try {
-    const result = await fetch(`${API_URL}/auth/register`, {
+    const result = await fetch(`${API_URL}/auth/register-web`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email, password, fullname }),
+      body: JSON.stringify({ email, password, fullname, otp: verificationCode }),
     }).then(res => res.json());
     console.log("check result in register>>> ", result);
-    
+
     // Nếu thành công, trả về thông tin để FE xử lý chuyển hướng
-    if (result.message === "Email đã có người đăng ký") {
+    if (result.message === "Người dùng đã tồn tại") {
         return {
           error: true,
           success: false,
           message: result.message,
           status: 400,
         };
+    }
+    if(result.message === 'OTP đã hết hạn'){
+      return {
+        error: true,
+        success: false,
+        message: result.message,
+        status: 400,
+      }
+    }
+    if (result.message === "OTP không hợp lệ") {
+      return {
+        error: true,
+        success: false,
+        message: result.message,
+        status: 400,
+      };
     }
     return {
       error: false,
@@ -97,6 +114,35 @@ export async function signUpUser(
     };
   } catch (error) {
     console.error("Sign up error:", error)
+    return {
+      error: true,
+      success: false,
+      message: "Đã xảy ra lỗi không xác định. Vui lòng thử lại sau.",
+      status: 500,
+    };
+  }
+}
+export async function sendOtp(email: string) {
+  try {
+    const result = await fetch(`${API_URL}/auth/request-otp-web`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    }).then(res => res.json());
+    console.log("check result in send otp>>> ", result);
+    if (result.message === 'Người dùng đã tồn tại'){
+      return {
+        error: true,
+        success: false,
+        message: result.message,
+        status: 400,
+      };
+    }
+    return result;
+  } catch (error) {
+    console.error("Send OTP error:", error);
     return {
       error: true,
       success: false,
