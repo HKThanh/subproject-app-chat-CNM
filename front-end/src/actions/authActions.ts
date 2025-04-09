@@ -11,11 +11,11 @@ import { auth, signIn } from "@/auth";
 // actions/login.ts
 const API_URL = process.env.NODE_PUBLIC_API_URL;
 
-export async function loginUser(phone: string, password: string) {
+export async function loginUser(email: string, password: string) {
   try {
     // First attempt to sign in
     const result = await signIn("credentials", {
-      phone,
+      email,
       password,
       redirect: false, // Không redirect tự động, xử lý bằng FE
     });
@@ -63,7 +63,7 @@ export async function loginUser(phone: string, password: string) {
 }
 
 export async function signUpUser(
-  phone: string,
+  email: string,
   password: string,
   fullname: string,
 ) {
@@ -73,12 +73,12 @@ export async function signUpUser(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ phone, password, fullname }),
+      body: JSON.stringify({ email, password, fullname }),
     }).then(res => res.json());
     console.log("check result in register>>> ", result);
     
     // Nếu thành công, trả về thông tin để FE xử lý chuyển hướng
-    if (result.message === "Tài khoản đã có người đăng ký") {
+    if (result.message === "Email đã có người đăng ký") {
         return {
           error: true,
           success: false,

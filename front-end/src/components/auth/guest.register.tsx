@@ -122,7 +122,7 @@ export default function RegisterForm() {
                   <FormItem>
                     <FormControl>
                       <Input
-                        placeholder="Số điện thoại"
+                        placeholder="Nhập email"
                         type="email"
                         className="rounded-full h-12 px-4 border-white/30 bg-white/30 backdrop-blur-lg focus:bg-white/40 transition-all font-medium text-gray-900 placeholder:text-gray-500"
                         {...field}
