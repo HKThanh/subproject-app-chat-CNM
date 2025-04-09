@@ -153,27 +153,29 @@ userController.updateAvatar = async (req, res) => {
 
 userController.updateProfile = async (req, res) => {
   try {
-    const id = req.user.id
-    const { fullname, ismale, birthday } = req.body
-    console.log( fullname, ismale, birthday)
+    const id = req.user.id;
+    const { fullname, ismale, birthday, bio } = req.body;
     if (!fullname && ismale === undefined && !birthday) {
-      return res.status(400).json({ message: "Cần cung cấp ít nhất một thông tin để cập nhật" })
+      return res
+        .status(400)
+        .json({ message: "Cần cung cấp ít nhất một thông tin để cập nhật" });
     }
 
-    const user = await UserModel.get(id)
+    const user = await UserModel.get(id);
 
     if (!user) {
-      return res.status(404).json({ message: "Không tìm thấy người dùng" })
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
     }
 
-    if (fullname) user.fullname = fullname
-    if (ismale !== undefined) user.ismale = Boolean(ismale)
-    if (birthday) user.birthday = birthday
+    if (fullname) user.fullname = fullname;
+    if (ismale !== undefined) {
+      user.ismale = ismale === true || ismale === 'true';
+    }
+    if (birthday) user.birthday = birthday;
+    if (bio) user.bio = bio;
+    user.updatedAt = new Date().toString();
 
-    user.updatedAt = new Date().toString()
-
-    await user.save()
-    console.log("check user >>>. ", user);
+    await user.save();
 
     return res.status(200).json({
       message: "Cập nhật thông tin thành công",
@@ -187,14 +189,14 @@ userController.updateProfile = async (req, res) => {
         bio: user.bio,
         phone: user.phone,
         coverPhoto: user.coverPhoto,
-        ismale: user.ismale
+        ismale: user.ismale,
       },
-    })
+    });
   } catch (error) {
-    console.error("Error updating profile:", error)
-    return res.status(500).json({ message: "Lỗi khi cập nhật thông tin" })
+    console.error("Error updating profile:", error);
+    return res.status(500).json({ message: "Lỗi khi cập nhật thông tin" });
   }
-}
+};
 
 userController.sendFriendRequest = async (req, res) => {
   const senderId = req.user.id;

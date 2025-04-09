@@ -28,6 +28,8 @@ const handleUserOnline = (socket) => {
         try {
             const { phone } = payload;
             addNewUser(phone, socket.id);
+            
+            // Join user vào room với ID là số điện thoại
             socket.join(phone);
 
             // Load unread messages khi user online
@@ -49,6 +51,8 @@ const handleUserOnline = (socket) => {
                 message: "Connected successfully",
                 socketId: socket.id
             });
+
+            console.log(`User ${phone} connected with socket ${socket.id}`);
         } catch (error) {
             console.error("Error handling user online:", error);
         }
@@ -299,53 +303,47 @@ const handleRecallMessage = async (io, socket) => {
         try {
             const { idMessage, idConversation } = payload;
             
-            // Tìm và cập nhật tin nhắn
-            const message = await MessageDetail.findOneAndUpdate(
+            // Tìm tin nhắn và thông tin người nhận
+            const message = await MessageDetail.findOne({ idMessage });
+            if (!message) {
+                throw new Error("Không tìm thấy tin nhắn");
+            }
+
+            // Cập nhật tin nhắn
+            const updatedMessage = await MessageDetail.findOneAndUpdate(
                 { idMessage },
                 { 
                     isRecall: true,
                     content: "Tin nhắn đã được thu hồi"
                 },
                 { new: true }
-            ).populate('idSender', 'id'); // Lấy thêm thông tin sender
+            );
 
-            if (!message) {
-                throw new Error("Không tìm thấy tin nhắn");
+            // Tìm conversation để lấy thông tin người nhận
+            const conversation = await Conversation.findOne({ idConversation });
+            if (!conversation) {
+                throw new Error("Không tìm thấy cuộc hội thoại");
             }
 
-            // Tìm receiver để gửi thông báo
-            const conversation = await Conversation.findOne({ idConversation });
-            const idReceiver = conversation.idSender === message.idSender.id ? 
+            // Xác định người nhận
+            const idReceiver = conversation.idSender === message.idSender ? 
                              conversation.idReceiver : conversation.idSender;
 
-            // Emit tới tất cả users trong conversation
-            io.to(idConversation).emit("message_recalled", {
+            console.log('Sending recall notification to receiver:', idReceiver);
+
+            // Gửi thông báo cho người nhận
+            io.to(idReceiver).emit("message_recalled", {
                 messageId: idMessage,
-                updatedMessage: {
-                    ...message.toObject(),
-                    isRecall: true,
-                    content: "Tin nhắn đã được thu hồi"
-                }
+                updatedMessage: updatedMessage
             });
 
-            // Emit riêng cho receiver nếu online
-            const receiverOnline = getUser(idReceiver);
-            if (receiverOnline) {
-                io.to(receiverOnline.socketId).emit("message_recalled", {
-                    messageId: idMessage,
-                    updatedMessage: {
-                        ...message.toObject(),
-                        isRecall: true,
-                        content: "Tin nhắn đã được thu hồi"
-                    }
-                });
-            }
-
-            // Emit success về cho người thu hồi
+            // Gửi thông báo thành công cho người gửi
             socket.emit("recall_message_success", {
                 messageId: idMessage,
                 success: true
             });
+
+            console.log('Recall message notification sent');
 
         } catch (error) {
             console.error("Error recalling message:", error);
