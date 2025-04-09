@@ -51,7 +51,14 @@ export async function loginUser(email: string, password: string) {
         status: 400,
       };
     }
-
+    else if(error.name ==="AccountIsLoggedError"){
+      return {
+        error: true,
+        success: false,
+        message: "Tài khoản đang đăng nhập",
+        status: 400,
+      };
+    }
     // Generic error response
     return {
       error: true,
