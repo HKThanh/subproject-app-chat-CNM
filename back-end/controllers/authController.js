@@ -123,10 +123,10 @@ authController.registerForWeb = async (req, res) => {
 
     const { otp: cachedOTP } = JSON.parse(cachedData);
     if (otp !== cachedOTP) {
-        return res.status(400).json({ message: 'OTP không hợp lệ' });
+        return res.status(400).json({ message: 'OTP không hợp lệ', status: 401 });
     }
 
-    brypt.hash(password, 10).then(async (hash) => {
+    bcrypt.hash(password, 10).then(async (hash) => {
         try {
             const newUser = await UserModel.create({
                 id: uuidv4(),
