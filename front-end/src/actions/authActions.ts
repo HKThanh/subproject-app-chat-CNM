@@ -31,20 +31,19 @@ export async function loginUser(email: string, password: string) {
   } catch (error: any) {
 
     // Handle specific error types
-    // if (error.name === "AccountNotActivatedError") {
-    //   // Try to get user ID from error or response
-    //   const userId = error.userId || error._id;
-    //   return {
-    //     error: true,
-    //     success: false,
-    //     message:
-    //       "Tài khoản chưa được kích hoạt. Vui lòng xác thực email của bạn.",
-    //     status: 401,
-    //     redirectTo: `/verify/${userId}`,
-    //   };
-    // } else
-     if (error.name === "InvalidPhonePasswordError") {
-
+    if (error.name === "AccountNotActivatedError") {
+      // Try to get user ID from error or response
+      const userId = error.userId || error._id;
+      return {
+        error: true,
+        success: false,
+        message:
+          "Tài khoản chưa được kích hoạt. Vui lòng xác thực email của bạn.",
+        status: 401,
+        redirectTo: `/verify/${userId}`,
+      };
+    } else if (error.name === "InvalidPhonePasswordError") {
+      
       return {
         error: true,
         success: false,
@@ -67,7 +66,7 @@ export async function signUpUser(
   email: string,
   password: string,
   fullname: string,
-  verificationCode: string,
+  otp: string,
 ) {
   try {
     const result = await fetch(`${API_URL}/auth/register-web`, {
@@ -75,10 +74,10 @@ export async function signUpUser(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email, password, fullname, otp: verificationCode }),
+      body: JSON.stringify({ email, password, fullname, otp }),
     }).then(res => res.json());
     console.log("check result in register>>> ", result);
-
+    
     // Nếu thành công, trả về thông tin để FE xử lý chuyển hướng
     if (result.message === "Người dùng đã tồn tại") {
         return {

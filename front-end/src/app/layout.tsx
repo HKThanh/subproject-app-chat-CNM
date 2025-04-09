@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import NextAuthProvider from "@/components/providers/session-provider";
+import { SessionProvider } from "next-auth/react";
 import AuthSync from "@/components/auth/auth.sync";
 
 const inter = Inter({
@@ -29,11 +29,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className} suppressHydrationWarning>
-        <NextAuthProvider>
+      <body className={inter.className}>
+        <SessionProvider>
           <AuthSync />
           {children}
-        </NextAuthProvider>
+        </SessionProvider>
       </body>
     </html>
   );

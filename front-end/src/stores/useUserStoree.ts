@@ -10,8 +10,8 @@ interface UserState {
   clearUser: () => void;
 }
 
-// We'll use a function to check server/client environment
-const getIsServer = () => typeof window === "undefined";
+// Check if we're in a browser environment
+const isServer = typeof window === "undefined";
 
 const useUserStore = create<UserState>()(
   persist(
@@ -35,19 +35,15 @@ const useUserStore = create<UserState>()(
     {
       name: "user-session",
       // Only use storage in browser environment
-      storage: createJSONStorage(() => {
-        // Check environment at runtime
-        if (getIsServer()) {
-          return {
+      storage: isServer
+        ? createJSONStorage(() => ({
             getItem: () => null,
             setItem: () => {},
             removeItem: () => {},
-          };
-        }
-        return sessionStorage;
-      }),
+          }))
+        : createJSONStorage(() => sessionStorage),
       // Skip persistence on server
-      skipHydration: true,
+      skipHydration: isServer,
     },
   ),
 );
