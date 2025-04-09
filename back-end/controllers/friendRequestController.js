@@ -17,7 +17,7 @@ FriendRequestController.checkRequestExists = async (req, res) => {
         });
     }
 
-    const senderId = req.user.phone;
+    const senderId = req.user.id;
 
     console.log(senderId);
     
@@ -36,19 +36,19 @@ FriendRequestController.checkRequestExists = async (req, res) => {
             if (status === "PENDING") {
                 return res.status(200).json({
                     code: 0,
-                    message: `Friend request is exist`,
+                    message: `Đã gửi yêu cầu kết bạn`,
                 });
             }
             if (status === "ACCEPTED") {
                 return res.status(200).json({
                     code: 2,
-                    message: `Already friend`,
+                    message: `Đã là bạn bè`,
                 });
             }
         } else {
             return res.status(200).json({
                 code: 1,
-                message: "Friend request not found",
+                message: "Không tìm thấy yêu cầu kết bạn",
             });
         }
     } catch (error) {
@@ -63,13 +63,13 @@ FriendRequestController.getAllRequests = async (req, res) => {
     if (!requests) {
         return res.status(404).json({
             code: 1,
-            message: "No friend requests found",
+            message: "Không tìm thấy yêu cầu kết bạn nào",
         });
     }
 
     return res.status(200).json({
         code: 0,
-        message: "Get all friend requests successfully",
+        message: "Lấy danh sách yêu cầu kết bạn thành công",
         data: requests,
     });
 }
