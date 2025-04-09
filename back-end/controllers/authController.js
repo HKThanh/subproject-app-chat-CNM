@@ -90,17 +90,23 @@ authController.register = async (req, res) => {
 
     // Check if the email is already registered
     const existingEmail = await UserModel.findOne({ email: email });
+    const existingPhone = await UserModel.findOne({ phone: phone });
+    // const existingEmail = await UserModel.scan({phone: phone}).exec();
     // write with dynamodb
     // const existingEmail = await UserModel.scan({email: email}).exec();
 
     if (existingEmail) {
-        return res.status(400).json({ message: 'Email đã được sử dụng' });
+        return res.status(400).json({ message: 'Email đã được đăng ký' });
+    }
+
+    if (existingPhone) {
+        return res.status(400).json({ message: 'Số điện thoại đã được đăng ký' });
     }
 
     bcrypt.hash(password, 10).then(async (hash) => {
         try {
             const newUser = await UserModel.create({
-                id: () => uuidv4(),
+                id: uuidv4(),
                 username: phone,
                 phone: phone,
                 password: hash,
@@ -134,11 +140,12 @@ authController.login = async (req, res) => {
         return res.status(400).json({ message: 'Hãy nhập cả sdt và mật khẩu' });
     }
 
+    // const user = await UserModel.scan("phone").contains(phone).exec();
+
     const user = await UserModel.findOne({ phone: phone });
     if (!user) {
         return res.status(400).json({ message: 'Nhập sai tài khoản hoặc mật khẩu' });
     }
-
     bcrypt.compare(password, user.password, async (err, result) => {
         if (result) {
             const data = {
@@ -155,6 +162,7 @@ authController.login = async (req, res) => {
             }
 
             if (!user.isLoggedin) {
+
                 const JWT_SECRET = process.env.JWT_SECRET;
                 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH;
                 const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30m' });
@@ -221,6 +229,7 @@ authController.logout = async (req, res) => {
         }
 
         user.isLoggedin = false;
+        await user.save();
 
         // remove token from redis
         await redisClient.del(user.phone);

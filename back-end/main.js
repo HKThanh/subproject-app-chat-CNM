@@ -3,42 +3,52 @@ const app = express();
 const port = 3000;
 const bodyParser = require("body-parser");
 const { createServer } = require("node:http");
+// const connectDB = require("./config/connectDynamodb");
 const connectDB = require("./config/connectMongo");
-const { initSocket, getIO } = require("./config/socket");
+const { initSocket } = require("./config/socket");
+const { redisClient } = require("./services/redisClient");
 
-const authController = require("./controllers/authController")
 const authRoutes = require("./routes/authRoute");
 const userRoutes = require("./routes/userRoute");
-const socketController = require("./controllers/socketController");
 const friendRequestRoutes = require("./routes/friendRequestRoute");
 
+// const corsOptions = {
+//     origin: ['http://localhost:3000', 'http://localhost:3001'], // Add your frontend URLs
+//     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+//     allowedHeaders: ['Content-Type', 'Authorization'],
+//     credentials: true,
+//     optionsSuccessStatus: 200
+// };
+
+// app.use(cors(corsOptions));
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 connectDB();
 
 const server = createServer(app);
-initSocket(server); // Khởi tạo socket
-const io = getIO(); // Lấy instance của socket.io
+initSocket(server);
 
 app.use(express.json());
 app.use("/auth", authRoutes);
 app.use("/user", userRoutes);
 app.use("/friend-request", friendRequestRoutes);
 
-io.on('connection', (socket) => {
-    console.log('Client connected:', socket.id);
-    
-    socketController.handleUserOnline(socket);
-    socketController.handleLoadConversation(io, socket);
-    socketController.handleSendMessage(io, socket);
-    socketController.handleSendFile(io, socket);
-    socketController.handleDeleteMessage(io, socket);
-    socketController.handleRecallMessage(io, socket);
-    socketController.handleForwardMessage(io, socket);
-});
 
-server.listen(port, () => {
+// io.on('connection', (socket) => {
+//     console.log('Client connected:', socket.id);
+//     authController.generateQR(null, null, io, socket);
+
+//     socket.on('verifyToken', (token) => {
+//         authController.verifyToken(io, socket, token);
+//     });
+
+//     socket.on('disconnect', () => {
+//         console.log('Client disconnected:', socket.id);
+//     });
+// });
+
+app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
 

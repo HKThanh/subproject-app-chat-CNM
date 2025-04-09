@@ -37,84 +37,83 @@ userController.getUserByPhone = async (req, res) => {
   }
 }
 
-userController.updatePasswordRequest = async (req, res) => {
-  const { email, phone } = req.body
-
-  if (!oldpassword || !newPassword) {
-    return res.status(400).json({ message: "Hãy nhập cả mật khẩu cũ và mới" })
-  }
+userController.resetPasswordRequest = async (req, res) => {
+  const { email, phone } = req.body;
 
   const user = await UserModel.findOne({ email, phone })
   if (!user) {
     return res.status(404).json({ message: "Không tìm thấy người dùng" })
   }
 
-  if (oldpassword !== user.password) {
-    return res.status(400).json({ message: "Sai mật khẩu cũ" })
-  }
-
-  if (newPassword !== repassword) {
-    return res.status(400).json({ message: "Nhập lại sai mật khẩu" })
-  }
-
   const otp = generateOTP();
 
   try {
     await sendOTP(email, otp);
-    await redisClient.setEx(otp, 300, JSON.stringify({ otp }));
-    await redisClient.setEx(email, 300, JSON.stringify({ email }));
-    await redisClient.setEx(phone, 300, JSON.stringify({ phone }));
-    res.status(200).json({ message: 'OTP sent successfully', otp: otp });
+    const idForRedis = uuidv4();
+    const data = JSON.stringify({ otp, phone, email });
+
+    await redisClient.setEx(idForRedis, 300, data); // Set OTP with 5 minutes expiration
+    res.status(200).json({ message: 'OTP sent successfully', otp: otp, id: idForRedis });
   } catch (error) {
     res.status(500).json({ message: 'Failed to send OTP' });
   }
 }
 
-userController.updatePassword = async (req, res) => {
-  const { oldpassword, newPassword } = req.body;
+userController.resetPassword = async (req, res) => {
+  const { otp, password } = req.body;
+  const idForRedis = req.params.id;
 
-  if (!oldpassword || !newPassword) {
-    return res.status(400).json({ message: "Hãy nhập cả mật khẩu cũ và mới" })
-  }
-
-  const redisData = await redisClient.get(otp);
-  const redisPhone = await redisClient.get(phone);
-  const redisEmail = await redisClient.get(email);
+  const redisData = await redisClient.get(idForRedis);
   if (!redisData) {
     return res.status(400).json({ message: "OTP đã hết hạn" })
   }
 
-  const { otp: storedOtp } = JSON.parse(redisData)
+  const { otp: storedOtp, phone: storedPhone, email: storedEmail } = JSON.parse(redisData);
 
   if (otp !== storedOtp) {
     return res.status(400).json({ message: "Sai mã OTP" })
   }
-
-  const { phone: storedPhone } = JSON.parse(redisPhone)
-  const { email: storedEmail } = JSON.parse(redisEmail)
   const user = await UserModel.findOne({ email: storedEmail, phone: storedPhone })
 
   if (!user) {
     return res.status(404).json({ message: "Không tìm thấy người dùng" })
   }
 
-  const oldPasswordCrypted = bcrypt.hashSync(oldpassword, 10);
-  
-  if (oldPasswordCrypted !== user.password) {
-    return res.status(400).json({ message: "Nhập sai mật khẩu" })
+  bcrypt.hash(password, 10, async (err, hash) => {
+
+    user.password = hash
+    await user.save()
+
+    res.status(200).json({ message: "Cập nhật mật khẩu thành công" , newpass: user.password});
+  });
+}
+
+userController.updatePassword = async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  const id = req.user.id;
+
+  const user = await UserModel.get(id)
+
+  if (!user) {
+    return res.status(404).json({ message: "Không tìm thấy người dùng" })
   }
 
+  bcrypt.compare(oldPassword, user.password, async (err, result) => {
+    if (!result) {
+      return res.status(400).json({ message: "Mật khẩu cũ không đúng" })
+    }
+  });
+
   bcrypt.hash(newPassword, 10, async (err, hash) => {
-    if (err) {
-      return res.status(500).json({ message: "Lỗi khi mã hóa mật khẩu" })
+    if (newPassword === oldPassword) {
+      return res.status(400).json({ message: "Mật khẩu mới không được giống mật khẩu cũ" })
     }
 
     user.password = hash
     await user.save()
-  });
 
-  res.status(200).json({ message: "Cập nhật mật khẩu thành công" })
-
+    return res.status(200).json({ message: "Cập nhật mật khẩu thành công" })
+  })
 }
 
 userController.updateAvatar = async (req, res) => {
