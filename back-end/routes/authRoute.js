@@ -18,8 +18,10 @@ router.post('/logout', authMiddleware, authController.logout);
 
 router.post('/refresh-token', authController.refreshToken);
 
-router.post('/update-password', userController.updatePassword);
+router.post('/reset-password/:id', userController.resetPassword);
 
-router.post('/update-pass-request', userController.updatePasswordRequest);
+router.post('/reset-password-request', userController.resetPasswordRequest);
+
+router.post('/update-password', authMiddleware, userController.updatePassword);
 
 module.exports = router;
