@@ -10,6 +10,7 @@ const { Server } = require("socket.io");
 const authController = require("./controllers/authController")
 const authRoutes = require("./routes/authRoute");
 const userRoutes = require("./routes/userRoute");
+const socketController = require("./controllers/socketController");
 
 app.use(cors());
 app.use(express.json());
@@ -31,11 +32,15 @@ app.use("/user", userRoutes);
 
 io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
-    authController.generateQR(null, null, io, socket);
 
-    socket.on('verifyToken', (token) => {
-        authController.verifyToken(io, socket, token);
-    });
+    // Đăng ký các socket handlers
+    socketController.handleUserOnline(socket);
+    socketController.handleLoadConversation(io, socket);
+    socketController.handleSendMessage(io, socket);
+    socketController.handleSendFile(io, socket);
+    socketController.handleDeleteMessage(io, socket);
+    socketController.handleRecallMessage(io, socket);
+    socketController.handleForwardMessage(io, socket);
 
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);

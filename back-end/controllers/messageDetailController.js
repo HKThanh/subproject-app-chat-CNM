@@ -1,13 +1,13 @@
-const dynamoose = require("../config/connectDynamodb")
+const MessageDetailModel = require("../models/MessageDetailModel");
 const { v4: uuidv4 } = require("uuid");
 const moment = require("moment-timezone");
-const MessageDetailModel = require("../models/MessageDetailModel")
-const getMessagesDetailByID = async (idMessageDetail) => {
-    const data = await MessageDetailModel.get(idMessageDetail);
-    return data;
-  };
 
-  //Tạo mới tin nhắn dạng text
+/**
+ * Tạo mới tin nhắn dạng text
+ * @param {string} idSender - ID người gửi
+ * @param {string} idConversation - ID cuộc trò chuyện
+ * @param {string} textMessage - Nội dung tin nhắn
+ */
 const createTextMessageDetail = async (idSender, idConversation, textMessage) => {
     const data = {
         idMessage: uuidv4(),
@@ -18,54 +18,63 @@ const createTextMessageDetail = async (idSender, idConversation, textMessage) =>
         isRemove: false,
         dateTime: moment.tz("Asia/Ho_Chi_Minh").format("YYYY-MM-DDTHH:mm:ss.SSS"),
     };
-    const newMessageDetail = await MessageDetailModel.create(data);
-    return newMessageDetail;
-}
+    
+    try {
+        const newMessageDetail = await MessageDetailModel.create(data);
+        return newMessageDetail;
+    } catch (error) {
+        console.error("Error creating text message:", error);
+        throw error;
+    }
+};
 
 // Tạo mới tin nhắn dạng hình ảnh
-const createNewImageMessage = async (idSender, idConversation, image) => {
-    const data = {
-        idMessage: uuidv4(),
-        idSender: idSender,
-        idConversation: idConversation,
-        type: "image",
-        content: image,
-        isRemove: false,
-        dateTime: moment.tz("Asia/Ho_Chi_Minh").format("YYYY-MM-DDTHH:mm:ss.SSS"),
-    };
-    const newMessageDetail = await MessageDetailModel.create(data);
-    return newMessageDetail;
-}
-
-// Tạo mới tin nhắn dạng file
-const createNewFileMessage = async (idSender, idConversation, file) => {
-    const data = {
-      idMessage: uuidv4(),
-      idSender: idSender,
-      idConversation: idConversation,
-      type: "file",
-      content: file,
-      isRemove: false,
-      dateTime: moment.tz("Asia/Ho_Chi_Minh").format("YYYY-MM-DDTHH:mm:ss.SSS"),
-    }
-    const newMessageDetail = await MessageDetailModel.create(data);
-    return newMessageDetail;
-  }
-
-// Tạo mới tin nhắn dạng video
-const creatLinkMessage = async (idSender, idConversation, link) => {  
+const createNewImageMessage = async (idSender, idConversation, imageUrl) => {
   const data = {
     idMessage: uuidv4(),
     idSender: idSender,
     idConversation: idConversation,
-    type: "link",
-    content: link,
+    type: "image",
+    content: imageUrl,
     isRemove: false,
     dateTime: moment.tz("Asia/Ho_Chi_Minh").format("YYYY-MM-DDTHH:mm:ss.SSS"),
-  }
+  };
+  
   const newMessageDetail = await MessageDetailModel.create(data);
   return newMessageDetail;
-}
+};
+
+// Tạo mới tin nhắn dạng file
+const createNewFileMessage = async (idSender, idConversation, fileUrl) => {
+  const data = {
+    idMessage: uuidv4(),
+    idSender: idSender,
+    idConversation: idConversation,
+    type: "file",
+    content: fileUrl,
+    isRemove: false,
+    dateTime: moment.tz("Asia/Ho_Chi_Minh").format("YYYY-MM-DDTHH:mm:ss.SSS"),
+  };
+  
+  const newMessageDetail = await MessageDetailModel.create(data);
+  return newMessageDetail;
+};
+
+// Tạo mới tin nhắn dạng video
+const createNewVideoMessage = async (idSender, idConversation, videoUrl) => {
+  const data = {
+    idMessage: uuidv4(),
+    idSender: idSender,
+    idConversation: idConversation,
+    type: "video",
+    content: videoUrl,
+    isRemove: false,
+    dateTime: moment.tz("Asia/Ho_Chi_Minh").format("YYYY-MM-DDTHH:mm:ss.SSS"),
+  };
+  
+  const newMessageDetail = await MessageDetailModel.create(data);
+  return newMessageDetail;
+};
 
 const createNewMessage = async (MessageDetail) => {
   try {
@@ -78,10 +87,9 @@ const createNewMessage = async (MessageDetail) => {
 }
 
 module.exports = {
-  getMessagesDetailByID,
   createTextMessageDetail,
   createNewImageMessage,
   createNewFileMessage,
-  creatLinkMessage,
+  createNewVideoMessage,
   createNewMessage
 };

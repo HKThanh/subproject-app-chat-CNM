@@ -1,6 +1,5 @@
 const dynamoose = require("dynamoose");
-const mongoose = require("mongoose");
-const Schema = mongoose.Schema;
+const moment = require('moment-timezone');
 
 const ConversationSchema = new dynamoose.Schema({
     idConversation: {
@@ -19,13 +18,18 @@ const ConversationSchema = new dynamoose.Schema({
     },
     idReceiver: String,
     idNewestMessage: String,
-    isBlock: Boolean,
-    imageList: {
+    isBlock: {
+        type: Boolean,
+        default: false
+    },
+    // Lưu danh sách URL của hình ảnh trong cuộc trò chuyện
+    listImage: {
         type: Array,
         default: [],
         schema: [String],
     },
-    fileList: {
+    // Lưu danh sách URL của file trong cuộc trò chuyện
+    listFile: {
         type: Array,
         default: [],
         schema: [String],
@@ -34,8 +38,7 @@ const ConversationSchema = new dynamoose.Schema({
         type: String,
         default: moment.tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DDTHH:mm:ss.SSS'),
     }
-})
+});
 
 const Conversation = dynamoose.model("Conversation", ConversationSchema);
-
 module.exports = Conversation;
