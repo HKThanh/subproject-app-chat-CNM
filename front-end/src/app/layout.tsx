@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
-import { SessionProvider } from "next-auth/react";
+import NextAuthProvider from "@/components/providers/session-provider";
 import AuthSync from "@/components/auth/auth.sync";
 
 const inter = Inter({
-  variable: "--font-inter",
   subsets: ["latin"],
+  variable: "--font-inter",
 });
-
 
 export const metadata: Metadata = {
   title: "WeChat - Ứng dụng nhắn tin trực tuyến",
@@ -30,13 +29,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${inter.variable} antialiased`}
-      >
-        <SessionProvider>
+      <body className={inter.className} suppressHydrationWarning>
+        <NextAuthProvider>
           <AuthSync />
           {children}
-        </SessionProvider>
+        </NextAuthProvider>
       </body>
     </html>
   );

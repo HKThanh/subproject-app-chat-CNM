@@ -10,16 +10,25 @@ export default function AuthSync() {
   const setTokens = useUserStore((state) => state.setTokens);
   const clearUser = useUserStore((state) => state.clearUser);
 
+  // Use a state to track if we're mounted on the client
+  const [isMounted, setIsMounted] = useState(false);
+
+  // First effect just to mark component as mounted (client-side only)
   useEffect(() => {
-    if (status === "loading") return;
+    setIsMounted(true);
+  }, []);
+
+  // Second effect to handle auth sync, only runs on client
+  useEffect(() => {
+    // Skip if not mounted (server-side) or still loading
+    if (!isMounted || status === "loading") return;
 
     if (!session?.user) {
       console.log("No valid session found, clearing user store");
       clearUser();
       return;
     }
-    console.log("check status >>> ", status);
-    
+
     if (status === "authenticated" && session?.user) {
       const user: IUser = {
         id: session.user.id,
@@ -33,11 +42,10 @@ export default function AuthSync() {
         ismale: session.user.ismale,
       };
 
-      console.log("Syncing user to store:", user);
       setUser(user, session.accessToken);
       setTokens(session.accessToken, session.refreshToken)
     }
-  }, [session, status, setUser, clearUser]);
+  }, [isMounted, session, status, setUser, clearUser, setTokens]);
 
   return null;
 }
