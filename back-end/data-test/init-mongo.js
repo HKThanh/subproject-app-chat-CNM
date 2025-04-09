@@ -5,7 +5,7 @@ db.createCollection("users");
 db.users.insertMany([
     {
         "id": "user001",
-        "username": "0912345678",
+        "username": "alice.johnson@example.com",
         "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
         "fullname": "John Doe",
         "ismale": true,
@@ -25,7 +25,7 @@ db.users.insertMany([
     },
     {
         "id": "user002",
-        "username": "0987654321",
+        "username": "alice.johnson@example.com",
         "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
         "fullname": "Jane Smith",
         "ismale": false,
@@ -43,7 +43,7 @@ db.users.insertMany([
     },
     {
         "id": "user003",
-        "username": "0933445566",
+        "username": "alice.johnson@example.com",
         "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
         "fullname": "Alice Johnson",
         "ismale": false,
