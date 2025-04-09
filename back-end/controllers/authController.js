@@ -14,22 +14,18 @@ const authController = {};
 const pendingLogins = new Map();
 
 authController.requestOTP = async (req, res) => {
-    const { phone, email } = req.body;
+    const { email } = req.body;
 
-    if (!phone) {
-        return res.status(400).json({ message: 'Hãy nhập số điện thoại' });
-    }
-
-    const existingUser = await UserModel.get(phone);
+    const existingUser = await UserModel.get(email);
     if (existingUser) {
-        return res.status(400).json({ message: 'Số điện thoại đã tồn tại' });
+        return res.status(400).json({ message: 'Email đã tồn tại' });
     }
 
     const otp = generateOTP();
 
     try {
         await sendOTP(email, otp);
-        await redisClient.setEx(phone, 300, JSON.stringify({ otp }));
+        await redisClient.setEx(email, 300, JSON.stringify({ otp }));
         res.status(200).json({ message: 'OTP sent successfully', otp: otp });
     } catch (error) {
         res.status(500).json({ message: 'Failed to send OTP' });
@@ -71,44 +67,38 @@ authController.verifyOTP = async (req, res) => {
         await user.save();
 
         await redisClient.del(email); // Remove OTP from Redis after verification
-        res.status(200).json({ message: 'OTP verified successfully', email: email });
+        res.status(200).json({ message: 'OTP xác thực thành công', email: email });
     }
 };
 
 authController.register = async (req, res) => {
-    const { phone, password, fullname, email } = req.body;
+    const { password, fullname, email } = req.body;
 
-    if (!phone || !password || !fullname || !email) {
+    if (!password || !fullname || !email) {
         return res.status(400).json({ message: 'Hãy nhập thông tin cần thiết' });
     }
 
-    // const existingUser = await UserModel.scan({phone: phone}).exec();
-    const existingUser = await UserModel.get(phone);
+    // const existingUser = await UserModel.scan({email: email}).exec();
+    const existingUser = await UserModel.get(email);
     if (existingUser) {
         return res.status(400).json({ message: 'Tài khoản đã có người đăng ký' });
     }
 
     // Check if the email is already registered
     const existingEmail = await UserModel.findOne({ email: email });
-    const existingPhone = await UserModel.findOne({ phone: phone });
-    // const existingEmail = await UserModel.scan({phone: phone}).exec();
     // write with dynamodb
     // const existingEmail = await UserModel.scan({email: email}).exec();
 
     if (existingEmail) {
-        return res.status(400).json({ message: 'Email đã được đăng ký' });
-    }
-
-    if (existingPhone) {
-        return res.status(400).json({ message: 'Số điện thoại đã được đăng ký' });
+        return res.status(400).json({ message: 'Email đã tồn tại' });
     }
 
     bcrypt.hash(password, 10).then(async (hash) => {
         try {
             const newUser = await UserModel.create({
                 id: uuidv4(),
-                username: phone,
-                phone: phone,
+                username: email,
+                phone: "",
                 password: hash,
                 fullname: fullname,
                 email: email,
@@ -121,8 +111,8 @@ authController.register = async (req, res) => {
             await sendOTP(email, otp);
             await redisClient.setEx(email, 300, JSON.stringify({ otp }));
             return res.status(200).json({ 
-                message: 'User registered and OTP sent successfully',
-                phone: newUser.phone,
+                message: 'OTP đã được gửi đến email của bạn',
+                email: newUser.email,
                 otp: otp 
             });
 
@@ -134,17 +124,17 @@ authController.register = async (req, res) => {
 };
 
 authController.login = async (req, res) => {
-    const { phone, password } = req.body;
+    const { email, password } = req.body;
 
-    if (!phone || !password) {
-        return res.status(400).json({ message: 'Hãy nhập cả sdt và mật khẩu' });
+    if (!email || !password) {
+        return res.status(400).json({ message: 'Hãy nhập cả email và mật khẩu' });
     }
 
-    // const user = await UserModel.scan("phone").contains(phone).exec();
+    // const user = await UserModel.scan("email").contains(email).exec();
 
-    const user = await UserModel.findOne({ phone: phone });
+    const user = await UserModel.findOne({ email: email });
     if (!user) {
-        return res.status(400).json({ message: 'Nhập sai tài khoản hoặc mật khẩu' });
+        return res.status(400).json({ message: 'Nhập sai email hoặc mật khẩu' });
     }
     bcrypt.compare(password, user.password, async (err, result) => {
         if (result) {
@@ -169,8 +159,8 @@ authController.login = async (req, res) => {
                 const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
 
                 // store token in redis
-                redisClient.setEx(user.phone, 1800, token);
-                redisClient.setEx(`${user.phone}-refresh`, 86400, refreshToken);
+                redisClient.setEx(user.email, 1800, token);
+                redisClient.setEx(`${user.email}-refresh`, 86400, refreshToken);
 
                 user.isLoggedin = true;
                 await user.save();
@@ -182,10 +172,10 @@ authController.login = async (req, res) => {
                     user: data,
                 });
             } else {
-                return res.status(400).json({ message: 'Tài khoản đã đăng nhập' });
+                return res.status(400).json({ message: 'Người dùng đang đăng nhập' });
             }
         } else {
-            res.status(400).json({ message: 'Nhập sai tài khoản hoặc mật khẩu' });
+            res.status(400).json({ message: 'Nhập sai email hoặc mật khẩu' });
         }
     });
 };
@@ -232,10 +222,10 @@ authController.logout = async (req, res) => {
         await user.save();
 
         // remove token from redis
-        await redisClient.del(user.phone);
+        await redisClient.del(user.email);
 
         // remove refresh token from redis
-        await redisClient.del(`${user.phone}-refresh`);
+        await redisClient.del(`${user.email}-refresh`);
 
         res.status(200).json({ message: 'Bạn đã đăng xuất' });
     } catch (err) {
@@ -285,8 +275,8 @@ authController.verifyToken = async (io, socket, data) => {
         const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
 
         // store token in redis
-        redisClient.setEx(user.phone, 1800, token);
-        redisClient.setEx(`${user.phone}-refresh`, 86400, refreshToken);
+        redisClient.setEx(user.email, 1800, token);
+        redisClient.setEx(`${user.email}-refresh`, 86400, refreshToken);
 
         io.to(socketId).emit('loginSuccess', {
             message: 'Đăng nhập thành công',

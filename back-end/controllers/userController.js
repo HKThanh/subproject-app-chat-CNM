@@ -38,9 +38,9 @@ userController.getUserByPhone = async (req, res) => {
 }
 
 userController.resetPasswordRequest = async (req, res) => {
-  const { email, phone } = req.body;
+  const { email } = req.body;
 
-  const user = await UserModel.findOne({ email, phone })
+  const user = await UserModel.findOne({ email })
   if (!user) {
     return res.status(404).json({ message: "Không tìm thấy người dùng" })
   }
@@ -50,7 +50,7 @@ userController.resetPasswordRequest = async (req, res) => {
   try {
     await sendOTP(email, otp);
     const idForRedis = uuidv4();
-    const data = JSON.stringify({ otp, phone, email });
+    const data = JSON.stringify({ otp, email });
 
     await redisClient.setEx(idForRedis, 300, data); // Set OTP with 5 minutes expiration
     res.status(200).json({ message: 'OTP sent successfully', otp: otp, id: idForRedis });
@@ -68,12 +68,12 @@ userController.resetPassword = async (req, res) => {
     return res.status(400).json({ message: "OTP đã hết hạn" })
   }
 
-  const { otp: storedOtp, phone: storedPhone, email: storedEmail } = JSON.parse(redisData);
+  const { otp: storedOtp, email: storedEmail } = JSON.parse(redisData);
 
   if (otp !== storedOtp) {
     return res.status(400).json({ message: "Sai mã OTP" })
   }
-  const user = await UserModel.findOne({ email: storedEmail, phone: storedPhone })
+  const user = await UserModel.findOne({ email: storedEmail })
 
   if (!user) {
     return res.status(404).json({ message: "Không tìm thấy người dùng" })
@@ -141,7 +141,7 @@ userController.updateAvatar = async (req, res) => {
       message: "Cập nhật avatar thành công",
       user: {
         id: user.id,
-        phone: user.phone,
+        email: user.email,
         urlavatar: user.urlavatar,
       },
     })
@@ -155,7 +155,6 @@ userController.updateProfile = async (req, res) => {
   try {
     const id = req.user.id
     const { fullname, ismale, birthday } = req.body
-    console.log(phone, fullname, ismale, birthday)
     if (!fullname && ismale === undefined && !birthday) {
       return res.status(400).json({ message: "Cần cung cấp ít nhất một thông tin để cập nhật" })
     }
@@ -285,8 +284,8 @@ userController.addToFriendList = async (senderId, receiverId) => {
 
 userController.getAllFriendRequests = async (req, res) => {
   try {
-    const phone = req.user.phone
-    const friendRequests = await FriendRequestModel.find({ receiverId: phone, status: "PENDING" })
+    const id = req.user.id
+    const friendRequests = await FriendRequestModel.find({ receiverId: id, status: "PENDING" })
     const requestsWithSenderInfo = await Promise.all(
       friendRequests.map(async (request) => {
         const sender = await UserModel.get(request.senderId)
@@ -324,7 +323,7 @@ userController.updateBio = async (req, res) => {
       message: "Cập nhật bio thành công",
       user: {
         id: user.id,
-        phone: user.phone,
+        email: user.email,
         bio: user.bio,
       },
     })
@@ -358,7 +357,7 @@ userController.updateCoverPhoto = async (req, res) => {
       message: "Cập nhật cover photo thành công",
       user: {
         id: user.id,
-        phone: user.phone,
+        email: user.email,
         coverPhoto: user.coverPhoto,
       },
     })
