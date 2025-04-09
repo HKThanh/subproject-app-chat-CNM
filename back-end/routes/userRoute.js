@@ -38,4 +38,6 @@ router.put(
 
 router.put("/phone", authMiddleware, userController.updatePhone);
 
+router.post("/search", authMiddleware, userController.findUserByText);
+
 module.exports = router;
