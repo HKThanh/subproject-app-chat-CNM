@@ -18,7 +18,7 @@ router.post('/register-web', authController.registerForWeb);
 
 router.post('/login', authController.login);
 
-router.post('/logout', authMiddleware, authController.logout);
+router.post('/logout/:platform', authMiddleware, authController.logout);
 
 router.post('/refresh-token', authController.refreshToken);
 
