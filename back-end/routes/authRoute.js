@@ -6,11 +6,15 @@ const userController = require('../controllers/userController');
 const authController = require('../controllers/authController');
 const authMiddleware = require('../middlewares/authMiddleware');
 
-router.post('/request-otp', authController.requestOTP);
+router.post('/verify-email-and-phone', authController.verifyEmailandPhone);
 
 router.post('/verify-otp', authController.verifyOTP);
 
-router.post('/register', authController.register);
+router.post('/register-phone', authController.verifyForPhone);
+
+router.post('/request-otp-web', authController.requestOTPForWeb);
+
+router.post('/register-web', authController.registerForWeb);
 
 router.post('/login', authController.login);
 

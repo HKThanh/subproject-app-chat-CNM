@@ -395,5 +395,35 @@ userController.cancelFriendRequest = async (req, res) => {
     return res.status(500).json({ message: "Server error", error: e });
   }
 };
+
+userController.updatePhone = async (req, res) => {
+  const id = req.user.id
+  const { phone } = req.body
+
+  if (!phone) {
+    return res.status(400).json({ message: "Số điện thoại không được để trống" })
+  }
+
+  const user = await UserModel.get(id)
+
+  if (!user) {
+    return res.status(404).json({ message: "Không tìm thấy người dùng" })
+  }
+
+  user.phone = phone
+  user.updatedAt = new Date().toString()
+
+  await user.save()
+
+  return res.status(200).json({
+    message: "Cập nhật số điện thoại thành công",
+    user: {
+      id: user.id,
+      email: user.email,
+      phone: user.phone,
+    },
+  })
+}
+
 module.exports = userController
 
