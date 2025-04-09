@@ -1,17 +1,24 @@
-const dynamoose = require("dynamoose");
+const mongoose = require('mongoose');
+const { Schema } = mongoose;
 
-const MessageBucketSchema = new dynamoose.Schema({
-    IDBucketMessage: String,
+const MessageBucketSchema = new Schema({
+    IDBucketMessage: {
+        type: String,
+        required: true,
+        index: true
+    },
     listIDMessageDetail: {
-        type: Array,
-        schema: [String]
+        type: [String],
+        default: []
     },
     IDNextBucket: {
-        default: "",
-        type: String
+        type: String,
+        default: ""
     }
+}, {
+    timestamps: true
 });
 
-const MessageBucket = dynamoose.model("MessageBucket", MessageBucketSchema);
+const MessageBucket = mongoose.model('MessageBucket', MessageBucketSchema);
 
 module.exports = MessageBucket;

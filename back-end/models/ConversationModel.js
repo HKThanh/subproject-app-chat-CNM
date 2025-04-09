@@ -1,44 +1,58 @@
-const dynamoose = require("dynamoose");
+const mongoose = require('mongoose');
 const moment = require('moment-timezone');
+const { Schema } = mongoose;
 
-const ConversationSchema = new dynamoose.Schema({
+const ConversationSchema = new Schema({
     idConversation: {
         type: String,
-        hashKey: true,
+        required: true,
+        unique: true
     },
     idSender: {
         type: String,
-        rangeKey: true,
-        index: {
-            global: true,
-            name: 'IDSender-lastChange-index',
-            rangeKey: 'lastChange',
-            project: false,
-        },
+        required: true,
+        index: true
     },
+    isGroup: {
+        type: Boolean,
+        default: false
+    },
+    groupName: String,
+    groupAvatar: String,
     idReceiver: String,
     idNewestMessage: String,
     isBlock: {
         type: Boolean,
         default: false
     },
-    // Lưu danh sách URL của hình ảnh trong cuộc trò chuyện
-    listImage: {
-        type: Array,
-        default: [],
-        schema: [String],
+    rules: {
+        IDOwner: String,
+        listIDCoOwner: [String]
     },
-    // Lưu danh sách URL của file trong cuộc trò chuyện
+    groupMembers: {
+        type: [String],
+        default: []
+    },
+    listImage: {
+        type: [String],
+        default: []
+    },
     listFile: {
-        type: Array,
-        default: [],
-        schema: [String],
+        type: [String],
+        default: []
     },
     lastChange: {
         type: String,
-        default: moment.tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DDTHH:mm:ss.SSS'),
+        default: () => moment.tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DDTHH:mm:ss.SSS')
     }
+}, {
+    timestamps: true
 });
 
-const Conversation = dynamoose.model("Conversation", ConversationSchema);
+// Thêm indexes để tối ưu queries
+ConversationSchema.index({ idSender: 1, lastChange: -1 });
+ConversationSchema.index({ groupMembers: 1 });
+
+const Conversation = mongoose.model('Conversation', ConversationSchema);
+
 module.exports = Conversation;

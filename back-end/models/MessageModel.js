@@ -1,13 +1,17 @@
-const dynamoose = require("dynamoose");
+const mongoose = require('mongoose');
+const { Schema } = mongoose;
 
-const schema = new dynamoose.Schema({
+const MessageSchema = new Schema({
     IDConversation: {
         type: String,
-        hashKey: true,
+        required: true,
+        index: true
     },
-    IDNewestBucket: String,
+    IDNewestBucket: String
+}, {
+    timestamps: true
 });
 
-const Message = dynamoose.model("Message", schema);
+const Message = mongoose.model('Message', MessageSchema);
 
 module.exports = Message;

@@ -1,37 +1,50 @@
-const dynamoose = require("dynamoose");
+const mongoose = require('mongoose');
+const { Schema } = mongoose;
 
-const MessageDetailSchema = new dynamoose.Schema({
+// Tin nhắn thực sự
+const MessageDetailSchema = new Schema({
     idMessage: {
         type: String,
         required: true,
+        index: true
     },
     idSender: String,
+    idReceiver: String,
     idConversation: String,
     type: String,
     content: String,
-    dateTime: String,
+    dateTime: {
+        type: String,
+        default: () => new Date().toISOString()
+    },
+    isRead: {
+        type: Boolean,
+        default: false
+    },
     isRecall: {
         type: Boolean,
-        default: false,
+        default: false
     },
     isReply: {
         type: Boolean,
-        default: false,
+        default: false
     },
     isFoward: {
         type: Boolean,
-        default: false,
+        default: false
     },
     isRemove: {
-        type: String,
+        type: Boolean,
         default: false
     },
     idMessageReply: {
         type: String,
-        default: null,
-    },
-})
+        default: null
+    }
+}, {
+    timestamps: true
+});
 
-const MessageDetail = dynamoose.model("MessageDetail", MessageDetailSchema);
+const MessageDetail = mongoose.model('MessageDetail', MessageDetailSchema);
 
 module.exports = MessageDetail;

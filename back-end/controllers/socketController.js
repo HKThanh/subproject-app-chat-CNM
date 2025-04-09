@@ -1,81 +1,102 @@
-const MessageController = require("./messageController");
-const MessageDetailController = require("./messageDetailController");
+const MessageController = require("./MessageController");
+const MessageDetailController = require("./MessageDetailController");
 const Conversation = require("../models/ConversationModel");
 const { v4: uuidv4 } = require("uuid");
 const s3 = require("../config/connectS3");
+const MessageDetail = require("../models/MessageDetailModel");
+const User = require("../models/UserModel");
+const MessageBucket = require("../models/MessageBucketModel");
+const moment = require("moment-timezone");
 
-// Mảng lưu trữ thông tin người dùng đang online
 let onlineUsers = [];
 
-/**
- * Thêm người dùng mới vào danh sách online
- * @param {string} phone - Số điện thoại người dùng
- * @param {string} socketId - ID socket của người dùng
- */
 const addNewUser = (phone, socketId) => {
     !onlineUsers.some((user) => user.phone === phone) &&
         onlineUsers.push({ phone, socketId });
 };
 
-/**
- * Xóa người dùng khỏi danh sách online khi disconnect
- * @param {string} socketId - ID socket cần xóa
- */
 const removeUser = (socketId) => {
     onlineUsers = onlineUsers.filter((item) => item.socketId !== socketId);
 };
 
-/**
- * Tìm thông tin người dùng trong danh sách online
- * @param {string} phone - Số điện thoại cần tìm
- * @returns {Object|undefined} Thông tin người dùng nếu tìm thấy
- */
 const getUser = (phone) => {
     return onlineUsers.find((user) => user.phone === phone);
 };
 
-/**
- * Xử lý sự kiện người dùng kết nối mới
- * Được gọi khi client emit "new_user_connect"
- */
 const handleUserOnline = (socket) => {
     socket.on("new_user_connect", async (payload) => {
-        addNewUser(payload.phone, socket.id);
-        console.log("User connected:", payload.phone);
-    });
-
-    socket.on("disconnect", () => {
-        removeUser(socket.id);
-        console.log("User disconnected");
-    });
-};
-
-/**
- * Xử lý tải danh sách cuộc trò chuyện
- * Được gọi khi client emit "load_conversations"
- */
-const handleLoadConversation = async (io, socket) => {
-    socket.on("load_conversations", async (payload) => {
         try {
-            // Query lấy tất cả conversation của user
-            const conversations = await Conversation.query("idSender")
-                                                 .eq(payload.phone)
-                                                 .exec();
-            // Trả về danh sách cho client
-            socket.emit("load_conversations_response", conversations);
+            const { phone } = payload;
+            addNewUser(phone, socket.id);
+            socket.join(phone);
+
+            // Load unread messages khi user online
+            const unreadMessages = await MessageDetail.find({
+                idReceiver: phone,
+                isRead: false
+            })
+            .sort({ dateTime: 1 })
+            .populate('idSender', 'fullname avatar'); 
+
+            if (unreadMessages.length > 0) {
+                socket.emit("unread_messages", {
+                    messages: unreadMessages,
+                    count: unreadMessages.length
+                });
+            }
+
+            socket.emit("connection_success", {
+                message: "Connected successfully",
+                socketId: socket.id
+            });
         } catch (error) {
-            console.error("Error loading conversations:", error);
-            socket.emit("error", { message: "Lỗi khi tải cuộc trò chuyện" });
+            console.error("Error handling user online:", error);
         }
     });
 };
 
-/**
- * Xử lý gửi tin nhắn text
- * @param {string} IDSender - ID người gửi
- * @param {string} IDConversation - ID cuộc trò chuyện
- * @param {string} textMessage - Nội dung tin nhắn
- */
+const handleLoadConversation = (io, socket) => {
+    socket.on("load_conversations", async (payload) => {
+        try {
+            const { IDUser, lastEvaluatedKey } = payload;
+            const skip = lastEvaluatedKey ? parseInt(lastEvaluatedKey) : 0;
+            const limit = 10;
+
+            // Chỉ query theo idSender và groupMembers
+            const conversations = await Conversation.find({
+                $or: [
+                    { idSender: IDUser },
+                    { groupMembers: IDUser }
+                ]
+            })
+            .sort({ lastChange: -1 })
+            .skip(skip)
+            .limit(limit);
+
+            // Tính tổng số conversation
+            const total = await Conversation.countDocuments({
+                $or: [
+                    { idSender: IDUser },
+                    { groupMembers: IDUser }
+                ]
+            });
+
+            const hasMore = total > skip + limit;
+
+            socket.emit("load_conversations_response", {
+                Items: conversations,
+                LastEvaluatedKey: hasMore ? skip + limit : null
+            });
+
+        } catch (error) {
+            console.error("Error loading conversations:", error);
+            socket.emit("error", { 
+                message: "Lỗi khi tải cuộc trò chuyện" 
+            });
+        }
+    });
+};
+
 const handleTextMessage = async (IDSender, IDConversation, textMessage) => {
     const message = await MessageDetailController.createTextMessageDetail(
         IDSender,
@@ -85,50 +106,53 @@ const handleTextMessage = async (IDSender, IDConversation, textMessage) => {
     return message;
 };
 
-/**
- * Cập nhật thời gian thay đổi cuối cùng của cuộc trò chuyện
- */
-const updateLastChangeConversation = async (IDConversation, IDMessage) => {
-    const conversation = await Conversation.get(IDConversation);
-    if (conversation) {
-        conversation.lastChange = new Date().toISOString();
-        conversation.idNewestMessage = IDMessage;
-        await conversation.save();
+const updateLastChangeConversation = async (idConversation, idMessage) => {
+    try {
+        const conversation = await Conversation.findOneAndUpdate(
+            { idConversation: idConversation },
+            {
+                lastChange: new Date().toISOString(),
+                idNewestMessage: idMessage
+            },
+            { new: true }
+        );
+        return conversation;
+    } catch (error) {
+        console.error("Error updating conversation:", error);
+        throw error;
     }
 };
 
-// Hàm xử lý upload file lên S3
 const uploadFileToS3 = async (file, fileType) => {
-  const bucketMap = {
-    'image': 'imagetintin',
-    'video': 'videotintin',
-    'document': 'documenttintin'
-  };
+    const bucketMap = {
+        'image': 'imagetintin',
+        'video': 'videotintin',
+        'document': 'documenttintin'
+    };
 
-  const params = {
-    Bucket: bucketMap[fileType] || 'documenttintin',
-    Key: `${uuidv4()}_${file.fileName}`,
-    Body: file.content,
-    ContentType: file.mimeType
-  };
+    const params = {
+        Bucket: bucketMap[fileType] || 'documenttintin',
+        Key: `${uuidv4()}_${file.fileName}`,
+        Body: file.content,
+        ContentType: file.mimeType
+    };
 
-  try {
-    const data = await s3.upload(params).promise();
-    return data.Location; // URL của file trên S3
-  } catch (error) {
-    console.error("Error uploading to S3:", error);
-    throw error;
-  }
+    try {
+        const data = await s3.upload(params).promise();
+        return data.Location;
+    } catch (error) {
+        console.error("Error uploading to S3:", error);
+        throw error;
+    }
 };
 
-// Hàm xử lý gửi file
 const handleSendFile = async (io, socket) => {
     socket.on("send_file", async (payload) => {
         try {
             const { idSender, idConversation, file } = payload;
             const { type, content, fileName } = file;
 
-            // Upload file lên S3
+            // Upload to S3
             const params = {
                 Bucket: process.env.AWS_BUCKET_NAME,
                 Key: `${uuidv4()}_${fileName}`,
@@ -138,7 +162,7 @@ const handleSendFile = async (io, socket) => {
 
             const uploadedFile = await s3.upload(params).promise();
 
-            // Tạo message detail mới
+            // Create message
             const newMessage = await MessageDetail.create({
                 idMessage: uuidv4(),
                 idSender,
@@ -148,31 +172,54 @@ const handleSendFile = async (io, socket) => {
                 dateTime: new Date().toISOString()
             });
 
-            // Gửi tin nhắn cho tất cả người trong cuộc trò chuyện
+            // Get conversation to find receiver
+            const conversation = await Conversation.findOne({ idConversation });
+            const idReceiver = conversation.idSender === idSender ? 
+                             conversation.idReceiver : conversation.idSender;
+
+            // Emit to conversation room
             io.to(idConversation).emit("receive_message", newMessage);
 
-            // Cập nhật conversation
+            // Emit success to sender
+            socket.emit("send_message_success", {
+                conversationId: idConversation,
+                message: newMessage
+            });
+
+            // Emit to specific receiver if online
+            const receiverOnline = getUser(idReceiver);
+            if (receiverOnline) {
+                io.to(receiverOnline.socketId).emit("receive_message", newMessage);
+            }
+
             await updateLastChangeConversation(idConversation, newMessage.idMessage);
 
         } catch (error) {
-            socket.emit("error", { message: "Lỗi khi gửi file" });
+            console.error("Error sending file:", error);
+            socket.emit("error", { 
+                message: "Lỗi khi gửi file",
+                error: error.message 
+            });
         }
     });
 };
 
-/**
- * Xử lý gửi tin nhắn
- * Được gọi khi client emit "send_message"
- */
 const handleSendMessage = async (io, socket) => {
     socket.on("send_message", async (payload) => {
         try {
-            const { IDSender, IDReceiver, textMessage, files } = payload;
+            const { IDSender, IDReceiver, textMessage } = payload;
+            console.log("Payload:", payload);
 
-            // Kiểm tra hoặc tạo conversation mới
-            let conversation = await Conversation.get({
-                idSender: IDSender,
-                idReceiver: IDReceiver
+            const receiverUser = await User.findOne({ id: IDReceiver });
+            if (!receiverUser) {
+                throw new Error("Receiver not found");
+            }
+
+            let conversation = await Conversation.findOne({
+                $or: [
+                    { idSender: IDSender, idReceiver: IDReceiver },
+                    { idSender: IDReceiver, idReceiver: IDSender }
+                ]
             });
 
             if (!conversation) {
@@ -180,55 +227,39 @@ const handleSendMessage = async (io, socket) => {
                     idConversation: uuidv4(),
                     idSender: IDSender,
                     idReceiver: IDReceiver,
+                    isGroup: false,
                     lastChange: new Date().toISOString()
                 });
             }
 
-            if (files && files.length > 0) {
-                // Xử lý từng file
-                for (const file of files) {
-                    const messageDetail = await handleSendFile(
-                        IDSender,
-                        conversation.idConversation,
-                        file
-                    );
+            // Thêm idReceiver khi tạo tin nhắn
+            const messageDetail = await MessageDetail.create({
+                idMessage: uuidv4(),
+                idSender: IDSender,
+                idReceiver: IDReceiver, // Thêm dòng này
+                idConversation: conversation.idConversation,
+                type: 'text',
+                content: textMessage,
+                dateTime: new Date().toISOString(),
+                isRead: false
+            });
 
-                    // Gửi tin nhắn đến tất cả người trong cuộc trò chuyện
-                    io.to(conversation.idConversation).emit("receive_message", {
-                        ...messageDetail,
-                        senderInfo: { id: IDSender }
-                    });
+            await updateLastChangeConversation(
+                conversation.idConversation,
+                messageDetail.idMessage
+            );
 
-                    // Cập nhật lastChange của conversation
-                    await updateLastChangeConversation(
-                        conversation.idConversation,
-                        messageDetail.idMessage
-                    );
-                }
-            } else if (textMessage) {
-                // Xử lý tin nhắn text
-                const messageDetail = await handleTextMessage(
-                    IDSender,
-                    conversation.idConversation,
-                    textMessage
-                );
-
-                // Gửi tin nhắn đến tất cả người trong cuộc trò chuyện
-                io.to(conversation.idConversation).emit("receive_message", {
-                    ...messageDetail,
+            const receiverOnline = getUser(IDReceiver);
+            if (receiverOnline) {
+                io.to(receiverOnline.socketId).emit("receive_message", {
+                    ...messageDetail.toObject(),
                     senderInfo: { id: IDSender }
                 });
-
-                // Cập nhật lastChange của conversation
-                await updateLastChangeConversation(
-                    conversation.idConversation,
-                    messageDetail.idMessage
-                );
             }
 
-            // Thông báo gửi thành công về cho người gửi
             socket.emit("send_message_success", {
-                conversationId: conversation.idConversation
+                conversationId: conversation.idConversation,
+                message: messageDetail
             });
 
         } catch (error) {
@@ -245,17 +276,16 @@ const handleDeleteMessage = async (io, socket) => {
     socket.on("delete_message", async (payload) => {
         try {
             const { idMessage, idSender } = payload;
-            const message = await MessageDetail.get(idMessage);
+            const message = await MessageDetail.findOneAndUpdate(
+                { idMessage },
+                { isRemove: true },
+                { new: true }
+            );
             
             if (message) {
-                // Thêm ID người xóa vào mảng deletedFor
-                message.isRemove = idSender;
-                const updatedMessage = await MessageDetail.update(message);
-                
-                // Chỉ gửi thông báo cho người xóa
                 socket.emit("message_deleted", {
                     messageId: idMessage,
-                    updatedMessage
+                    updatedMessage: message
                 });
             }
         } catch (error) {
@@ -268,84 +298,205 @@ const handleRecallMessage = async (io, socket) => {
     socket.on("recall_message", async (payload) => {
         try {
             const { idMessage, idConversation } = payload;
-            const message = await MessageDetail.get(idMessage);
             
-            if (message) {
-                message.isRecall = true;
-                const updatedMessage = await MessageDetail.update(message);
-                
-                // Gửi thông báo cho tất cả người trong cuộc trò chuyện
-                io.to(idConversation).emit("message_recalled", {
+            // Tìm và cập nhật tin nhắn
+            const message = await MessageDetail.findOneAndUpdate(
+                { idMessage },
+                { 
+                    isRecall: true,
+                    content: "Tin nhắn đã được thu hồi"
+                },
+                { new: true }
+            ).populate('idSender', 'id'); // Lấy thêm thông tin sender
+
+            if (!message) {
+                throw new Error("Không tìm thấy tin nhắn");
+            }
+
+            // Tìm receiver để gửi thông báo
+            const conversation = await Conversation.findOne({ idConversation });
+            const idReceiver = conversation.idSender === message.idSender.id ? 
+                             conversation.idReceiver : conversation.idSender;
+
+            // Emit tới tất cả users trong conversation
+            io.to(idConversation).emit("message_recalled", {
+                messageId: idMessage,
+                updatedMessage: {
+                    ...message.toObject(),
+                    isRecall: true,
+                    content: "Tin nhắn đã được thu hồi"
+                }
+            });
+
+            // Emit riêng cho receiver nếu online
+            const receiverOnline = getUser(idReceiver);
+            if (receiverOnline) {
+                io.to(receiverOnline.socketId).emit("message_recalled", {
                     messageId: idMessage,
-                    updatedMessage
+                    updatedMessage: {
+                        ...message.toObject(),
+                        isRecall: true,
+                        content: "Tin nhắn đã được thu hồi"
+                    }
                 });
             }
+
+            // Emit success về cho người thu hồi
+            socket.emit("recall_message_success", {
+                messageId: idMessage,
+                success: true
+            });
+
         } catch (error) {
-            socket.emit("error", { message: "Lỗi khi thu hồi tin nhắn" });
+            console.error("Error recalling message:", error);
+            socket.emit("error", { 
+                message: "Lỗi khi thu hồi tin nhắn",
+                error: error.message 
+            });
         }
     });
 };
+
 const handleForwardMessage = async (io, socket) => {
     socket.on("forward_message", async (payload) => {
         try {
             const { IDMessageDetail, targetConversations, IDSender } = payload;
             
-            // Lấy tin nhắn gốc cần forward
-            const originalMessage = await MessageDetailModel.get(IDMessageDetail);
+            const originalMessage = await MessageDetail.findOne({ idMessage: IDMessageDetail });
             
             if (!originalMessage) {
                 throw new Error("Message not found");
             }
 
             const results = [];
-            const userSender = await UserModel.get(IDSender);
+            const userSender = await User.findOne({ id: IDSender });
             
-            // Forward tới nhiều conversations
             for (const IDConversation of targetConversations) {
-                // Tạo message detail mới với nội dung từ tin nhắn gốc
-                const forwardedMessage = {
-                    IDMessageDetail: uuidv4(),
-                    IDSender: IDSender,
-                    IDConversation: IDConversation,
+                const forwardedMessage = await MessageDetail.create({
+                    idMessage: uuidv4(),
+                    idSender: IDSender,
+                    idConversation: IDConversation,
                     type: originalMessage.type,
                     content: originalMessage.content,
-                    dateTime: moment.tz("Asia/Ho_Chi_Minh").format("YYYY-MM-DDTHH:mm:ss.SSS"),
+                    dateTime: new Date().toISOString(),
                     isForward: true
-                };
+                });
 
-                // Lưu tin nhắn mới
-                const newMessage = await MessageDetailModel.create(forwardedMessage);
+                await updateLastChangeConversation(
+                    IDConversation,
+                    forwardedMessage.idMessage
+                );
 
-                // Cập nhật lastChange và tin nhắn mới nhất của conversation
-                const conversation = await Conversation.get(IDConversation);
-                if (conversation) {
-                    conversation.lastChange = moment.tz("Asia/Ho_Chi_Minh").format("YYYY-MM-DDTHH:mm:ss.SSS");
-                    conversation.idNewestMessage = newMessage.IDMessageDetail;
-                    await conversation.save();
-                }
-
-                // Gửi tin nhắn tới tất cả người trong conversation
                 io.to(IDConversation).emit("receive_message", {
-                    ...newMessage,
+                    ...forwardedMessage.toObject(),
                     userSender
                 });
 
                 results.push({
                     conversationId: IDConversation,
-                    messageId: newMessage.IDMessageDetail
+                    messageId: forwardedMessage.idMessage
                 });
             }
 
-            // Thông báo forward thành công về cho người gửi
-            socket.emit("forward_message_success", {
-                originalMessageId: IDMessageDetail,
-                forwardedMessages: results
+            socket.emit("forward_message_success", { results });
+        } catch (error) {
+            console.error("Error forwarding message:", error);
+            socket.emit("error", { message: "Lỗi khi chuyển tiếp tin nhắn" });
+        }
+    });
+};
+
+const getUserBySocketId = (socketId) => {
+    return onlineUsers.find((user) => user.socketId === socketId);
+};
+
+const handleMarkMessageRead = (socket) => {
+    socket.on("mark_message_read", async (payload) => {
+        try {
+            const { messageId } = payload;
+            await MessageDetail.findOneAndUpdate(
+                { idMessage: messageId },
+                { isRead: true }
+            );
+        } catch (error) {
+            console.error("Error marking message as read:", error);
+        }
+    });
+};
+
+// Handler để đánh dấu tin nhắn đã đọc khi user click vào conversation hoặc tin nhắn
+const handleMarkMessagesRead = (socket) => {
+    socket.on("mark_messages_read", async (payload) => {
+        try {
+            const { conversationId, receiverId } = payload;
+            console.log("Marking messages read - Conversation:", conversationId, "Receiver:", receiverId);
+
+            // Query để tìm và update tin nhắn chưa đọc
+            const result = await MessageDetail.updateMany(
+                {
+                    idConversation: conversationId,
+                    idReceiver: receiverId,
+                    isRead: false
+                },
+                { isRead: true }
+            );
+
+            console.log("Update result:", result);
+
+            // Emit kết quả
+            socket.emit("messages_marked_read", {
+                conversationId,
+                receiverId,
+                success: true,
+                updatedCount: result.modifiedCount
             });
 
         } catch (error) {
-            console.error("Error forwarding message:", error);
-            socket.emit("forward_message_error", {
-                message: "Lỗi khi chuyển tiếp tin nhắn",
+            console.error("Error marking messages as read:", error);
+            socket.emit("error", { 
+                message: "Lỗi khi đánh dấu tin nhắn đã đọc",
+                error: error.message 
+            });
+        }
+    });
+};
+
+const handleLoadMessages = (io, socket) => {
+    socket.on("load_messages", async (payload) => {
+        try {
+            const { IDConversation, lastMessageId, limit = 20 } = payload;
+            
+            let query = {
+                idConversation: IDConversation
+            };
+
+            if (lastMessageId) {
+                const lastMessage = await MessageDetail.findOne({ idMessage: lastMessageId });
+                if (lastMessage) {
+                    query.dateTime = { $lt: lastMessage.dateTime };
+                }
+            }
+
+            const messages = await MessageDetail.find(query)
+                .sort({ dateTime: -1 })
+                .limit(limit);
+
+            // Chỉ format dateTime, không cần xử lý content vì đã được set khi recall
+            const processedMessages = messages.map(msg => ({
+                ...msg.toJSON(),
+                dateTime: moment.tz(msg.dateTime, "Asia/Ho_Chi_Minh").format()
+            }));
+
+            socket.emit("load_messages_response", {
+                messages: processedMessages,
+                hasMore: messages.length === limit,
+                conversationId: IDConversation
+            });
+
+        } catch (error) {
+            console.error("Error loading messages:", error);
+            socket.emit("error", {
+                message: "Lỗi khi tải tin nhắn",
                 error: error.message
             });
         }
@@ -359,6 +510,10 @@ module.exports = {
     handleSendFile,
     handleDeleteMessage,
     handleRecallMessage,
-    handleForwardMessage
-    // Export thêm các hàm mới nếu cần
+    handleForwardMessage,
+    getUserBySocketId,
+    getUser,
+    handleMarkMessageRead,
+    handleMarkMessagesRead,
+    handleLoadMessages
 };
