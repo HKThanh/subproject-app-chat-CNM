@@ -2,11 +2,13 @@ import SearchIcon from "@/assets/common/icon-search";
 import UserAddIcon from "@/assets/common/icon-user-add";
 import GroupAddIcon from "@/assets/common/icon-user-group";
 import { Input } from "@heroui/input";
+import Image from "next/image";
+import Avatar from "@/assets/images/user-avatar.png";
 
 const ChatList = () => {
   return (
-    <div className="flex flex-col w-full">
-      <div className="flex flex-row w-1/4 items-center gap-2 p-4">
+    <div className="flex flex-col w-full p-4">
+      <div className="flex flex-row w-1/4 items-center gap-2">
         <Input
           placeholder="Tìm kiếm..."
           variant="faded"
@@ -28,7 +30,15 @@ const ChatList = () => {
           <GroupAddIcon width={27} />
         </div>
       </div>
-      <div></div>
+      <div className="flex flex-row w-full items-center">
+        <div>
+          <Image width={40} height={40} alt="avatar" src={Avatar} />
+        </div>
+        <div>
+          <div>Room name</div>
+          <div>Last Message</div>
+        </div>
+      </div>
     </div>
   );
 };
