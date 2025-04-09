@@ -1,26 +1,26 @@
-require("dotenv").config()
-const bcrypt = require("bcrypt")
-const jwt = require("jsonwebtoken")
-const { JWT_SECRET } = process.env
-const { v4: uuidv4 } = require("uuid")
-const qrcode = require("qrcode")
+require("dotenv").config();
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const { JWT_SECRET } = process.env;
+const { v4: uuidv4 } = require("uuid");
+const qrcode = require("qrcode");
 
-const UserModel = require("../models/UserModel")
-const FriendRequestModel = require("../models/FriendRequestModel")
-const redisClient = require("../services/redisClient")
-const { generateOTP, sendOTP } = require("../services/otpServices")
-const fileService = require("../services/fileService")
+const UserModel = require("../models/UserModel");
+const FriendRequestModel = require("../models/FriendRequestModel");
+const redisClient = require("../services/redisClient");
+const { generateOTP, sendOTP } = require("../services/otpServices");
+const fileService = require("../services/fileService");
 
-const userController = {}
+const userController = {};
 
 userController.getAllUsers = async (req, res) => {
   try {
-    const users = await UserModel.find()
-    res.status(200).json(users)
+    const users = await UserModel.find();
+    res.status(200).json(users);
   } catch (error) {
-    res.status(500).json({ message: "Failed to get users" })
+    res.status(500).json({ message: "Failed to get users" });
   }
-}
+};
 
 userController.getUserByPhone = async (req, res) => {
   const id = req.user.id;
@@ -29,20 +29,20 @@ userController.getUserByPhone = async (req, res) => {
     const user = await UserModel.get(id);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" })
+      return res.status(404).json({ message: "User not found" });
     }
-    res.status(200).json(user)
+    res.status(200).json(user);
   } catch (error) {
-    res.status(500).json({ message: "Failed to get user" })
+    res.status(500).json({ message: "Failed to get user" });
   }
-}
+};
 
 userController.resetPasswordRequest = async (req, res) => {
   const { email } = req.body;
 
-  const user = await UserModel.findOne({ email })
+  const user = await UserModel.findOne({ email });
   if (!user) {
-    return res.status(404).json({ message: "Không tìm thấy người dùng" })
+    return res.status(404).json({ message: "Không tìm thấy người dùng" });
   }
 
   const otp = generateOTP();
@@ -53,11 +53,13 @@ userController.resetPasswordRequest = async (req, res) => {
     const data = JSON.stringify({ otp, email });
 
     await redisClient.setEx(idForRedis, 300, data); // Set OTP with 5 minutes expiration
-    res.status(200).json({ message: 'OTP sent successfully', otp: otp, id: idForRedis });
+    res
+      .status(200)
+      .json({ message: "OTP sent successfully", otp: otp, id: idForRedis });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to send OTP' });
+    res.status(500).json({ message: "Failed to send OTP" });
   }
-}
+};
 
 userController.resetPassword = async (req, res) => {
   const { otp, password } = req.body;
@@ -65,77 +67,85 @@ userController.resetPassword = async (req, res) => {
 
   const redisData = await redisClient.get(idForRedis);
   if (!redisData) {
-    return res.status(400).json({ message: "OTP đã hết hạn" })
+    return res.status(400).json({ message: "OTP đã hết hạn" });
   }
 
   const { otp: storedOtp, email: storedEmail } = JSON.parse(redisData);
 
   if (otp !== storedOtp) {
-    return res.status(400).json({ message: "Sai mã OTP" })
+    return res.status(400).json({ message: "Sai mã OTP" });
   }
-  const user = await UserModel.findOne({ email: storedEmail })
+  const user = await UserModel.findOne({ email: storedEmail });
 
   if (!user) {
-    return res.status(404).json({ message: "Không tìm thấy người dùng" })
+    return res.status(404).json({ message: "Không tìm thấy người dùng" });
   }
 
   bcrypt.hash(password, 10, async (err, hash) => {
+    user.password = hash;
+    await user.save();
 
-    user.password = hash
-    await user.save()
-
-    res.status(200).json({ message: "Cập nhật mật khẩu thành công" , newpass: user.password});
+    res
+      .status(200)
+      .json({
+        message: "Cập nhật mật khẩu thành công",
+        newpass: user.password,
+      });
   });
-}
+};
 
 userController.updatePassword = async (req, res) => {
   const { oldPassword, newPassword } = req.body;
   const id = req.user.id;
 
-  const user = await UserModel.get(id)
+  const user = await UserModel.get(id);
 
   if (!user) {
-    return res.status(404).json({ message: "Không tìm thấy người dùng" })
+    return res.status(404).json({ message: "Không tìm thấy người dùng" });
   }
 
   bcrypt.compare(oldPassword, user.password, async (err, result) => {
     if (!result) {
-      return res.status(400).json({ message: "Mật khẩu cũ không đúng" })
+      return res.status(400).json({ message: "Mật khẩu cũ không đúng" });
     }
   });
 
   bcrypt.hash(newPassword, 10, async (err, hash) => {
     if (newPassword === oldPassword) {
-      return res.status(400).json({ message: "Mật khẩu mới không được giống mật khẩu cũ" })
+      return res
+        .status(400)
+        .json({ message: "Mật khẩu mới không được giống mật khẩu cũ" });
     }
 
-    user.password = hash
-    await user.save()
+    user.password = hash;
+    await user.save();
 
-    return res.status(200).json({ message: "Cập nhật mật khẩu thành công" })
-  })
-}
+    return res.status(200).json({ message: "Cập nhật mật khẩu thành công" });
+  });
+};
 
 userController.updateAvatar = async (req, res) => {
   try {
-    const id = req.user.id
-    const fileUrl = req.body.fileUrl
-    console.log(req.body)
+    const id = req.user.id;
+    const fileUrl = req.body.fileUrl;
+    console.log(req.body);
 
     if (!fileUrl) {
-      return res.status(400).json({ message: "File avatar không được để trống" })
+      return res
+        .status(400)
+        .json({ message: "File avatar không được để trống" });
     }
 
-    const user = await UserModel.get(id)
+    const user = await UserModel.get(id);
 
     if (!user) {
-      return res.status(404).json({ message: "Không tìm thấy người dùng" })
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
     }
 
-    user.urlavatar = fileUrl // Lưu URL từ S3
-    user.updatedAt = new Date().toString()
+    user.urlavatar = fileUrl; // Lưu URL từ S3
+    user.updatedAt = new Date().toString();
 
-    await user.save()
+    await user.save();
 
     return res.status(200).json({
       message: "Cập nhật avatar thành công",
@@ -144,34 +154,36 @@ userController.updateAvatar = async (req, res) => {
         email: user.email,
         urlavatar: user.urlavatar,
       },
-    })
+    });
   } catch (error) {
-    console.error("Error updating avatar:", error)
-    return res.status(500).json({ message: "Lỗi khi cập nhật avatar" })
+    console.error("Error updating avatar:", error);
+    return res.status(500).json({ message: "Lỗi khi cập nhật avatar" });
   }
-}
+};
 
 userController.updateProfile = async (req, res) => {
   try {
-    const id = req.user.id
-    const { fullname, ismale, birthday } = req.body
+    const id = req.user.id;
+    const { fullname, ismale, birthday } = req.body;
     if (!fullname && ismale === undefined && !birthday) {
-      return res.status(400).json({ message: "Cần cung cấp ít nhất một thông tin để cập nhật" })
+      return res
+        .status(400)
+        .json({ message: "Cần cung cấp ít nhất một thông tin để cập nhật" });
     }
 
-    const user = await UserModel.get(id)
+    const user = await UserModel.get(id);
 
     if (!user) {
-      return res.status(404).json({ message: "Không tìm thấy người dùng" })
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
     }
 
-    if (fullname) user.fullname = fullname
-    if (ismale !== undefined) user.ismale = Boolean(ismale)
-    if (birthday) user.birthday = birthday
+    if (fullname) user.fullname = fullname;
+    if (ismale !== undefined) user.ismale = Boolean(ismale);
+    if (birthday) user.birthday = birthday;
 
-    user.updatedAt = new Date().toString()
+    user.updatedAt = new Date().toString();
 
-    await user.save()
+    await user.save();
     console.log("check user >>>. ", user);
 
     return res.status(200).json({
@@ -186,21 +198,23 @@ userController.updateProfile = async (req, res) => {
         bio: user.bio,
         phone: user.phone,
         coverPhoto: user.coverPhoto,
-        ismale: user.ismale
+        ismale: user.ismale,
       },
-    })
+    });
   } catch (error) {
-    console.error("Error updating profile:", error)
-    return res.status(500).json({ message: "Lỗi khi cập nhật thông tin" })
+    console.error("Error updating profile:", error);
+    return res.status(500).json({ message: "Lỗi khi cập nhật thông tin" });
   }
-}
+};
 
 userController.sendFriendRequest = async (req, res) => {
   const senderId = req.user.id;
   const { receiverId } = req.body;
 
   if (senderId === receiverId) {
-    return res.status(400).json({ code: -2, message: "Gửi cho bản thân làm gì" });
+    return res
+      .status(400)
+      .json({ code: -2, message: "Gửi cho bản thân làm gì" });
   }
 
   const existing = await FriendRequestModel.findOne({ senderId, receiverId });
@@ -234,7 +248,11 @@ userController.sendFriendRequest = async (req, res) => {
   }
 
   await FriendRequestModel.create({ senderId, receiverId, status: "PENDING" });
-  return res.json({ code: 1, message: "Request sent", data: { senderId, receiverId } });
+  return res.json({
+    code: 1,
+    message: "Request sent",
+    data: { senderId, receiverId },
+  });
 };
 
 userController.handleFriendRequest = async (req, res) => {
@@ -247,8 +265,12 @@ userController.handleFriendRequest = async (req, res) => {
 
   // const request = requests[0];
 
-  const request = await FriendRequestModel.findOne({ id: id, status: "PENDING" });
-  if (!request) return res.json({ code: 0, message: "Không tìm thấy yêu cầu kết bạn" });
+  const request = await FriendRequestModel.findOne({
+    id: id,
+    status: "PENDING",
+  });
+  if (!request)
+    return res.json({ code: 0, message: "Không tìm thấy yêu cầu kết bạn" });
 
   request.status = type;
   await request.save();
@@ -262,7 +284,10 @@ userController.handleFriendRequest = async (req, res) => {
     // await FriendRequestModel.update({ id: id }, { status: "DECLINED" }).exec();
   }
 
-  return res.json({ code: 1, message: `Friend request ${type.toLowerCase()} successfully` });
+  return res.json({
+    code: 1,
+    message: `Friend request ${type.toLowerCase()} successfully`,
+  });
 };
 
 userController.addToFriendList = async (senderId, receiverId) => {
@@ -284,40 +309,43 @@ userController.addToFriendList = async (senderId, receiverId) => {
 
 userController.getAllFriendRequests = async (req, res) => {
   try {
-    const id = req.user.id
-    const friendRequests = await FriendRequestModel.find({ receiverId: id, status: "PENDING" })
+    const id = req.user.id;
+    const friendRequests = await FriendRequestModel.find({
+      receiverId: id,
+      status: "PENDING",
+    });
     const requestsWithSenderInfo = await Promise.all(
       friendRequests.map(async (request) => {
-        const sender = await UserModel.get(request.senderId)
-        return { ...request.toObject(), sender }
-      }),
-    )
-    res.status(200).json(requestsWithSenderInfo)
+        const sender = await UserModel.get(request.senderId);
+        return { ...request.toObject(), sender };
+      })
+    );
+    res.status(200).json(requestsWithSenderInfo);
   } catch (error) {
-    console.error("Error fetching friend requests:", error)
-    res.status(500).json({ message: "Failed to fetch friend requests" })
+    console.error("Error fetching friend requests:", error);
+    res.status(500).json({ message: "Failed to fetch friend requests" });
   }
 };
 
 userController.updateBio = async (req, res) => {
   try {
-    const id = req.user.id
-    const { bio } = req.body
+    const id = req.user.id;
+    const { bio } = req.body;
 
     if (!bio && bio !== "") {
-      return res.status(400).json({ message: "Bio không được để trống" })
+      return res.status(400).json({ message: "Bio không được để trống" });
     }
 
-    const user = await UserModel.get(id)
+    const user = await UserModel.get(id);
 
     if (!user) {
-      return res.status(404).json({ message: "Không tìm thấy người dùng" })
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
     }
 
-    user.bio = bio
-    user.updatedAt = new Date().toString()
+    user.bio = bio;
+    user.updatedAt = new Date().toString();
 
-    await user.save()
+    await user.save();
 
     return res.status(200).json({
       message: "Cập nhật bio thành công",
@@ -326,32 +354,34 @@ userController.updateBio = async (req, res) => {
         email: user.email,
         bio: user.bio,
       },
-    })
+    });
   } catch (error) {
-    console.error("Error updating bio:", error)
-    return res.status(500).json({ message: "Lỗi khi cập nhật bio" })
+    console.error("Error updating bio:", error);
+    return res.status(500).json({ message: "Lỗi khi cập nhật bio" });
   }
-}
+};
 
 userController.updateCoverPhoto = async (req, res) => {
   try {
-    const id = req.user.id
-    const fileUrl = req.body.fileUrl
+    const id = req.user.id;
+    const fileUrl = req.body.fileUrl;
 
     if (!fileUrl) {
-      return res.status(400).json({ message: "Cover photo không được để trống" })
+      return res
+        .status(400)
+        .json({ message: "Cover photo không được để trống" });
     }
 
-    const user = await UserModel.get(id)
+    const user = await UserModel.get(id);
 
     if (!user) {
-      return res.status(404).json({ message: "Không tìm thấy người dùng" })
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
     }
 
-    user.coverPhoto = fileUrl
-    user.updatedAt = new Date().toString()
+    user.coverPhoto = fileUrl;
+    user.updatedAt = new Date().toString();
 
-    await user.save()
+    await user.save();
 
     return res.status(200).json({
       message: "Cập nhật cover photo thành công",
@@ -360,17 +390,16 @@ userController.updateCoverPhoto = async (req, res) => {
         email: user.email,
         coverPhoto: user.coverPhoto,
       },
-    })
+    });
   } catch (error) {
-    console.error("Error updating cover photo:", error)
-    return res.status(500).json({ message: "Lỗi khi cập nhật cover photo" })
+    console.error("Error updating cover photo:", error);
+    return res.status(500).json({ message: "Lỗi khi cập nhật cover photo" });
   }
-}
+};
 
 userController.cancelFriendRequest = async (req, res) => {
   const senderId = req.user.id;
   const { receiverId } = req.params;
-
 
   try {
     // const request = await FriendRequestModel.scan({
@@ -383,7 +412,7 @@ userController.cancelFriendRequest = async (req, res) => {
       senderId,
       receiverId,
       status: "PENDING",
-    })
+    });
 
     // if (request.length === 0) {
     //   return res.status(404).json({ message: "No pending request found" });
@@ -397,23 +426,25 @@ userController.cancelFriendRequest = async (req, res) => {
 };
 
 userController.updatePhone = async (req, res) => {
-  const id = req.user.id
-  const { phone } = req.body
+  const id = req.user.id;
+  const { phone } = req.body;
 
   if (!phone) {
-    return res.status(400).json({ message: "Số điện thoại không được để trống" })
+    return res
+      .status(400)
+      .json({ message: "Số điện thoại không được để trống" });
   }
 
-  const user = await UserModel.get(id)
+  const user = await UserModel.get(id);
 
   if (!user) {
-    return res.status(404).json({ message: "Không tìm thấy người dùng" })
+    return res.status(404).json({ message: "Không tìm thấy người dùng" });
   }
 
-  user.phone = phone
-  user.updatedAt = new Date().toString()
+  user.phone = phone;
+  user.updatedAt = new Date().toString();
 
-  await user.save()
+  await user.save();
 
   return res.status(200).json({
     message: "Cập nhật số điện thoại thành công",
@@ -422,8 +453,43 @@ userController.updatePhone = async (req, res) => {
       email: user.email,
       phone: user.phone,
     },
-  })
-}
+  });
+};
 
-module.exports = userController
+userController.findUserByText = async (req, res) => {
+  const { text } = req.body;
 
+  if (text.slice(1) === "0") {
+    const regex = new RegExp(`^${text}`);
+
+    try {
+      let numberTest = Number.parseInt(text);
+      const user = await UserModel.find({ phone: regex });
+
+      if (!user) {
+        return res.status(404).json({ message: "Không tìm thấy người dùng" });
+      }
+
+      return res.status(200).json(user);
+    } catch (e) {
+      const regex = new RegExp(`^${text}`, "i"); // tìm kiếm tương đối
+      const user = await UserModel.find({ fullname: regex }); // tìm kiếm tương đối
+
+      if (!user) {
+        return res.status(404).json({ message: "Không tìm thấy người dùng" });
+      }
+
+      return res.status(200).json(user);
+    }
+  } else {
+    const regex = new RegExp(`^${text}`, "i"); // tìm kiếm tương đối
+    const user = await UserModel.find({ fullname: regex }); // tìm kiếm tương đối
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
+    }
+  }
+
+  res.status(200).json(user);
+};
+
+module.exports = userController;

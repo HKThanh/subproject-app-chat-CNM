@@ -1,11 +1,5 @@
 const nodemailer = require('nodemailer');
-const twilio = require('twilio');
 require('dotenv').config();
-const axios = require('axios');
-
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-const twilioClient = new twilio(accountSid, authToken);
 
 const generateOTP = () => {
     return Math.floor(100000 + Math.random() * 900000).toString(); // OTP 6 chữ số
