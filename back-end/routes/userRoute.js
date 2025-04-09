@@ -36,4 +36,6 @@ router.put(
   userController.updateCoverPhoto
 );
 
+router.put("/phone", authMiddleware, userController.updatePhone);
+
 module.exports = router;
