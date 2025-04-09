@@ -77,7 +77,7 @@ export async function loginUser(phone: string, password: string) {
 export async function signUpUser(
   phone: string,
   password: string,
-  name: string,
+  fullname: string,
 ) {
   try {
     const result = await fetch(`${API_URL}/auth/register`, {
@@ -85,7 +85,7 @@ export async function signUpUser(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ phone, password, name }),
+      body: JSON.stringify({ phone, password, fullname }),
     }).then(res => res.json());
     console.log("check result in register>>> ", result);
     

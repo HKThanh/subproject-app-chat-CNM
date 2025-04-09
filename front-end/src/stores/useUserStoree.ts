@@ -19,11 +19,18 @@ const useUserStore = create<UserState>()(
       user: null,
       accessToken: null,
       refreshToken: null,
-      setUser: (user, accessToken) => set({ user, accessToken }),
-      setTokens: (accessToken, refreshToken) =>
-        set({ accessToken, refreshToken }),
-      clearUser: () =>
-        set({ user: null, accessToken: null, refreshToken: null }),
+      setUser: (user, accessToken) => {
+        console.log('Setting user:', user); // Add debug log
+        set({ user, accessToken });
+      },
+      setTokens: (accessToken, refreshToken) => {
+        console.log('Setting tokens:', { accessToken, refreshToken }); // Add debug log
+        set({ accessToken, refreshToken });
+      },
+      clearUser: () => {
+        console.log('Clearing user'); // Add debug log
+        set({ user: null, accessToken: null, refreshToken: null });
+      },
     }),
     {
       name: "user-session",
@@ -33,7 +40,7 @@ const useUserStore = create<UserState>()(
             getItem: () => null,
             setItem: () => {},
             removeItem: () => {},
-          })) // Empty storage for server
+          }))
         : createJSONStorage(() => sessionStorage),
       // Skip persistence on server
       skipHydration: isServer,

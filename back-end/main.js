@@ -3,36 +3,52 @@ const app = express();
 const port = 3000;
 const bodyParser = require("body-parser");
 const { createServer } = require("node:http");
-const cors = require("cors");
+// const cors = require("cors");
 const connectDB = require("./config/connectDynamodb");
-const { Server } = require("socket.io");
+// const { Server } = require("socket.io");
+// const connectDB = require("./config/connectDynamodb");
+const connectDB = require("./config/connectMongo");
+const { initSocket } = require("./config/socket");
 
 const authController = require("./controllers/authController")
 const authRoutes = require("./routes/authRoute");
 const userRoutes = require("./routes/userRoute");
 const socketController = require("./controllers/socketController");
+const friendRequestRoutes = require("./routes/friendRequestRoute");
 
-app.use(cors());
+// const corsOptions = {
+//     origin: ['http://localhost:3000', 'http://localhost:3001'], // Add your frontend URLs
+//     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+//     allowedHeaders: ['Content-Type', 'Authorization'],
+//     credentials: true,
+//     optionsSuccessStatus: 200
+// };
+
+// app.use(cors(corsOptions));
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 connectDB();
 
 const server = createServer(app);
-const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"],
-    },
-});
+initSocket(server);
 
 app.use(express.json());
 app.use("/auth", authRoutes);
 app.use("/user", userRoutes);
+app.use("/friend-request", friendRequestRoutes);
 
 io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
+//     authController.generateQR(null, null, io, socket);
 
+//     socket.on('verifyToken', (token) => {
+//         authController.verifyToken(io, socket, token);
+//     });
+
+//     socket.on('disconnect', () => {
+//         console.log('Client disconnected:', socket.id);
+//     });
     // Đăng ký các socket handlers
     socketController.handleUserOnline(socket);
     socketController.handleLoadConversation(io, socket);
@@ -42,9 +58,6 @@ io.on('connection', (socket) => {
     socketController.handleRecallMessage(io, socket);
     socketController.handleForwardMessage(io, socket);
 
-    socket.on('disconnect', () => {
-        console.log('Client disconnected:', socket.id);
-    });
 });
 
 app.listen(port, () => {
