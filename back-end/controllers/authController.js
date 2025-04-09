@@ -90,17 +90,23 @@ authController.register = async (req, res) => {
 
     // Check if the email is already registered
     const existingEmail = await UserModel.findOne({ email: email });
+    const existingPhone = await UserModel.findOne({ phone: phone });
+    // const existingEmail = await UserModel.scan({phone: phone}).exec();
     // write with dynamodb
     // const existingEmail = await UserModel.scan({email: email}).exec();
 
     if (existingEmail) {
-        return res.status(400).json({ message: 'Email đã được sử dụng' });
+        return res.status(400).json({ message: 'Email đã được đăng ký' });
+    }
+
+    if (existingPhone) {
+        return res.status(400).json({ message: 'Số điện thoại đã được đăng ký' });
     }
 
     bcrypt.hash(password, 10).then(async (hash) => {
         try {
             const newUser = await UserModel.create({
-                id: () => uuidv4(),
+                id: uuidv4(),
                 username: phone,
                 phone: phone,
                 password: hash,
@@ -155,8 +161,7 @@ authController.login = async (req, res) => {
                 ismale: user.ismale
             }
 
-            const tokenInRedis = await redisClient.get(user.phone);
-            if (!tokenInRedis) {
+            if (!user.isLoggedin) {
 
                 const JWT_SECRET = process.env.JWT_SECRET;
                 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH;
@@ -168,6 +173,7 @@ authController.login = async (req, res) => {
                 redisClient.setEx(`${user.phone}-refresh`, 86400, refreshToken);
 
                 user.isLoggedin = true;
+                await user.save();
 
                 return res.status(200).json({
                     message: 'Đăng nhập thành công',
@@ -176,24 +182,7 @@ authController.login = async (req, res) => {
                     user: data,
                 });
             } else {
-                const decoded = jwt.verify(tokenInRedis, JWT_SECRET);
-                if (decoded.id !== user.id) {
-                    return res.status(401).json({ message: 'Token không hợp lệ' });
-                }
-
-                // check if user is logged in
-                if (user.isLoggedin) {
-                    return res.status(400).json({ message: 'Người dùng đã đăng nhập' });
-                }
-
-                user.isLoggedin = true;
-
-                return res.status(200).json({
-                    message: 'Đăng nhập thành công',
-                    accessToken: tokenInRedis,
-                    refreshToken: tokenInRedis,
-                    user: data,
-                });
+                return res.status(400).json({ message: 'Tài khoản đã đăng nhập' });
             }
         } else {
             res.status(400).json({ message: 'Nhập sai tài khoản hoặc mật khẩu' });
@@ -240,6 +229,7 @@ authController.logout = async (req, res) => {
         }
 
         user.isLoggedin = false;
+        await user.save();
 
         // remove token from redis
         await redisClient.del(user.phone);

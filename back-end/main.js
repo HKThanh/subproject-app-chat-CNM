@@ -6,8 +6,8 @@ const { createServer } = require("node:http");
 // const connectDB = require("./config/connectDynamodb");
 const connectDB = require("./config/connectMongo");
 const { initSocket } = require("./config/socket");
+const { redisClient } = require("./services/redisClient");
 
-const authController = require("./controllers/authController")
 const authRoutes = require("./routes/authRoute");
 const userRoutes = require("./routes/userRoute");
 const friendRequestRoutes = require("./routes/friendRequestRoute");
