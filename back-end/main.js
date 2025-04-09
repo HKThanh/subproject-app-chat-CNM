@@ -49,8 +49,9 @@ app.use("/friend-request", friendRequestRoutes);
 //     });
 // });
 
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+server.listen(port, '0.0.0.0', () => {
+    console.log(`Server is running on port ${port} and accessible from all network interfaces`);
+    console.log(`API địa chỉ: http://localhost:${port}`);
 });
 
 process.on('SIGINT', async () => {
