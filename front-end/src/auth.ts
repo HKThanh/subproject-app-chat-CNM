@@ -57,7 +57,7 @@ export const {
                     throw new ServerError();
                 }
                 if (!response.user || !response.accessToken) {
-                    if (response.message === "Sai tên đăng nhập") {
+                    if (response.message === "Nhập sai email hoặc mật khẩu") {
                         throw new InvalidPhonePasswordError()
                     }
                     else if (response.message === "Nhập sai mật khẩu") {

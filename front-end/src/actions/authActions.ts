@@ -25,24 +25,25 @@ export async function loginUser(email: string, password: string) {
       error: false,
       success: true,
       message: "Đăng nhập thành công!",
-      redirectTo: "/",
+      redirectTo: "/chat",
       status: 200,
     };
   } catch (error: any) {
 
     // Handle specific error types
-    if (error.name === "AccountNotActivatedError") {
-      // Try to get user ID from error or response
-      const userId = error.userId || error._id;
-      return {
-        error: true,
-        success: false,
-        message:
-          "Tài khoản chưa được kích hoạt. Vui lòng xác thực email của bạn.",
-        status: 401,
-        redirectTo: `/verify/${userId}`,
-      };
-    } else if (error.name === "InvalidPhonePasswordError") {
+    // if (error.name === "AccountNotActivatedError") {
+    //   // Try to get user ID from error or response
+    //   const userId = error.userId || error._id;
+    //   return {
+    //     error: true,
+    //     success: false,
+    //     message:
+    //       "Tài khoản chưa được kích hoạt. Vui lòng xác thực email của bạn.",
+    //     status: 401,
+    //     redirectTo: `/verify/${userId}`,
+    //   };
+    // } else
+     if (error.name === "InvalidPhonePasswordError") {
 
       return {
         error: true,
