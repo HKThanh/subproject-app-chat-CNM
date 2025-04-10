@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const { JWT_SECRET, JWT_REFRESH } = process.env;
 const { v4: uuidv4 } = require("uuid");
 const qrcode = require('qrcode');
-const { getIO } = require('../config/socket');
+const { getIO } = require('../config/socket')
 
 const UserModel = require('../models/UserModel');
 const redisClient = require('../services/redisClient');
@@ -171,7 +171,6 @@ authController.registerForWeb = async (req, res) => {
 
 authController.login = async (req, res) => {
     const { email, password, platform } = req.body;
-    const io = getIO();
 
     if (!email || !password) {
         return res.status(400).json({ message: 'Hãy nhập cả email và mật khẩu' });
@@ -203,21 +202,10 @@ authController.login = async (req, res) => {
             const isLoggedIn = await redisClient.get(deviceKey);
 
             if (isLoggedIn) {
-                // Emit force logout event to previous session
-                io.to(deviceKey).emit('forceLogout', {
-                    platform: platform,
-                    message: 'Tài khoản của bạn đã đăng nhập ở thiết bị khác'
-                });
-
                 // Remove old session
                 await redisClient.del(deviceKey);
                 await redisClient.del(`${deviceKey}-refresh`);
                 
-                // Notify other users about status change
-                io.emit('userOffline', {
-                    userId: user.id,
-                    platform: platform
-                });
             }
 
             const JWT_SECRET = process.env.JWT_SECRET;
@@ -232,9 +220,6 @@ authController.login = async (req, res) => {
                 platform: platform 
             }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
 
-            // Join socket room for this device
-            io.socketsJoin(deviceKey);
-
             // Lưu token theo platform
             await redisClient.setEx(deviceKey, 1800, token);
             await redisClient.setEx(`${deviceKey}-refresh`, 86400, refreshToken);
@@ -244,15 +229,6 @@ authController.login = async (req, res) => {
                 user.isLoggedin = true;
                 await user.save();
 
-                // Notify other users about status change
-                io.emit('userOnline', {
-                    userId: user.id,
-                    platform: platform,
-                    userInfo: {
-                        fullname: user.fullname,
-                        urlavatar: user.urlavatar
-                    }
-                });
             }
 
             return res.status(200).json({
@@ -260,13 +236,13 @@ authController.login = async (req, res) => {
                 accessToken: token,
                 refreshToken: refreshToken,
                 user: data,
-            });
+    
+        });
         } else {
             res.status(400).json({ message: 'Nhập sai email hoặc mật khẩu' });
         }
     });
 };
-
 authController.refreshToken = async (req, res) => {
     const { refreshToken, platform } = req.body;
 
@@ -329,7 +305,6 @@ authController.refreshToken = async (req, res) => {
 authController.logout = async (req, res) => {
     const { authorization } = req.headers;
     const platform = req.params.platform;
-    const io = getIO();
 
     if (!authorization) {
         return res.status(401).json({ message: 'Authorization missed' });
@@ -352,15 +327,6 @@ authController.logout = async (req, res) => {
 
         const deviceKey = `${user.email}-${platform}`;
         
-        // Notify about logout
-        io.to(deviceKey).emit('loggedOut', {
-            platform: platform,
-            message: 'Bạn đã đăng xuất'
-        });
-
-        // Leave socket room
-        io.socketsLeave(deviceKey);
-        
         // Xóa token theo platform
         await redisClient.del(deviceKey);
         await redisClient.del(`${deviceKey}-refresh`);
@@ -372,12 +338,6 @@ authController.logout = async (req, res) => {
         if (!mobileKey && !webKey) {
             user.isLoggedin = false;
             await user.save();
-
-            // Notify other users
-            io.emit('userOffline', {
-                userId: user.id,
-                platform: platform
-            });
         }
 
         res.status(200).json({ message: 'Bạn đã đăng xuất' });
