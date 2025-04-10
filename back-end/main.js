@@ -6,7 +6,7 @@ const { createServer } = require("node:http");
 // const connectDB = require("./config/connectDynamodb");
 const connectDB = require("./config/connectMongo");
 const { initSocket } = require("./config/socket");
-const { redisClient } = require("./services/redisClient");
+const redisClient = require("./services/redisClient");
 const cors = require("cors")
 
 const authRoutes = require("./routes/authRoute");
@@ -14,7 +14,7 @@ const userRoutes = require("./routes/userRoute");
 const friendRequestRoutes = require("./routes/friendRequestRoute");
 
 const corsOptions = {
-    origin: ['http://localhost:3001'], // Add your frontend URLs
+    origin: ['http://localhost:3001', 'http://localhost:8082'], // Add your frontend URLs
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
@@ -51,6 +51,11 @@ app.use("/friend-request", friendRequestRoutes);
 
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
+});
+
+server.listen(port, '0.0.0.0', () => {
+    console.log(`Server is running on port ${port} and accessible from all network interfaces`);
+    console.log(`API địa chỉ: http://localhost:${port}`);
 });
 
 process.on('SIGINT', async () => {
