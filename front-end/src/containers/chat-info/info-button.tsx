@@ -11,11 +11,11 @@ export default function InfoButton({ onClick, isActive }: InfoButtonProps) {
   return (
     <button
       className={`w-8 h-8 rounded-full flex items-center justify-center ${
-        isActive ? "bg-gray-700" : "bg-gray-800 hover:bg-gray-700"
+        isActive ? "bg-gray-200" : "bg-gray-100 hover:bg-gray-200"
       }`}
       onClick={onClick}
     >
-      <Info className="w-4 h-4 text-gray-300" />
+      <Info className="w-4 h-4 text-gray-700" />
     </button>
   );
 }

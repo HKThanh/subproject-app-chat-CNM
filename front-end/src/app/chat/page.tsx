@@ -11,11 +11,11 @@ export default function Home() {
   const [showChatInfo, setShowChatInfo] = useState(false);
 
   return (
-    <div className="flex h-screen bg-gray-900 text-gray-200">
+    <div className="flex h-screen bg-gray-50 text-gray-900">
       <div
         className={`${
           showChatInfo ? "w-1/4" : "w-1/3"
-        } flex flex-col border-r border-gray-800 transition-all duration-300`}
+        } flex flex-col border-r border-gray-200 transition-all duration-300`}
       >
         <div className="p-4">
           <SearchBar />
@@ -28,7 +28,7 @@ export default function Home() {
       <div
         className={`${
           showChatInfo ? "w-2/4" : "w-2/3"
-        } flex flex-col border-r border-gray-800 transition-all duration-300`}
+        } flex flex-col border-r border-gray-200 transition-all duration-300`}
       >
         <ChatDetail
           onToggleInfo={() => setShowChatInfo(!showChatInfo)}

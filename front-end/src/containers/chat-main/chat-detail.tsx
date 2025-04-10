@@ -42,7 +42,7 @@ export default function ChatDetail({
   return (
     <div className="flex flex-col h-full">
       <ChatHeader onToggleInfo={onToggleInfo} showChatInfo={showChatInfo} />
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-900">
+      <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
         <ChatMessage message={codeMessage} timestamp="16:37" />
       </div>
       <ChatInput />

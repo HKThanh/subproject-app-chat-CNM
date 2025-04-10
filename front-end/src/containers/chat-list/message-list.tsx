@@ -99,12 +99,13 @@ export default function MessageList() {
       {messages.map((message) => (
         <div
           key={message.id}
-          className="flex items-center px-4 py-3 hover:bg-gray-800 cursor-pointer border-b border-gray-800"
+          className="flex items-center px-4 py-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200"
         >
           <div className="relative">
             <Image src={Avatar} alt="avatar" width={20} height={20} />
+
             {message.isGroup && (
-              <div className="absolute -bottom-1 -right-1 bg-gray-700 text-xs text-white rounded-full px-1 border border-gray-900">
+              <div className="absolute -bottom-1 -right-1 bg-gray-200 text-xs text-gray-700 rounded-full px-1 border border-gray-50">
                 {message.memberCount}
               </div>
             )}
@@ -112,24 +113,24 @@ export default function MessageList() {
 
           <div className="ml-3 flex-1 min-w-0">
             <div className="flex justify-between items-start">
-              <h3 className="text-sm font-medium text-gray-200 truncate">
+              <h3 className="text-sm font-medium text-gray-900 truncate">
                 {message.name}
               </h3>
               <div className="flex items-center">
-                <span className="text-xs text-gray-400 ml-1">
+                <span className="text-xs text-gray-500 ml-1">
                   {message.time}
                 </span>
                 {message.unread && (
                   <div className="w-2 h-2 rounded-full bg-red-500 ml-2"></div>
                 )}
                 {message.unreadCount && (
-                  <div className="w-5 h-5 rounded-full bg-red-500 ml-2 flex items-center justify-center text-xs">
+                  <div className="w-5 h-5 rounded-full bg-red-500 ml-2 flex items-center justify-center text-xs text-white">
                     {message.unreadCount}
                   </div>
                 )}
               </div>
             </div>
-            <div className="flex items-center text-sm text-gray-400 truncate">
+            <div className="flex items-center text-sm text-gray-500 truncate">
               {message.hasAttachment && message.attachmentType === "edit" && (
                 <MessageSquare className="w-4 h-4 mr-1 text-gray-500" />
               )}
@@ -144,7 +145,7 @@ export default function MessageList() {
               )}
               <span className="truncate">{message.message}</span>
               {message.badge && (
-                <span className="ml-2 px-1.5 py-0.5 bg-gray-700 text-xs rounded-full">
+                <span className="ml-2 px-1.5 py-0.5 bg-gray-200 text-xs rounded-full">
                   {message.badge}
                 </span>
               )}
