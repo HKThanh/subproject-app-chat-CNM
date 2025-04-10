@@ -5,18 +5,18 @@ const authController = require("../controllers/authController");
 let io;
 
 const initSocketIO = (server) => {
-  return new Server(server, {
-    cors: {
-      origin: "*",
-    },
-    maxHttpBufferSize: 1e9, // Cho phép gửi file lớn
-    pingTimeout: 24 * 60 * 60 * 1000,    // 24 hours
-    pingInterval: 25000,                  // 25 seconds
-    reconnection: true,
-    reconnectionAttempts: Infinity,       // Vô hạn số lần thử kết nối lại
-    reconnectionDelay: 1000,             // Delay 1 giây trước mỗi lần thử
-    reconnectionDelayMax: 5000,          // Tối đa 5 giây delay
-  });
+    return new Server(server, {
+        cors: {
+            origin: "*",
+        },
+        maxHttpBufferSize: 1e9, // Cho phép gửi file lớn
+        pingTimeout: 24 * 60 * 60 * 1000,    // 24 hours
+        pingInterval: 25000,                  // 25 seconds
+        reconnection: true,
+        reconnectionAttempts: Infinity,       // Vô hạn số lần thử kết nối lại
+        reconnectionDelay: 1000,             // Delay 1 giây trước mỗi lần thử
+        reconnectionDelayMax: 5000,          // Tối đa 5 giây delay
+    });
 };
 
 const initSocket = (server) => {
