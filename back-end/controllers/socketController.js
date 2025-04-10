@@ -23,6 +23,8 @@ const getUser = (phone) => {
     return onlineUsers.find((user) => user.phone === phone);
 };
 
+
+// Handler để quản lý user online
 const handleUserOnline = (socket) => {
     socket.on("new_user_connect", async (payload) => {
         try {
@@ -58,6 +60,7 @@ const handleUserOnline = (socket) => {
         }
     });
 };
+
 
 const handleLoadConversation = (io, socket) => {
     socket.on("load_conversations", async (payload) => {
@@ -254,6 +257,7 @@ const handleSendMessage = async (io, socket) => {
             );
 
             const receiverOnline = getUser(IDReceiver);
+            console.log("Tìm thấy ng nhận để emit sự kiện nhận tin nhắn: ", receiverOnline)
             if (receiverOnline) {
                 io.to(receiverOnline.socketId).emit("receive_message", {
                     ...messageDetail.toObject(),
@@ -324,6 +328,7 @@ const handleRecallMessage = async (io, socket) => {
             if (!conversation) {
                 throw new Error("Không tìm thấy cuộc hội thoại");
             }
+            console.log("Conversation của tin nhắn bị thu hồi: ", conversation);
 
             // Xác định người nhận
             const idReceiver = conversation.idSender === message.idSender ? 
