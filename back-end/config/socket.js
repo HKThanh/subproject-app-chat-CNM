@@ -27,11 +27,16 @@ const initSocket = (server) => {
 
         // Auth handlers
         socket.on("getQRCode", () => {
-            authController.generateQR(socket);
+            authController.generateQR(socket, io);
         });
 
         socket.on("verifyQRToken", (data) => {
             authController.verifyToken(io, socket, data);
+        });
+        
+        socket.on('joinDevice', (deviceKey) => {
+            socket.join(deviceKey);
+            console.log(`Socket ${socket.id} joined room ${deviceKey}`);
         });
 
         // Chat handlers từ socketController

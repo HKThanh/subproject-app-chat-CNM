@@ -4,7 +4,6 @@ const jwt = require('jsonwebtoken');
 const { JWT_SECRET, JWT_REFRESH } = process.env;
 const { v4: uuidv4 } = require("uuid");
 const qrcode = require('qrcode');
-const { getIO } = require('../config/socket')
 
 const UserModel = require('../models/UserModel');
 const redisClient = require('../services/redisClient');
@@ -169,7 +168,7 @@ authController.registerForWeb = async (req, res) => {
     });
 }
 
-authController.login = async (req, res) => {
+authController.login = async (req, res, io) => {
     const { email, password, platform } = req.body;
 
     if (!email || !password) {
@@ -202,9 +201,17 @@ authController.login = async (req, res) => {
             const isLoggedIn = await redisClient.get(deviceKey);
 
             if (isLoggedIn) {
+                // Emit force logout event to the previous session
+                io.to(deviceKey).emit('forceLogout', {
+                    platform,
+                    message: 'Tài khoản của bạn đã đăng nhập ở thiết bị khác',
+                });
+
                 // Remove old session
-                await redisClient.del(deviceKey);
-                await redisClient.del(`${deviceKey}-refresh`);
+                await Promise.all([
+                    redisClient.del(deviceKey),
+                    redisClient.del(`${deviceKey}-refresh`),
+                ]);
                 
             }
 
@@ -346,33 +353,49 @@ authController.logout = async (req, res) => {
     }
 };
 
-authController.generateQR = async (req, res, io, socket) => {
+authController.generateQR = async (socket, io) => {
     const tempToken = jwt.sign({ socketId: socket.id }, JWT_SECRET, { expiresIn: '5m' });
     pendingLogins.set(tempToken, socket.id);
     console.log('Pending logins: ', pendingLogins);
+    console.log('Temp token: ', tempToken);
 
     try {
         const qrURL = await qrcode.toDataURL(tempToken);
-        socket.emit('qrCode', qrURL);
+        // Gửi QR code đến client cụ thể thông qua socket.id
+        io.to(socket.id).emit('qrCode', qrURL);
     } catch (err) {
         console.error('Error generating QR code: ', err);
-        socket.emit('errorCreatetQR', { message: 'Không thể tạo mã QR' });
+        io.to(socket.id).emit('errorCreateQR', { message: 'Không thể tạo mã QR' });
     }
 }
 
 authController.verifyToken = async (io, socket, data) => {
-    const { qrToken, mobileToken } = data;
-    const socketId = pendingLogins.get(qrToken);
-
-    if (!socketId || !mobileToken) {
-        socket.emit('loginQRFailed', { message: 'Mã QR đã hết hạn' });
-        return;
-    }
-
     try {
+        // Parse data if it's a string
+        let parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+
+        if (!parsedData || !parsedData.qrToken || !parsedData.mobileToken) {
+            io.to(socket.id).emit('loginQRFailed', {
+                message: 'Dữ liệu không hợp lệ hoặc thiếu thông tin'
+            });
+            return;
+        }
+
+        const { qrToken, mobileToken } = parsedData;
+        const socketId = pendingLogins.get(qrToken);
+
+        if (!socketId) {
+            io.to(socket.id).emit('loginQRFailed', {
+                message: 'Mã QR đã hết hạn hoặc không tồn tại'
+            });
+            return;
+        }
+
         const qrDecoded = jwt.verify(qrToken, JWT_SECRET);
-        if (qrDecoded.socketId !== socket.id) {
-            socket.emit('loginQRFailed', { message: 'Mã QR không hợp lệ' });
+        if (qrDecoded.socketId !== socketId) {
+            io.to(socket.id).emit('loginQRFailed', {
+                message: 'Mã QR không hợp lệ'
+            });
             return;
         }
 
@@ -380,16 +403,18 @@ authController.verifyToken = async (io, socket, data) => {
         const user = await UserModel.get(mobileDecoded.id);
 
         if (!user) {
-            socket.emit('loginQRFailed', { message: 'Người dùng không tồn tại' });
+            io.to(socket.id).emit('loginQRFailed', {
+                message: 'Người dùng không tồn tại'
+            });
             return;
         }
 
         const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30m' });
-        const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
+        const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH, { expiresIn: '1d' });
 
         // store token in redis
-        redisClient.setEx(user.email, 1800, token);
-        redisClient.setEx(`${user.email}-refresh`, 86400, refreshToken);
+        await redisClient.setEx(user.email, 1800, token);
+        await redisClient.setEx(`${user.email}-refresh`, 86400, refreshToken);
 
         io.to(socketId).emit('loginQRSuccess', {
             message: 'Đăng nhập thành công',
@@ -397,8 +422,11 @@ authController.verifyToken = async (io, socket, data) => {
             refreshToken: refreshToken,
         });
     } catch (err) {
-        console.error('Error verifying token: ', err);
-        socket.emit('loginQRFailed', { message: 'Xác thực thất bại' });
+        console.error('Error in verifyToken:', err);
+        io.to(socket.id).emit('loginQRFailed', {
+            message: 'Xác thực thất bại',
+            error: err.message
+        });
     }
 }
 
