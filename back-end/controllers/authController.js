@@ -146,18 +146,17 @@ authController.registerForWeb = async (req, res) => {
 }
 
 authController.login = async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, platform } = req.body; // Thêm platform
 
     if (!email || !password) {
         return res.status(400).json({ message: 'Hãy nhập cả email và mật khẩu' });
     }
 
-    // const user = await UserModel.scan("email").contains(email).exec();
-
     const user = await UserModel.findOne({ email: email });
     if (!user) {
         return res.status(400).json({ message: 'Nhập sai email hoặc mật khẩu' });
     }
+
     bcrypt.compare(password, user.password, async (err, result) => {
         if (result) {
             const data = {
@@ -173,29 +172,44 @@ authController.login = async (req, res) => {
                 ismale: user.ismale
             }
 
+            // Kiểm tra và quản lý đăng nhập theo platform
+            const deviceKey = `${user.email}-${platform}`; // platform: 'mobile' hoặc 'web'
+            const isLoggedIn = await redisClient.get(deviceKey);
+
+            if (isLoggedIn) {
+                return res.status(400).json({ 
+                    message: `Người dùng đã đăng nhập trên ${platform}` 
+                });
+            }
+
+            const JWT_SECRET = process.env.JWT_SECRET;
+            const JWT_REFRESH_SECRET = process.env.JWT_REFRESH;
+            const token = jwt.sign({ 
+                id: user.id,
+                platform: platform 
+            }, JWT_SECRET, { expiresIn: '30m' });
+            
+            const refreshToken = jwt.sign({ 
+                id: user.id,
+                platform: platform 
+            }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
+
+            // Lưu token theo platform
+            await redisClient.setEx(deviceKey, 1800, token);
+            await redisClient.setEx(`${deviceKey}-refresh`, 86400, refreshToken);
+
+            // Cập nhật trạng thái đăng nhập
             if (!user.isLoggedin) {
-
-                const JWT_SECRET = process.env.JWT_SECRET;
-                const JWT_REFRESH_SECRET = process.env.JWT_REFRESH;
-                const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30m' });
-                const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
-
-                // store token in redis
-                redisClient.setEx(user.email, 1800, token);
-                redisClient.setEx(`${user.email}-refresh`, 86400, refreshToken);
-
                 user.isLoggedin = true;
                 await user.save();
-
-                return res.status(200).json({
-                    message: 'Đăng nhập thành công',
-                    accessToken: token,
-                    refreshToken: refreshToken,
-                    user: data,
-                });
-            } else {
-                return res.status(400).json({ message: 'Người dùng đang đăng nhập' });
             }
+
+            return res.status(200).json({
+                message: 'Đăng nhập thành công',
+                accessToken: token,
+                refreshToken: refreshToken,
+                user: data,
+            });
         } else {
             res.status(400).json({ message: 'Nhập sai email hoặc mật khẩu' });
         }
@@ -223,10 +237,14 @@ authController.refreshToken = async (req, res) => {
 
 authController.logout = async (req, res) => {
     const { authorization } = req.headers;
+    const platform = req.params.platform; // Thêm platform vào query params
 
-    // check if user still login
     if (!authorization) {
         return res.status(401).json({ message: 'Authorization missed' });
+    }
+
+    if (!platform || !['web', 'mobile'].includes(platform)) {
+        return res.status(400).json({ message: 'Invalid platform' });
     }
 
     const token = authorization.split(' ')[1];
@@ -240,14 +258,27 @@ authController.logout = async (req, res) => {
             return res.status(404).json({ message: 'Người dùng không tồn tại' });
         }
 
-        user.isLoggedin = false;
-        await user.save();
+        const deviceKey = `${user.email}-${platform}`;
+        
+        // Xóa token theo platform
+        await redisClient.del(deviceKey);
+        await redisClient.del(`${deviceKey}-refresh`);
 
-        // remove token from redis
-        await redisClient.del(user.email);
+        // Kiểm tra nếu không còn đăng nhập ở platform nào
+        const mobileKey = await redisClient.get(`${user.email}-mobile`);
+        const webKey = await redisClient.get(`${user.email}-web`);
 
-        // remove refresh token from redis
-        await redisClient.del(`${user.email}-refresh`);
+        if (mobileKey) {
+            await redisClient.del(`${user.email}-mobile`);
+        }
+        if (webKey) {
+            await redisClient.del(`${user.email}-web`);
+        }
+
+        if (!mobileKey && !webKey) {
+            user.isLoggedin = false;
+            await user.save();
+        }
 
         res.status(200).json({ message: 'Bạn đã đăng xuất' });
     } catch (err) {

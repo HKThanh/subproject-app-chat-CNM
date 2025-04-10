@@ -3,6 +3,7 @@ const s3  = require("../config/connectS3")
 require("dotenv").config()
 const fileService = {}
 
+// func để lọc ra file hình ảnh
 const imageFileFilter = (req, file, cb) => {
   if (file.mimetype.startsWith("image/")) {
     cb(null, true)
@@ -11,6 +12,8 @@ const imageFileFilter = (req, file, cb) => {
   }
 }
 
+
+// func lưu file vào memory
 fileService.uploadFile = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -28,6 +31,8 @@ fileService.uploadAvatar = multer({
   fileFilter: imageFileFilter,
 })
 
+
+// Hàm xử lí hình ảnh (để lưu hình vào db hoặc s3)
 fileService.processAvatar = async (req, res, next) => {
   if (!req.file) {
     return res.status(400).json({ message: "Không có file được tải lên" })
@@ -77,4 +82,3 @@ fileService.processAvatar = async (req, res, next) => {
 }
 
 module.exports = fileService
-
