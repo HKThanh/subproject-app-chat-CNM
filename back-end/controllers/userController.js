@@ -27,14 +27,29 @@ userController.getUser = async (req, res) => {
   const id = req.user.id;
 
   try {
-    const user = await UserModel.get(id);
+    const user = await UserModel.get(id); 
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "không tìm thấy người dùng" });
     }
-    res.status(200).json(user);
+
+    const dataReturn = {
+      id: user.id,
+      email: user.email,
+      fullname: user.fullname,
+      urlavatar: user.urlavatar,
+      birthday: user.birthday,
+      bio: user.bio,
+      phone: user.phone,
+      coverPhoto: user.coverPhoto,
+      ismale: user.ismale,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    }
+
+    res.status(200).json(dataReturn);
   } catch (error) {
-    res.status(500).json({ message: "Failed to get user" });
+    res.status(500).json({ message: "Lỗi server không thể lấy người dùng" });
   }
 };
 
