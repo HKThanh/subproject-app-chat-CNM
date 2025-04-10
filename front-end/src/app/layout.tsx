@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "next-auth/react";
 import AuthSync from "@/components/auth/auth.sync";
+import { Toaster } from "sonner";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -32,6 +33,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <SessionProvider>
           <AuthSync />
+          <Toaster richColors position="top-right" />
           {children}
         </SessionProvider>
       </body>

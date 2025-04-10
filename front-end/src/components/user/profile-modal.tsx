@@ -26,11 +26,13 @@ export type UserProfile = {
 interface ProfileModalProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  
 }
 
 export default function ProfileModal({ open = false, onOpenChange }: ProfileModalProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [viewingImage, setViewingImage] = useState<string | null>(null)
+  const [imageType, setImageType] = useState<"avatar" | "cover" | null>(null)
 
   const user = useUserStore((state) => state.user)
   const [profile, setProfile] = useState<UserProfile>({
@@ -152,6 +154,11 @@ export default function ProfileModal({ open = false, onOpenChange }: ProfileModa
     setViewingImage(null);
   }
 
+  const handleViewImage = (url: string, type: "avatar" | "cover") => {
+    setViewingImage(url);
+    setImageType(type);
+  };
+
   return (
     <>
       <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden">
@@ -169,7 +176,7 @@ export default function ProfileModal({ open = false, onOpenChange }: ProfileModa
               key="view"
               profile={profile}
               onEdit={() => setIsEditing(true)}
-              onViewImage={setViewingImage}
+              onViewImage={handleViewImage}
             />
           )}
         </AnimatePresence>
@@ -178,8 +185,12 @@ export default function ProfileModal({ open = false, onOpenChange }: ProfileModa
       <ImageViewer
         imageUrl={viewingImage}
         isOpen={!!viewingImage}
-        onClose={() => setViewingImage(null)}
+        onClose={() => {
+          setViewingImage(null);
+          setImageType(null);
+        }}
         onUpdate={handleUpdateImage}
+        imageType={imageType || "avatar"} // Fallback to avatar if somehow type is null
       />
     </>
   )

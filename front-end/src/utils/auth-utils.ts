@@ -12,14 +12,17 @@ export async function getAuthToken(): Promise<string | null> {
     // Thử lấy token từ session
     const session = await getSession();
     const sessionToken = session?.accessToken;
-    
+
+    console.log('Session token:', sessionToken);
+
     if (sessionToken) {
       return sessionToken;
     }
-    
+
     // Nếu không có trong session, thử lấy từ zustand
     const zustandToken = useUserStore.getState().accessToken;
-    
+    console.log('Zustand token:', zustandToken);
+
     return zustandToken || null;
   } catch (error) {
     console.error("Lỗi khi lấy token xác thực:", error);
