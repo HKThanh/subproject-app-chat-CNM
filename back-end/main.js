@@ -4,7 +4,7 @@ const port = 3000;
 const bodyParser = require("body-parser");
 const { createServer } = require("node:http");
 const connectDB = require("./config/connectMongo");
-const { initSocket, getIO } = require("./config/socket");
+const { initSocket } = require("./config/socket");
 const redisClient = require("./services/redisClient");
 const cors = require("cors")
 
@@ -33,10 +33,9 @@ const server = createServer(app);
 
 // Khởi tạo Socket.IO
 initSocket(server);
-const io = getIO();
 
 // Routes
-app.use("/auth", authRoutes(io));
+app.use("/auth", authRoutes);
 app.use("/user", userRoutes);
 app.use("/friend-request", friendRequestRoutes);
 
