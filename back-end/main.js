@@ -37,7 +37,7 @@ const io = getIO();
 
 // Routes
 app.use("/auth", authRoutes(io));
-app.use("/user", userRoutes);
+app.use("/user", userRoutes(io));
 app.use("/friend-request", friendRequestRoutes);
 
 server.listen(port, '0.0.0.0', () => {

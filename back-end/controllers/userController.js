@@ -4,7 +4,6 @@ const jwt = require("jsonwebtoken");
 const { JWT_SECRET } = process.env;
 const { v4: uuidv4 } = require("uuid");
 const qrcode = require("qrcode");
-const { getIO } = require("../config/socket");
 
 const UserModel = require("../models/UserModel");
 const FriendRequestModel = require("../models/FriendRequestModel");
@@ -224,10 +223,9 @@ userController.updateProfile = async (req, res) => {
   }
 };
 
-userController.sendFriendRequest = async (req, res) => {
+userController.sendFriendRequest = async (req, res, io) => {
   const senderId = req.user.id;
   const { receiverId } = req.body;
-  const io = getIO();
 
   if (senderId === receiverId) {
     return res.status(400).json({ 
@@ -270,9 +268,8 @@ userController.sendFriendRequest = async (req, res) => {
 };
 
 // Sửa lại hàm handleFriendRequest
-userController.handleFriendRequest = async (req, res) => {
+userController.handleFriendRequest = async (req, res, io) => {
   const { id, type } = req.body;
-  const io = getIO();
 
   const request = await FriendRequestModel.findOne({
     id: id,
@@ -333,10 +330,9 @@ userController.addToFriendList = async (senderId, receiverId) => {
   await Promise.all([sender.save(), receiver.save()]);
 };
 
-userController.getAllFriendRequests = async (req, res) => {
+userController.getAllFriendRequests = async (req, res, io) => {
   try {
     const id = req.user.id;
-    const io = getIO();
     
     // Lấy tất cả yêu cầu kết bạn đang pending
     const friendRequests = await FriendRequestModel.find({
@@ -468,10 +464,9 @@ userController.updateCoverPhoto = async (req, res) => {
   }
 };
 
-userController.cancelFriendRequest = async (req, res) => {
+userController.cancelFriendRequest = async (req, res, io) => {
   const senderId = req.user.id;
   const { receiverId } = req.params;
-  const io = getIO();
 
   try {
     const request = await FriendRequestModel.findOne({
