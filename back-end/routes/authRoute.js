@@ -32,5 +32,4 @@ const authRoutes = (io) => {
 
     return router;
 }
-
 module.exports = authRoutes;

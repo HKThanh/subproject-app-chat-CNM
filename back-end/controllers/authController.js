@@ -4,7 +4,6 @@ const jwt = require('jsonwebtoken');
 const { JWT_SECRET, JWT_REFRESH } = process.env;
 const { v4: uuidv4 } = require("uuid");
 const qrcode = require('qrcode');
-// const { getIO } = require("../config/socket");
 
 const UserModel = require('../models/UserModel');
 const redisClient = require('../services/redisClient');
@@ -15,7 +14,7 @@ const authController = {};
 const pendingLogins = new Map();
 
 const checkEmailAndPhone = async (email, phone) => {
-    const user = await UserModel.findOne({
+    const user = await UserModel.findOne({ 
         $or: [
             { email: email },
             { phone: phone }
@@ -67,12 +66,12 @@ authController.verifyForPhone = async (req, res) => {
             }
 
             const otp = generateOTP();
-            await sendOTP(email, otp);
-            await redisClient.setEx(email, 300, JSON.stringify({ otp }));
+                await sendOTP(email, otp);
+                await redisClient.setEx(email, 300, JSON.stringify({ otp }));
 
             console.log(otp);
-
-            return res.status(200).json({
+            
+            return res.status(200).json({ 
                 message: 'OTP đã được gửi đến email của bạn',
                 email: newUser.email,
             });
@@ -108,7 +107,7 @@ authController.verifyOTP = async (req, res) => {
     await user.save();
     await redisClient.del(email); // Remove OTP from Redis after successful verification
 
-    return res.status(200).json({ message: 'Xác thực thành công', email: email });
+    return res.status(200).json({ message: 'Xác thực thành công' , email: email });
 }
 
 authController.requestOTPForWeb = async (req, res) => {
@@ -128,7 +127,7 @@ authController.requestOTPForWeb = async (req, res) => {
     await redisClient.setEx(email, 300, JSON.stringify({ otp }));
 
     console.log(otp);
-
+    
     return res.status(200).json({ message: 'OTP đã được gửi đến email của bạn', email: email });
 }
 
@@ -213,18 +212,19 @@ authController.login = async (req, res, io) => {
                     redisClient.del(deviceKey),
                     redisClient.del(`${deviceKey}-refresh`),
                 ]);
+                
             }
 
             const JWT_SECRET = process.env.JWT_SECRET;
             const JWT_REFRESH_SECRET = process.env.JWT_REFRESH;
-            const token = jwt.sign({
+            const token = jwt.sign({ 
                 id: user.id,
-                platform: platform
+                platform: platform 
             }, JWT_SECRET, { expiresIn: '30m' });
-
-            const refreshToken = jwt.sign({
+            
+            const refreshToken = jwt.sign({ 
                 id: user.id,
-                platform: platform
+                platform: platform 
             }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
 
             // Lưu token theo platform
@@ -243,20 +243,19 @@ authController.login = async (req, res, io) => {
                 accessToken: token,
                 refreshToken: refreshToken,
                 user: data,
-
-            });
+    
+        });
         } else {
             res.status(400).json({ message: 'Nhập sai email hoặc mật khẩu' });
         }
     });
 };
-
 authController.refreshToken = async (req, res) => {
     const { refreshToken, platform } = req.body;
 
     if (!refreshToken || !platform) {
-        return res.status(400).json({
-            message: 'Refresh token and platform are required'
+        return res.status(400).json({ 
+            message: 'Refresh token and platform are required' 
         });
     }
 
@@ -268,8 +267,8 @@ authController.refreshToken = async (req, res) => {
         const user = await UserModel.findOne({ id: decoded.id });
 
         if (!user) {
-            return res.status(404).json({
-                message: 'User not found'
+            return res.status(404).json({ 
+                message: 'User not found' 
             });
         }
 
@@ -278,20 +277,20 @@ authController.refreshToken = async (req, res) => {
         const storedRefreshToken = await redisClient.get(`${deviceKey}-refresh`);
 
         if (!storedRefreshToken || storedRefreshToken !== refreshToken) {
-            return res.status(403).json({
-                message: 'Invalid refresh token'
+            return res.status(403).json({ 
+                message: 'Invalid refresh token' 
             });
         }
 
         // Generate new tokens
-        const newToken = jwt.sign({
+        const newToken = jwt.sign({ 
             id: user.id,
-            platform: platform
+            platform: platform 
         }, JWT_SECRET, { expiresIn: '30m' });
 
-        const newRefreshToken = jwt.sign({
+        const newRefreshToken = jwt.sign({ 
             id: user.id,
-            platform: platform
+            platform: platform 
         }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
 
         // Update tokens in Redis
@@ -304,8 +303,8 @@ authController.refreshToken = async (req, res) => {
         });
 
     } catch (err) {
-        return res.status(403).json({
-            message: 'Invalid refresh token'
+        return res.status(403).json({ 
+            message: 'Invalid refresh token' 
         });
     }
 };
@@ -334,7 +333,7 @@ authController.logout = async (req, res) => {
         }
 
         const deviceKey = `${user.email}-${platform}`;
-
+        
         // Xóa token theo platform
         await redisClient.del(deviceKey);
         await redisClient.del(`${deviceKey}-refresh`);

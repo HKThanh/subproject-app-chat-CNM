@@ -33,7 +33,7 @@ const initSocket = (server) => {
         socket.on("verifyQRToken", (data) => {
             authController.verifyToken(io, socket, data);
         });
-
+        
         socket.on('joinDevice', (deviceKey) => {
             socket.join(deviceKey);
             console.log(`Socket ${socket.id} joined room ${deviceKey}`);
