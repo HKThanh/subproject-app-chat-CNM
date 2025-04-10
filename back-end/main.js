@@ -3,7 +3,6 @@ const app = express();
 const port = 3000;
 const bodyParser = require("body-parser");
 const { createServer } = require("node:http");
-// const connectDB = require("./config/connectDynamodb");
 const connectDB = require("./config/connectMongo");
 const { initSocket } = require("./config/socket");
 const redisClient = require("./services/redisClient");
@@ -25,31 +24,23 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+
+// Kết nối database
 connectDB();
 
+// Tạo HTTP server
 const server = createServer(app);
+
+// Khởi tạo Socket.IO
 initSocket(server);
 
-app.use(express.json());
+// Routes
 app.use("/auth", authRoutes);
 app.use("/user", userRoutes);
 app.use("/friend-request", friendRequestRoutes);
 
-
-// io.on('connection', (socket) => {
-//     console.log('Client connected:', socket.id);
-//     authController.generateQR(null, null, io, socket);
-
-//     socket.on('verifyToken', (token) => {
-//         authController.verifyToken(io, socket, token);
-//     });
-
-//     socket.on('disconnect', () => {
-//         console.log('Client disconnected:', socket.id);
-//     });
-// });
-
-app.listen(port, () => {
+// Lắng nghe trên server thay vì app
+server.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
 
@@ -65,4 +56,4 @@ process.on('SIGINT', async () => {
         console.log('MongoDB connection closed');
         process.exit(0);
     });
-});
+});/*  */

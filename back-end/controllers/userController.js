@@ -23,7 +23,7 @@ userController.getAllUsers = async (req, res) => {
   }
 };
 
-userController.getUserByPhone = async (req, res) => {
+userController.getUser = async (req, res) => {
   const id = req.user.id;
 
   try {
@@ -165,7 +165,7 @@ userController.updateAvatar = async (req, res) => {
 userController.updateProfile = async (req, res) => {
   try {
     const id = req.user.id;
-    const { fullname, ismale, birthday } = req.body;
+    const { fullname, ismale, birthday, bio } = req.body;
     if (!fullname && ismale === undefined && !birthday) {
       return res
         .status(400)
@@ -179,13 +179,14 @@ userController.updateProfile = async (req, res) => {
     }
 
     if (fullname) user.fullname = fullname;
-    if (ismale !== undefined) user.ismale = Boolean(ismale);
+    if (ismale !== undefined) {
+      user.ismale = ismale === true || ismale === 'true';
+    }
     if (birthday) user.birthday = birthday;
-
+    if (bio) user.bio = bio;
     user.updatedAt = new Date().toString();
 
     await user.save();
-    console.log("check user >>>. ", user);
 
     return res.status(200).json({
       message: "Cập nhật thông tin thành công",
