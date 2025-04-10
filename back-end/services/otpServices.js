@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+require('dotenv').config();
 
 const generateOTP = () => {
     return Math.floor(100000 + Math.random() * 900000).toString(); // OTP 6 chữ số

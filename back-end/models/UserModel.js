@@ -26,13 +26,8 @@ const generateBirthdate = () => {
 //         type: Boolean,
 //         default: true,
 //     },
-//     isVerified: {
-//         type: Boolean,
-//         default: false,
-//     },
+    
 //     phone: String,
-//     urlavatar: String,
-//     birthday: String,
 //     urlavatar: {
 //         type: String,
 //         default: "",
@@ -52,6 +47,10 @@ const generateBirthdate = () => {
 //     friendList: {
 //         type: Array,
 //         schema: [String],
+//     },
+//     isVerified: {
+//         type: Boolean,
+//         default: false,
 //     },
 //     isLoggedin: {
 //         type: Boolean,
@@ -115,14 +114,6 @@ const UserSchema = new Schema({
         default: false,
     },
     email: {
-        type: String,
-        default: "",
-    },
-    bio: {
-        type: String,
-        default: "",
-    },
-    coverPhoto: {
         type: String,
         default: "",
     },
