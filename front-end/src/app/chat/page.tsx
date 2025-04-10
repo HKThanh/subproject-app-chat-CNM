@@ -1,13 +1,22 @@
+"use client";
+
+import ChatInfo from "@/containers/chat-info/chat-info";
 import MessageList from "@/containers/chat-list/message-list";
 import SearchBar from "@/containers/chat-list/search-bar";
 import TabNavigation from "@/containers/chat-list/tab-navigation";
 import ChatDetail from "@/containers/chat-main/chat-detail";
-import ChatList from "@/containers/chats/chat-list";
+import { useState } from "react";
 
-const ChatPage = () => {
+export default function Home() {
+  const [showChatInfo, setShowChatInfo] = useState(false);
+
   return (
     <div className="flex h-screen bg-gray-900 text-gray-200">
-      <div className="w-1/3 flex flex-col border-r border-gray-800">
+      <div
+        className={`${
+          showChatInfo ? "w-1/4" : "w-1/3"
+        } flex flex-col border-r border-gray-800 transition-all duration-300`}
+      >
         <div className="p-4">
           <SearchBar />
         </div>
@@ -16,11 +25,21 @@ const ChatPage = () => {
           <MessageList />
         </div>
       </div>
-      <div className="w-2/3 flex flex-col">
-        <ChatDetail />
+      <div
+        className={`${
+          showChatInfo ? "w-2/4" : "w-2/3"
+        } flex flex-col border-r border-gray-800 transition-all duration-300`}
+      >
+        <ChatDetail
+          onToggleInfo={() => setShowChatInfo(!showChatInfo)}
+          showChatInfo={showChatInfo}
+        />
       </div>
+      {showChatInfo && (
+        <div className="w-1/4 flex flex-col transition-all duration-300">
+          <ChatInfo />
+        </div>
+      )}
     </div>
   );
-};
-
-export default ChatPage;
+}

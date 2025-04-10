@@ -2,7 +2,15 @@ import ChatHeader from "./chat-header";
 import ChatInput from "./chat-input";
 import ChatMessage from "./chat-message";
 
-export default function ChatDetail() {
+interface ChatDetailProps {
+  onToggleInfo: () => void;
+  showChatInfo: boolean;
+}
+
+export default function ChatDetail({
+  onToggleInfo,
+  showChatInfo,
+}: ChatDetailProps) {
   const codeMessage = `
 />
 <Path
@@ -33,7 +41,7 @@ export default function ChatDetail() {
 
   return (
     <div className="flex flex-col h-full">
-      <ChatHeader />
+      <ChatHeader onToggleInfo={onToggleInfo} showChatInfo={showChatInfo} />
       <div className="flex-1 overflow-y-auto p-4 bg-gray-900">
         <ChatMessage message={codeMessage} timestamp="16:37" />
       </div>

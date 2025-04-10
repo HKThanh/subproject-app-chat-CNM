@@ -1,8 +1,18 @@
+"use client";
+
 import { Phone, Video, Search, Info } from "lucide-react";
 import Avatar from "@/assets/images/user-avatar.png";
 import Image from "next/image";
 
-export default function ChatHeader() {
+interface ChatHeaderProps {
+  onToggleInfo: () => void;
+  showChatInfo: boolean;
+}
+
+export default function ChatHeader({
+  onToggleInfo,
+  showChatInfo,
+}: ChatHeaderProps) {
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 bg-gray-900">
       <div className="flex items-center">
@@ -24,7 +34,12 @@ export default function ChatHeader() {
         <button className="p-2 rounded-full hover:bg-gray-800">
           <Search className="w-5 h-5 text-gray-300" />
         </button>
-        <button className="p-2 rounded-full hover:bg-gray-800">
+        <button
+          className={`p-2 rounded-full ${
+            showChatInfo ? "bg-gray-700" : "hover:bg-gray-800"
+          }`}
+          onClick={onToggleInfo}
+        >
           <Info className="w-5 h-5 text-gray-300" />
         </button>
       </div>

@@ -55,7 +55,7 @@ export default function LoginForm() {
     try {
       const result = await loginUser(email, password);
       console.log("check result>>> ", result);
-      
+
       if (result.error) {
         toast.error(result.message);
         setError(result.message);
@@ -86,7 +86,11 @@ export default function LoginForm() {
     <div className="min-h-screen flex items-center justify-center p-6 relative bg-gradient-to-br from-purple-50/30 to-orange-50/30">
       <Toaster richColors position="top-right" />
       <Card className="w-full max-w-md bg-white/20 backdrop-blur-md rounded-xl shadow-lg border-white/30 relative overflow-hidden">
-        <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} borderWidth={2} duration={8}/>
+        <ShineBorder
+          shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]}
+          borderWidth={2}
+          duration={8}
+        />
         <CardHeader className="text-center">
           <h2 className="text-3xl font-extrabold text-gray-900">
             WeChat - kết nối ngay!
@@ -184,7 +188,7 @@ export default function LoginForm() {
 
           <div className="mt-8 text-center text-sm">
             <span className="text-gray-800 font-medium">
-              Chưa có tài khoản? 
+              Chưa có tài khoản?
             </span>{" "}
             <Button
               variant="link"
