@@ -39,11 +39,6 @@ app.use("/auth", authRoutes);
 app.use("/user", userRoutes);
 app.use("/friend-request", friendRequestRoutes);
 
-// Lắng nghe trên server thay vì app
-server.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-});
-
 server.listen(port, '0.0.0.0', () => {
     console.log(`Server is running on port ${port} and accessible from all network interfaces`);
     console.log(`API địa chỉ: http://localhost:${port}`);
@@ -56,4 +51,4 @@ process.on('SIGINT', async () => {
         console.log('MongoDB connection closed');
         process.exit(0);
     });
-});/*  */
+});
