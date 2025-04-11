@@ -1,156 +1,91 @@
-import { MessageSquare, Phone, ImageIcon } from "lucide-react";
-import Avatar from "@/assets/images/user-avatar.png";
+import { MessageSquare, Phone, ImageIcon, Loader2, Clock } from "lucide-react";
 import Image from "next/image";
+import { Conversation } from "@/socket/useChat";
+import { formatDistanceToNow } from "date-fns";
+import { vi } from "date-fns/locale";
 
-const messages = [
-  {
-    id: 1,
-    name: "nhóm 5_CNM",
-    avatar: "/placeholder.svg?height=40&width=40",
-    message: "Vũ Hải Nam: còn nhiều lắm tôi push lên...",
-    time: "9 phút",
-    hasAttachment: true,
-    attachmentType: "edit",
-    unread: false,
-  },
-  {
-    id: 2,
-    name: "Spx Hoàn",
-    avatar: "/placeholder.svg?height=40&width=40",
-    message: "Bạn: ",
-    time: "9 phút",
-    hasAttachment: true,
-    attachmentType: "image",
-    unread: false,
-  },
-  {
-    id: 3,
-    name: "Tấn Lộc",
-    avatar: "/placeholder.svg?height=40&width=40",
-    message: "import { colors } from '@/src/constan...",
-    time: "31 phút",
-    unread: false,
-  },
-  {
-    id: 4,
-    name: "MCB TOEIC T9-T10-T11",
-    avatar: "/placeholder.svg?height=40&width=40",
-    message: "Nguyễn Tài: hình như có bạn rớt",
-    time: "2 giờ",
-    isGroup: true,
-    memberCount: "99+",
-    badge: "5",
-    unread: false,
-  },
-  {
-    id: 5,
-    name: "Trần Đặng Minh Quang",
-    avatar: "/placeholder.svg?height=40&width=40",
-    message: "Hôm nay (09/04) là sinh nhật c...",
-    time: "8 giờ",
-    hasAttachment: true,
-    attachmentType: "audio",
-    unread: true,
-  },
-  {
-    id: 6,
-    name: "Hữu Ngộ",
-    avatar: "/placeholder.svg?height=40&width=40",
-    message: "Hôm nay (09/04) là sinh nhật c...",
-    time: "8 giờ",
-    hasAttachment: true,
-    attachmentType: "audio",
-    unread: true,
-  },
-  {
-    id: 7,
-    name: "Đinh Nguyên Chung",
-    avatar: "/placeholder.svg?height=40&width=40",
-    message: "Ch",
-    time: "Hôm qua",
-    unreadCount: 1,
-  },
-  {
-    id: 8,
-    name: "19h20 246 MCB GIẢI ĐỀ...",
-    avatar: "/placeholder.svg?height=40&width=40",
-    message: "Ngọc Hân: 👋 Thông báo nghỉ lễ...",
-    time: "3 ngày",
-    isGroup: true,
-    memberCount: "31",
-    badge: "5+",
-    unread: false,
-  },
-  {
-    id: 9,
-    name: "Cô Ba",
-    avatar: "/placeholder.svg?height=40&width=40",
-    message: "Cuộc gọi thoại đến",
-    time: "",
-    hasAttachment: true,
-    attachmentType: "call",
-    unreadCount: 1,
-  },
-];
+interface MessageListProps {
+  conversations: Conversation[];
+  activeConversationId: string | null;
+  onSelectConversation: (conversationId: string) => void;
+  loading: boolean;
+}
 
-export default function MessageList() {
+export default function MessageList({
+  conversations,
+  activeConversationId,
+  onSelectConversation,
+  loading
+}: MessageListProps) {
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+          <p className="mt-2 text-sm text-gray-500">Đang tải cuộc trò chuyện...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (conversations.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <MessageSquare className="h-12 w-12 text-gray-300" />
+          <p className="mt-2 text-gray-500">Không có cuộc trò chuyện nào</p>
+          <p className="text-sm text-gray-400">Bắt đầu trò chuyện mới</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Format thời gian
+  const formatTime = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return formatDistanceToNow(date, { addSuffix: true, locale: vi });
+    } catch (error) {
+      return "Không rõ";
+    }
+  };
+
   return (
     <div className="flex-1 overflow-y-auto">
-      {messages.map((message) => (
+      {conversations.map((conversation) => (
         <div
-          key={message.id}
-          className="flex items-center px-4 py-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200"
+          key={conversation.idConversation}
+          className={`flex items-center px-4 py-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200 ${
+            activeConversationId === conversation.idConversation ? "bg-blue-50" : ""
+          }`}
+          onClick={() => onSelectConversation(conversation.idConversation)}
         >
-          <div className="relative">
-            <Image src={Avatar} alt="avatar" width={20} height={20} />
-
-            {message.isGroup && (
-              <div className="absolute -bottom-1 -right-1 bg-gray-200 text-xs text-gray-700 rounded-full px-1 border border-gray-50">
-                {message.memberCount}
-              </div>
-            )}
+          <div className="relative mr-3">
+            <Image
+              src={conversation.userInfo?.avatar || `https://ui-avatars.com/api/?name=${conversation.userInfo?.fullname || "User"}`}
+              alt={conversation.userInfo?.fullname || "User"}
+              width={48}
+              height={48}
+              className="rounded-full"
+            />
+            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
           </div>
-
-          <div className="ml-3 flex-1 min-w-0">
-            <div className="flex justify-between items-start">
-              <h3 className="text-sm font-medium text-gray-900 truncate">
-                {message.name}
+          <div className="flex-1 min-w-0">
+            <div className="flex justify-between">
+              <h3 className="font-medium text-gray-900 truncate">
+                {conversation.userInfo?.fullname || "Người dùng"}
               </h3>
-              <div className="flex items-center">
-                <span className="text-xs text-gray-500 ml-1">
-                  {message.time}
-                </span>
-                {message.unread && (
-                  <div className="w-2 h-2 rounded-full bg-red-500 ml-2"></div>
-                )}
-                {message.unreadCount && (
-                  <div className="w-5 h-5 rounded-full bg-red-500 ml-2 flex items-center justify-center text-xs text-white">
-                    {message.unreadCount}
-                  </div>
-                )}
-              </div>
+              <span className="text-xs text-gray-500 whitespace-nowrap">
+                {formatTime(conversation.lastChange)}
+              </span>
             </div>
-            <div className="flex items-center text-sm text-gray-500 truncate">
-              {message.hasAttachment && message.attachmentType === "edit" && (
-                <MessageSquare className="w-4 h-4 mr-1 text-gray-500" />
-              )}
-              {message.hasAttachment && message.attachmentType === "image" && (
-                <ImageIcon className="w-4 h-4 mr-1 text-gray-500" />
-              )}
-              {message.hasAttachment && message.attachmentType === "audio" && (
-                <MessageSquare className="w-4 h-4 mr-1 text-gray-500" />
-              )}
-              {message.hasAttachment && message.attachmentType === "call" && (
-                <Phone className="w-4 h-4 mr-1 text-gray-500" />
-              )}
-              <span className="truncate">{message.message}</span>
-              {message.badge && (
-                <span className="ml-2 px-1.5 py-0.5 bg-gray-200 text-xs rounded-full">
-                  {message.badge}
-                </span>
-              )}
-            </div>
+            <p className="text-sm text-gray-500 truncate">{conversation.lastMessage}</p>
           </div>
+          {conversation.unreadCount && conversation.unreadCount > 0 && (
+            <div className="ml-2 bg-blue-500 text-white text-xs rounded-full h-5 min-w-5 flex items-center justify-center px-1">
+              {conversation.unreadCount > 9 ? "9+" : conversation.unreadCount}
+            </div>
+          )}
         </div>
       ))}
     </div>

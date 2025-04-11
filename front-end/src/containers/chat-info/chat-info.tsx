@@ -12,8 +12,13 @@ import {
   Pencil,
 } from "lucide-react";
 import Image from "next/image";
+import { Conversation } from "@/socket/useChat";
 
-export default function ChatInfo() {
+interface ChatInfoProps {
+  activeConversation: Conversation | null;
+}
+
+export default function ChatInfo({ activeConversation }: ChatInfoProps) {
   return (
     <div className="h-full overflow-y-auto bg-gray-50 text-gray-900">
       {/* Header */}
@@ -26,8 +31,8 @@ export default function ChatInfo() {
         <div className="relative mb-2">
           <div className="w-20 h-20 rounded-full overflow-hidden">
             <Image
-              src="/placeholder.svg?height=80&width=80"
-              alt="Gió Đà Lạt"
+              src={activeConversation?.userInfo?.avatar || `https://ui-avatars.com/api/?name=${activeConversation?.userInfo?.fullname || "User"}`}
+              alt={activeConversation?.userInfo?.fullname || "User"}
               width={80}
               height={80}
               className="object-cover"
@@ -37,7 +42,9 @@ export default function ChatInfo() {
             <Pencil className="w-4 h-4 text-gray-600" />
           </button>
         </div>
-        <h3 className="text-lg font-medium mb-4">Gió Đà Lạt</h3>
+        <h3 className="text-lg font-medium mb-4">
+          {activeConversation?.userInfo?.fullname || "Người dùng"}
+        </h3>
 
         {/* Action buttons */}
         <div className="flex justify-between w-full">

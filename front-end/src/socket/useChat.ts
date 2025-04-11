@@ -14,6 +14,7 @@ export interface Message {
   isRead: boolean;
   isRemove?: boolean;
   isRecall?: boolean;
+  isOwn?: boolean; // Thêm trường để đánh dấu tin nhắn của người dùng hiện tại
 }
 
 export interface Conversation {
@@ -201,13 +202,22 @@ export const useChat = (userId: string) => {
   }) => {
     console.log(`Nhận ${data.messages.length} tin nhắn cho cuộc trò chuyện ${data.conversationId}`);
 
+    // Đánh dấu tin nhắn của người dùng hiện tại
+    const enhancedMessages = data.messages.map(msg => {
+      console.log("Processing message:", msg.content, "idSender:", msg.idSender, "userId:", userId, "isOwn:", msg.idSender === userId);
+      return {
+        ...msg,
+        isOwn: msg.idSender === userId // Đánh dấu tin nhắn của người dùng hiện tại
+      };
+    });
+
     setMessages((prev) => ({
       ...prev,
-      [data.conversationId]: data.messages,
+      [data.conversationId]: enhancedMessages,
     }));
 
     setLoading(false);
-  }, []);
+  }, [userId]);
 
   // Đăng ký sự kiện tải tin nhắn
   useEffect(() => {
@@ -276,36 +286,39 @@ export const useChat = (userId: string) => {
         ? conversation.idReceiver
         : conversation.idSender;
 
+      // Tạo tin nhắn tạm thời để hiển thị ngay lập tức
+      const tempMessage: Message = {
+        idMessage: `temp-${Date.now()}`,
+        idSender: userId,
+        idReceiver: receiverId,
+        idConversation: conversationId,
+        type: "text",
+        content: text,
+        dateTime: new Date().toISOString(),
+        isRead: false,
+        isOwn: true, // Đánh dấu tin nhắn do người dùng hiện tại gửi
+      };
+
+      console.log("Created temp message with isOwn:", tempMessage.isOwn);
+
+      // Cập nhật danh sách tin nhắn với tin nhắn tạm thời
+      setMessages((prev) => {
+        const conversationMessages = prev[conversationId] || [];
+        return {
+          ...prev,
+          [conversationId]: [...conversationMessages, tempMessage],
+        };
+      });
+
+      // Gửi tin nhắn đến server
       socket.emit("send_message", {
         IDSender: userId,
         IDReceiver: receiverId,
         IDConversation: conversationId,
         textMessage: text,
       });
-
-      // Lắng nghe phản hồi gửi tin nhắn thành công
-      const handleSendMessageSuccess = (data: Message) => {
-        console.log("Tin nhắn đã được gửi:", data);
-
-        // Cập nhật danh sách tin nhắn
-        setMessages((prev) => {
-          const conversationMessages = prev[conversationId] || [];
-          return {
-            ...prev,
-            [conversationId]: [...conversationMessages, data],
-          };
-        });
-      };
-
-      socket.on("send_message_success", handleSendMessageSuccess);
-      socket.on("error", handleError);
-
-      return () => {
-        socket.off("send_message_success", handleSendMessageSuccess);
-        socket.off("error", handleError);
-      };
     },
-    [socket, isConnected, isUserConnected, isValidUserId, conversations]
+    [socket, isConnected, isUserConnected, isValidUserId, conversations, userId]
   );
 
   // Đánh dấu tin nhắn đã đọc
@@ -393,27 +406,64 @@ export const useChat = (userId: string) => {
 
   // Xử lý lỗi chung đã được định nghĩa ở trên
 
-  // Lắng nghe tin nhắn mới
+  // Lắng nghe tin nhắn mới và phản hồi gửi tin nhắn thành công
   useEffect(() => {
     if (!socket || !isConnected || !isUserConnected) return;
 
+    // Xử lý tin nhắn nhận được từ người khác
     const handleReceiveMessage = (data: Message) => {
       console.log("Nhận tin nhắn mới:", data);
+
+      // Đảm bảo tin nhắn nhận được có đầy đủ thông tin
+      const enhancedMessage = {
+        ...data,
+        isOwn: false,  // Đánh dấu tin nhắn không phải do người dùng hiện tại gửi
+        dateTime: data.dateTime || new Date().toISOString() // Đảm bảo có dateTime
+      };
 
       // Cập nhật danh sách tin nhắn
       setMessages((prev) => {
         const conversationMessages = prev[data.idConversation] || [];
         return {
           ...prev,
-          [data.idConversation]: [...conversationMessages, data],
+          [data.idConversation]: [...conversationMessages, enhancedMessage],
+        };
+      });
+    };
+
+    // Xử lý phản hồi khi gửi tin nhắn thành công
+    const handleSendMessageSuccess = (data: Message) => {
+      console.log("Phản hồi gửi tin nhắn thành công:", data);
+
+      // Đảm bảo tin nhắn có đầy đủ thông tin
+      const enhancedMessage = {
+        ...data,
+        isOwn: true,  // Đánh dấu tin nhắn do người dùng hiện tại gửi
+        dateTime: data.dateTime || new Date().toISOString() // Đảm bảo có dateTime
+      };
+
+      // Cập nhật danh sách tin nhắn, thay thế tin nhắn tạm thời bằng tin nhắn chính thức
+      setMessages((prev) => {
+        const conversationMessages = prev[data.idConversation] || [];
+
+        // Lọc bỏ tin nhắn tạm thời có nội dung giống với tin nhắn chính thức
+        const filteredMessages = conversationMessages.filter(msg =>
+          !(msg.idMessage.startsWith('temp-') && msg.content === data.content)
+        );
+
+        return {
+          ...prev,
+          [data.idConversation]: [...filteredMessages, enhancedMessage],
         };
       });
     };
 
     socket.on("receive_message", handleReceiveMessage);
+    socket.on("send_message_success", handleSendMessageSuccess);
 
     return () => {
       socket.off("receive_message", handleReceiveMessage);
+      socket.off("send_message_success", handleSendMessageSuccess);
     };
   }, [socket, isConnected, isUserConnected]);
 
