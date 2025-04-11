@@ -20,15 +20,12 @@ const useUserStore = create<UserState>()(
       accessToken: null,
       refreshToken: null,
       setUser: (user, accessToken) => {
-        console.log('Setting user:', user); // Add debug log
         set({ user, accessToken });
       },
       setTokens: (accessToken, refreshToken) => {
-        console.log('Setting tokens:', { accessToken, refreshToken }); // Add debug log
         set({ accessToken, refreshToken });
       },
       clearUser: () => {
-        console.log('Clearing user'); // Add debug log
         set({ user: null, accessToken: null, refreshToken: null });
       },
     }),

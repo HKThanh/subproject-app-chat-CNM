@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 export async function middleware(request: any) {
   const session = await auth();
-  const isProfile = request.nextUrl.pathname.startsWith("/profile");
+  const isProfile = request.nextUrl.pathname.startsWith("/chat");
   if (isProfile && !session?.user) {
     return NextResponse.redirect(new URL("/auth/login", request.url));
   }

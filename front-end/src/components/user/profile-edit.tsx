@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useCallback } from "react"; // Thêm useCallback
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,10 +30,10 @@ export default function ProfileEdit({
 }: ProfileEditProps) {
   const [formData, setFormData] = useState<UserProfile>({ ...profile });
 
-  // Tối ưu hàm handleChange với useCallback
-  const handleChange = useCallback((field: keyof UserProfile, value: string) => {
+  // Hàm xử lý thay đổi giá trị form
+  const handleChange = (field: keyof UserProfile, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-  }, []);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +50,7 @@ export default function ProfileEdit({
   const years = Array.from({ length: 100 }, (_, i) => String(currentYear - i));
 
   return (
-    <div className="relative"> 
+    <div className="relative">
       <div className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center">
           <Button
@@ -114,7 +114,7 @@ export default function ProfileEdit({
 
         <div className="space-y-2">
           <Label>Ngày sinh</Label>
-          <div className="flex gap-2">
+          <div className="flex gap-2 z-10">
             <Select
               value={formData.birthDay}
               onValueChange={(value) => handleChange("birthDay", value)}
@@ -122,7 +122,7 @@ export default function ProfileEdit({
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Ngày" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[200px] overflow-y-auto">
                 {days.map((day) => (
                   <SelectItem key={day} value={day}>
                     {day}
@@ -138,7 +138,7 @@ export default function ProfileEdit({
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Tháng" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[200px] overflow-y-auto">
                 {months.map((month) => (
                   <SelectItem key={month} value={month}>
                     {month}
@@ -154,7 +154,7 @@ export default function ProfileEdit({
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Năm" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[200px] overflow-y-auto">
                 {years.map((year) => (
                   <SelectItem key={year} value={year}>
                     {year}

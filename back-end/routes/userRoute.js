@@ -29,7 +29,7 @@ router.put("/bio", authMiddleware, userController.updateBio);
 router.put(
   "/cover/upload",
   authMiddleware,
-  fileService.uploadAvatar.single("coverPhoto"),
+  fileService.uploadAvatar.single("cover"),
   fileService.processAvatar,
   userController.updateCoverPhoto
 );

@@ -29,6 +29,7 @@ export default function AuthSync() {
         createdAt: session.user.createdAt,
         email: session.user.email,
         bio: session.user.bio,
+        phone: session.user.phone,
         coverPhoto: session.user.coverPhoto,
         ismale: session.user.ismale,
       };
