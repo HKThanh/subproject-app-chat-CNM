@@ -59,18 +59,11 @@ fileService.processChatFile = async (req, res, next) => {
     return res.status(400).json({ message: "No file uploaded" });
   }
 
-  const fileType = req.body.fileType;
-  const bucketMap = {
-    'image': 'imagetintin',
-    'video': 'videotintin',
-    'document': 'documenttintin'
-  };
-
   const random = (num) => `${Math.random().toString(36).substring(2, num + 2)}`;
   const filePath = `${random(4)}-${new Date().getTime()}-${req.file.originalname}`;
 
   const uploadParams = {
-    Bucket: bucketMap[fileType],
+    Bucket: process.env.AWS_BUCKET_NAME,
     Body: req.file.buffer,
     Key: filePath,
     ContentType: req.file.mimetype,

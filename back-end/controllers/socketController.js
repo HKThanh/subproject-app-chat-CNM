@@ -348,7 +348,6 @@ const handleDeleteMessage = async (io, socket) => {
                 { isRemove: true },
                 { new: true }
             );
-            
 
             // Gửi thông báo thành công cho người gửi
             socket.emit("delete_message_success", {
