@@ -7,7 +7,7 @@ export interface Message {
   idMessage: string;
   idSender: string;
   idReceiver?: string;
-  conversationId: string;
+  idConversation: string;
   type: "text" | "file" | "forward";
   content: string;
   dateTime: string;
@@ -18,7 +18,7 @@ export interface Message {
 }
 
 export interface Conversation {
-  conversationId: string;
+  idConversation: string;
   idSender: string;
   idReceiver: string;
   lastMessage: string;
@@ -198,9 +198,9 @@ export const useChat = (userId: string) => {
   const handleLoadMessagesResponse = useCallback((data: {
     messages: Message[];
     hasMore: boolean;
-    conversationId: string;
+    idConversation: string;
   }) => {
-    console.log(`Nhận ${data.messages.length} tin nhắn cho cuộc trò chuyện ${data.conversationId}`);
+    console.log(`Nhận ${data.messages.length} tin nhắn cho cuộc trò chuyện ${data.idConversation}`);
 
     // Đánh dấu tin nhắn của người dùng hiện tại
     const enhancedMessages = data.messages.map(msg => {
@@ -213,7 +213,7 @@ export const useChat = (userId: string) => {
 
     setMessages((prev) => ({
       ...prev,
-      [data.conversationId]: enhancedMessages,
+      [data.idConversation]: enhancedMessages,
     }));
 
     setLoading(false);
@@ -232,7 +232,7 @@ export const useChat = (userId: string) => {
 
   // Tải tin nhắn của một cuộc trò chuyện
   const loadMessages = useCallback(
-    (conversationId: string) => {
+    (idConversation: string) => {
       if (!socket || !isConnected || !isUserConnected || !isValidUserId) {
         console.log("Không thể tải tin nhắn: Chưa sẵn sàng");
         return;
@@ -241,15 +241,15 @@ export const useChat = (userId: string) => {
       setLoading(true);
       setError(null);
 
-      console.log(`Tải tin nhắn cho cuộc trò chuyện ${conversationId}`);
+      console.log(`Tải tin nhắn cho cuộc trò chuyện ${idConversation}`);
       socket.emit("load_messages", {
-        IDConversation: conversationId,
+        IDConversation: idConversation,
         lastEvaluatedKey: null,
         limit: 50,
       });
 
       const timeoutId = setTimeout(() => {
-        console.log(`Timeout khi tải tin nhắn cho cuộc trò chuyện ${conversationId}`);
+        console.log(`Timeout khi tải tin nhắn cho cuộc trò chuyện ${idConversation}`);
         setLoading(false);
         setError("Không thể tải tin nhắn: Hết thời gian chờ. Vui lòng thử lại sau.");
       }, 10000); // 10 giây timeout
@@ -263,17 +263,17 @@ export const useChat = (userId: string) => {
 
   // Gửi tin nhắn
   const sendMessage = useCallback(
-    (conversationId: string, text: string) => {
+    (idConversation: string, text: string) => {
       if (!socket || !isConnected || !isUserConnected || !isValidUserId) {
         console.log("Không thể gửi tin nhắn: Chưa sẵn sàng");
         return;
       }
 
-      console.log(`Gửi tin nhắn đến cuộc trò chuyện ${conversationId}: ${text}`);
+      console.log(`Gửi tin nhắn đến cuộc trò chuyện ${idConversation}: ${text}`);
 
       // Tìm thông tin người nhận từ cuộc trò chuyện
       const conversation = conversations.find(
-        (conv) => conv.conversationId === conversationId
+        (conv) => conv.idConversation === idConversation
       );
 
       if (!conversation) {
@@ -291,7 +291,7 @@ export const useChat = (userId: string) => {
         idMessage: `temp-${Date.now()}`,
         idSender: userId,
         idReceiver: receiverId,
-        conversationId: conversationId,
+        idConversation: idConversation,
         type: "text",
         content: text,
         dateTime: new Date().toISOString(),
@@ -303,10 +303,10 @@ export const useChat = (userId: string) => {
 
       // Cập nhật danh sách tin nhắn với tin nhắn tạm thời
       setMessages((prev) => {
-        const conversationMessages = prev[conversationId] || [];
+        const conversationMessages = prev[idConversation] || [];
         return {
           ...prev,
-          [conversationId]: [...conversationMessages, tempMessage],
+          [idConversation]: [...conversationMessages, tempMessage],
         };
       });
 
@@ -314,7 +314,7 @@ export const useChat = (userId: string) => {
       socket.emit("send_message", {
         IDSender: userId,
         IDReceiver: receiverId,
-        IDConversation: conversationId,
+        IDConversation: idConversation,
         textMessage: text,
       });
     },
@@ -323,7 +323,7 @@ export const useChat = (userId: string) => {
 
   // Đánh dấu tin nhắn đã đọc
   const markMessagesAsRead = useCallback(
-    (messageIds: string[], conversationId: string) => {
+    (messageIds: string[], idConversation: string) => {
       if (!socket || !isConnected || !isUserConnected || !isValidUserId) {
         console.log("Không thể đánh dấu đã đọc: Chưa sẵn sàng");
         return;
@@ -336,12 +336,12 @@ export const useChat = (userId: string) => {
       console.log(`Đánh dấu ${messageIds.length} tin nhắn đã đọc`);
       socket.emit("mark_messages_read", {
         messageIds,
-        conversationId,
+        idConversation,
       });
 
       // Cập nhật trạng thái tin nhắn trong state
       setMessages((prev) => {
-        const conversationMessages = prev[conversationId] || [];
+        const conversationMessages = prev[idConversation] || [];
         const updatedMessages = conversationMessages.map((msg) => {
           if (messageIds.includes(msg.idMessage)) {
             return { ...msg, isRead: true };
@@ -351,7 +351,7 @@ export const useChat = (userId: string) => {
 
         return {
           ...prev,
-          [conversationId]: updatedMessages,
+          [idConversation]: updatedMessages,
         };
       });
     },
@@ -360,7 +360,7 @@ export const useChat = (userId: string) => {
 
   // Xóa tin nhắn
   const deleteMessage = useCallback(
-    (messageId: string, conversationId: string) => {
+    (messageId: string, idConversation: string) => {
       if (!socket || !isConnected || !isUserConnected || !isValidUserId) {
         console.log("Không thể xóa tin nhắn: Chưa sẵn sàng");
         return;
@@ -378,7 +378,7 @@ export const useChat = (userId: string) => {
 
         // Cập nhật danh sách tin nhắn
         setMessages((prev) => {
-          const conversationMessages = prev[conversationId] || [];
+          const conversationMessages = prev[idConversation] || [];
           const updatedMessages = conversationMessages.map((msg) => {
             if (msg.idMessage === data.idMessage) {
               return { ...msg, isRemove: true };
@@ -388,7 +388,7 @@ export const useChat = (userId: string) => {
 
           return {
             ...prev,
-            [conversationId]: updatedMessages,
+            [idConversation]: updatedMessages,
           };
         });
       };
@@ -415,7 +415,7 @@ export const useChat = (userId: string) => {
       console.log("Nhận tin nhắn mới:", data);
 
       // Kiểm tra data có hợp lệ không
-      if (!data || !data.conversationId) {
+      if (!data || !data.idConversation) {
         console.error("Tin nhắn nhận được không hợp lệ:", data);
         return;
       }
@@ -429,10 +429,10 @@ export const useChat = (userId: string) => {
 
       // Cập nhật danh sách tin nhắn
       setMessages((prev) => {
-        const conversationMessages = prev[data.conversationId] || [];
+        const conversationMessages = prev[data.idConversation] || [];
         return {
           ...prev,
-          [data.conversationId]: [...conversationMessages, enhancedMessage],
+          [data.idConversation]: [...conversationMessages, enhancedMessage],
         };
       });
     };
@@ -455,7 +455,7 @@ export const useChat = (userId: string) => {
     // Xử lý phản hồi khi gửi tin nhắn thành công
     const handleSendMessageSuccess = (data: Message) => {
       // Kiểm tra data có hợp lệ không
-      if (!data || !data.conversationId) {
+      if (!data || !data.idConversation) {
         console.error("Phản hồi gửi tin nhắn không hợp lệ:", data);
         return;
       }
@@ -471,7 +471,7 @@ export const useChat = (userId: string) => {
 
       // Cập nhật danh sách tin nhắn, thay thế tin nhắn tạm thời bằng tin nhắn chính thức
       setMessages((prev) => {
-        const conversationMessages = prev[data.conversationId] || [];
+        const conversationMessages = prev[data.idConversation] || [];
 
         // Tìm tin nhắn tạm thời có nội dung giống với tin nhắn chính thức
         const tempMessageIndex = conversationMessages.findIndex(msg =>
@@ -484,14 +484,14 @@ export const useChat = (userId: string) => {
           newMessages[tempMessageIndex] = enhancedMessage;
           return {
             ...prev,
-            [data.conversationId]: newMessages,
+            [data.idConversation]: newMessages,
           };
         }
 
         // Nếu không tìm thấy, thêm tin nhắn chính thức vào danh sách
         return {
           ...prev,
-          [data.conversationId]: [...conversationMessages, enhancedMessage],
+          [data.idConversation]: [...conversationMessages, enhancedMessage],
         };
       });
     };

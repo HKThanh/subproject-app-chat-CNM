@@ -67,7 +67,11 @@ export default function ChatDetail({
                 return dateA - dateB;
               })
               .map((msg, index) => {
-                console.log("Message:", msg.content, "isOwn:", msg.isOwn);
+                // Chỉ hiển thị tin nhắn có nội dung
+                if (!msg.content || msg.content.trim() === "") {
+                  return null;
+                }
+
                 return (
                   <ChatMessage
                     key={msg.idMessage || index}
@@ -76,7 +80,7 @@ export default function ChatDetail({
                     isOwn={Boolean(msg.isOwn)}
                   />
                 );
-              })}
+              }).filter(Boolean)}
             {/* Thêm phần tử trống để cuộn xuống */}
             <div ref={messagesEndRef} />
           </>

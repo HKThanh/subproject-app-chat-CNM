@@ -7,7 +7,6 @@ interface ChatMessageProps {
 }
 
 export default function ChatMessage({ message, timestamp, isOwn = false }: ChatMessageProps) {
-  console.log("Rendering message:", message, "isOwn:", isOwn);
   return (
     <div className={`mb-4 ${isOwn ? 'flex justify-end' : ''}`}>
       <div
@@ -22,9 +21,12 @@ export default function ChatMessage({ message, timestamp, isOwn = false }: ChatM
         <div className="whitespace-pre-wrap break-words">
           {message}
         </div>
-        <div className="text-xs mt-1 opacity-70 text-right">
-          {timestamp !== "Invalid Date" ? timestamp : "Bây giờ"}
-        </div>
+        {/* Chỉ hiển thị timestamp khi message có giá trị */}
+        {message && message.trim() !== "" && (
+          <div className="text-xs mt-1 opacity-70 text-right">
+            {timestamp !== "Invalid Date" ? timestamp : "Bây giờ"}
+          </div>
+        )}
       </div>
       {!isOwn && (
         <div className="flex items-center mt-1 ml-2">
