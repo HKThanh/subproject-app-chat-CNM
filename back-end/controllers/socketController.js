@@ -557,7 +557,7 @@ const handleMarkMessagesRead = (socket) => {
 const handleLoadMessages = (io, socket) => {
     socket.on("load_messages", async (payload) => {
         try {
-            const { IDConversation, lastMessageId, limit = 20 } = payload;
+            const { IDConversation, lastMessageId, firstMessageId, limit = 20 } = payload;
             
             let query = {
                 idConversation: IDConversation
@@ -568,22 +568,35 @@ const handleLoadMessages = (io, socket) => {
                 if (lastMessage) {
                     query.dateTime = { $lt: lastMessage.dateTime };
                 }
+            } else if (firstMessageId) {
+                const firstMessage = await MessageDetail.findOne({ idMessage: firstMessageId });
+                if (firstMessage) {
+                    query.dateTime = { $gt: firstMessage.dateTime };
+                }
             }
 
             const messages = await MessageDetail.find(query)
-                .sort({ dateTime: -1 })
+                .sort({ dateTime: firstMessageId ? 1 : -1 })
                 .limit(limit);
 
             // Chỉ format dateTime, không cần xử lý content vì đã được set khi recall
-            const processedMessages = messages.map(msg => ({
+            let processedMessages = messages.map(msg => ({
                 ...msg.toJSON(),
                 dateTime: moment.tz(msg.dateTime, "Asia/Ho_Chi_Minh").format()
             }));
 
+            // Sắp xếp lại nếu load tin nhắn mới
+            if (firstMessageId) {
+                processedMessages = processedMessages.sort((a, b) => 
+                    new Date(a.dateTime) - new Date(b.dateTime)
+                );
+            }
+
             socket.emit("load_messages_response", {
                 messages: processedMessages,
                 hasMore: messages.length === limit,
-                conversationId: IDConversation
+                conversationId: IDConversation,
+                direction: lastMessageId ? "older" : "newer"
             });
 
         } catch (error) {
