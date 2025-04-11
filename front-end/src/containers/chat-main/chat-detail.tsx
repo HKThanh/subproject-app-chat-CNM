@@ -72,7 +72,7 @@ export default function ChatDetail({
                   <ChatMessage
                     key={msg.idMessage || index}
                     message={msg.content}
-                    timestamp={msg.dateTime ? new Date(msg.dateTime).toLocaleTimeString() : new Date().toLocaleTimeString()}
+                    timestamp={msg.dateTime ? new Date(msg.dateTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                     isOwn={Boolean(msg.isOwn)}
                   />
                 );

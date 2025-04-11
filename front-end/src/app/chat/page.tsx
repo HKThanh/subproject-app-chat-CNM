@@ -54,7 +54,7 @@ export default function Home() {
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900">
       <div
-        className={`${showChatInfo ? "w-1/4" : "w-1/3"
+        className={`${showChatInfo ? "w-1/5" : "w-1/4"
           } flex flex-col border-r border-gray-200 transition-all duration-300`}
       >
         <div className="p-4">
@@ -71,7 +71,7 @@ export default function Home() {
         </div>
       </div>
       <div
-        className={`${showChatInfo ? "w-2/4" : "w-2/3"
+        className={`${showChatInfo ? "w-3/5" : "w-3/4"
           } flex flex-col border-r border-gray-200 transition-all duration-300`}
       >
         <ChatDetail
@@ -84,7 +84,7 @@ export default function Home() {
         />
       </div>
       {showChatInfo && (
-        <div className="w-1/4 flex flex-col transition-all duration-300">
+        <div className="w-1/5 flex flex-col transition-all duration-300">
           <ChatInfo
             activeConversation={activeConversation ? conversations.find(c => c.idConversation === activeConversation) : null}
           />
