@@ -89,7 +89,7 @@ export default function LoginForm() {
         <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} borderWidth={2} duration={8}/>
         <CardHeader className="text-center">
           <h2 className="text-3xl font-extrabold text-gray-900">
-            WeChat - kết nối ngay!
+            WeLo - kết nối ngay!
           </h2>
         </CardHeader>
         <CardContent className="pt-6">
