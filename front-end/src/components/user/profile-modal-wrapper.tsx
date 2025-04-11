@@ -11,11 +11,13 @@ interface ProfileModalWrapperProps {
 
 export default function ProfileModalWrapper({ isOpen, onClose }: ProfileModalWrapperProps) {
   return (
-    <Dialog 
-      open={isOpen} 
+    <Dialog
+      open={isOpen}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
+      // Thêm thuộc tính modal để đảm bảo focus trap và khắc phục vấn đề aria-hidden
+      modal={true}
     >
       <ProfileModal />
     </Dialog>

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 function Dialog({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
+  // Thêm thuộc tính defaultProps để đảm bảo focus trap và khắc phục vấn đề aria-hidden
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
 }
 

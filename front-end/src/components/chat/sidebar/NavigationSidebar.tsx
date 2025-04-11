@@ -34,6 +34,7 @@ export default function NavigationSidebar() {
   const [activeItem, setActiveItem] = useState('messages')
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   // Lấy thông tin người dùng từ Zustand store
   const user = useUserStore((state) => state.user)
@@ -90,8 +91,19 @@ export default function NavigationSidebar() {
     { id: 'documents', icon: FolderOpen, label: 'Tài liệu' },
   ]
 
+  // Xử lý đóng modal profile
   const handleCloseModal = () => {
     setIsProfileModalOpen(false);
+  };
+
+  // Xử lý mở modal profile và đóng dropdown
+  const handleOpenProfileModal = () => {
+    // Đóng dropdown trước khi mở modal
+    setIsDropdownOpen(false);
+    // Sau đó mở modal
+    setTimeout(() => {
+      setIsProfileModalOpen(true);
+    }, 100);
   };
 
   return (
@@ -99,7 +111,7 @@ export default function NavigationSidebar() {
       <div className="fixed left-0 top-0 h-screen w-[70px] bg-[#2563eb] flex flex-col items-center py-4">
         {/* Avatar */}
         <div className="mb-8">
-          <DropdownMenu>
+          <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
             <DropdownMenuTrigger asChild>
               <Avatar className="h-10 w-10 border-2 border-white hover:opacity-90 transition-opacity cursor-pointer">
                 <AvatarImage
@@ -114,7 +126,7 @@ export default function NavigationSidebar() {
                 <p className="text-sm text-muted-foreground">{userEmail}</p>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => setIsProfileModalOpen(true)}>
+              <DropdownMenuItem onSelect={handleOpenProfileModal}>
                 <User className="mr-2 h-4 w-4" />
                 Trang cá nhân
               </DropdownMenuItem>
