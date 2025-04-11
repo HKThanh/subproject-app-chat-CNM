@@ -69,17 +69,50 @@ const handleLoadConversation = (io, socket) => {
             const skip = lastEvaluatedKey ? parseInt(lastEvaluatedKey) : 0;
             const limit = 10;
 
-            // Chỉ query theo idSender và groupMembers
+            // Query conversations
             const conversations = await Conversation.find({
                 $or: [
                     { idSender: IDUser },
                     { groupMembers: IDUser },
-                    { idReceiver: IDUser } // Thêm điều kiện này nếu cần
+                    { idReceiver: IDUser }
                 ]
             })
             .sort({ lastChange: -1 })
             .skip(skip)
             .limit(limit);
+
+            // Lấy thông tin người dùng và tin nhắn mới nhất cho mỗi cuộc trò chuyện
+            const conversationsWithDetails = await Promise.all(
+                conversations.map(async (conv) => {
+                    // Xác định ID người nhận
+                    const otherUserId = conv.idSender === IDUser ? conv.idReceiver : conv.idSender;
+                    
+                    // Lấy thông tin người nhận
+                    const otherUser = await User.findOne({ id: otherUserId })
+                        .select('id fullname avatar phone status');
+
+                    // Lấy tin nhắn mới nhất
+                    const latestMessage = await MessageDetail.findOne({
+                        idConversation: conv.idConversation
+                    })
+                    .sort({ dateTime: -1 })
+                    .limit(1);
+
+                    // Đếm số tin nhắn chưa đọc
+                    const unreadCount = await MessageDetail.countDocuments({
+                        idConversation: conv.idConversation,
+                        idReceiver: IDUser,
+                        isRead: false
+                    });
+
+                    return {
+                        ...conv.toObject(),
+                        otherUser,
+                        latestMessage,
+                        unreadCount
+                    };
+                })
+            );
 
             // Tính tổng số conversation
             const total = await Conversation.countDocuments({
@@ -92,8 +125,9 @@ const handleLoadConversation = (io, socket) => {
             const hasMore = total > skip + limit;
 
             socket.emit("load_conversations_response", {
-                Items: conversations,
-                LastEvaluatedKey: hasMore ? skip + limit : null
+                Items: conversationsWithDetails,
+                LastEvaluatedKey: hasMore ? skip + limit : null,
+                total
             });
 
         } catch (error) {
@@ -215,14 +249,8 @@ const handleSendFile = async (io, socket) => {
 const handleSendMessage = async (io, socket) => {
     socket.on("send_message", async (payload) => {
         try {
-            const { IDSender, IDReceiver, textMessage } = payload;
-            console.log("Payload:", payload);
-
-            const receiverUser = await User.findOne({ id: IDReceiver });
-            if (!receiverUser) {
-                throw new Error("Receiver not found");
-            }
-
+            const { IDSender, IDReceiver, textMessage, type = 'text', fileUrl } = payload;
+            
             let conversation = await Conversation.findOne({
                 $or: [
                     { idSender: IDSender, idReceiver: IDReceiver },
@@ -230,6 +258,7 @@ const handleSendMessage = async (io, socket) => {
                 ]
             });
 
+            // Tạo conversation mới nếu chưa có
             if (!conversation) {
                 conversation = await Conversation.create({
                     idConversation: uuidv4(),
@@ -240,35 +269,51 @@ const handleSendMessage = async (io, socket) => {
                 });
             }
 
-            // Thêm idReceiver khi tạo tin nhắn
+            // Tạo message detail dựa vào type
+            let messageContent = textMessage;
+            if (type !== 'text') {
+                messageContent = fileUrl; // URL từ S3 sau khi upload
+            }
+
             const messageDetail = await MessageDetail.create({
                 idMessage: uuidv4(),
                 idSender: IDSender,
-                idReceiver: IDReceiver, // Thêm dòng này
+                idReceiver: IDReceiver,
                 idConversation: conversation.idConversation,
-                type: 'text',
-                content: textMessage,
+                type: type, // 'text', 'image', 'video', 'document'
+                content: messageContent,
                 dateTime: new Date().toISOString(),
                 isRead: false
             });
 
+            // Update last change của conversation
             await updateLastChangeConversation(
                 conversation.idConversation,
                 messageDetail.idMessage
             );
 
+            // Lấy thông tin sender và receiver
+            const [senderUser, receiverUser] = await Promise.all([
+                User.findOne({ id: IDSender }).select('id fullname avatar phone status'),
+                User.findOne({ id: IDReceiver }).select('id fullname avatar phone status')
+            ]);
+
+            const messageWithUsers = {
+                ...messageDetail.toObject(),
+                senderInfo: senderUser,
+                receiverInfo: receiverUser
+            };
+
+            // Emit message cho receiver nếu online
             const receiverOnline = getUser(IDReceiver);
-            console.log("Tìm thấy ng nhận để emit sự kiện nhận tin nhắn: ", receiverOnline)
             if (receiverOnline) {
-                io.to(receiverOnline.socketId).emit("receive_message", {
-                    ...messageDetail.toObject(),
-                    senderInfo: { id: IDSender }
-                });
+                io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers);
             }
 
+            // Emit success cho sender
             socket.emit("send_message_success", {
                 conversationId: conversation.idConversation,
-                message: messageDetail
+                message: messageWithUsers
             });
 
         } catch (error) {
