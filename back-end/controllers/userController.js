@@ -62,7 +62,7 @@ userController.resetPasswordRequest = async (req, res) => {
   }
 
   const otp = generateOTP();
-
+  console.log("OTP:", otp);
   try {
     await sendOTP(email, otp);
     const idForRedis = uuidv4();
