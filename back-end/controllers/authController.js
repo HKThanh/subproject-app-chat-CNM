@@ -118,13 +118,17 @@ authController.requestOTPForWeb = async (req, res) => {
     }
 
     const user = await UserModel.findOne({ email: email });
-    if (!user.isVerified) {
-        await redisClient.del(email); // Remove old OTP if exists
+    if (user && !user.isVerified) {
+        redisClient.del(email); // Remove old OTP if exists
+    }
+
+    if (user) {
+        return res.status(400).json({ message: 'Email đã tồn tại' });
     }
 
     const otp = generateOTP();
     await sendOTP(email, otp);
-    await redisClient.setEx(email, 300, JSON.stringify({ otp }));
+    await redisClient.setEx(email, 300, JSON.stringify({ otp })); // Store OTP in Redis for 5 minutes
 
     console.log(otp);
     
