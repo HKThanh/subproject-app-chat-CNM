@@ -104,7 +104,6 @@ export const {
 
                 const expired = typeof token.accessToken === 'string' && isTokenExpired(token.accessToken);
                 if (expired && token.refreshToken) {
-                    console.log('Token expired, attempting to refresh...');
                     try {
                         const response = await fetch('http://localhost:3000/auth/refresh-token', {
                             method: 'POST',
@@ -119,10 +118,8 @@ export const {
                         }
 
                         const data = await response.json();
-                        console.log('Refresh token response:', data);
 
                         if (data.accessToken) {
-                            console.log('New access token received');
                             token.accessToken = data.accessToken;
 
                             // Nếu có refreshToken mới, cập nhật luôn
@@ -229,10 +226,6 @@ function isTokenExpired(token: string): boolean {
 
         const decoded = JSON.parse(jsonPayload);
         const currentTime = Math.floor(Date.now() / 1000);
-
-        console.log('Token expiration:', new Date(decoded.exp * 1000).toLocaleString());
-        console.log('Current time:', new Date(currentTime * 1000).toLocaleString());
-        console.log('Token expired:', decoded.exp < currentTime);
 
         return decoded.exp < currentTime;
     } catch (error) {
