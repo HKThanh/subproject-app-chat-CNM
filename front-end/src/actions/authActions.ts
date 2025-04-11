@@ -11,38 +11,25 @@ import { auth, signIn } from "@/auth";
 // actions/login.ts
 const API_URL = process.env.NODE_PUBLIC_API_URL;
 
-export async function loginUser(phone: string, password: string) {
+export async function loginUser(email: string, password: string) {
   try {
     // First attempt to sign in
     const result = await signIn("credentials", {
-      phone,
+      email,
       password,
       redirect: false, // Không redirect tự động, xử lý bằng FE
     });
-    // If login successful, get session to check user role
-    // const session = await auth();
-    // // console.log("check session in action>>> ", session);
-
-    // // Redirect based on user role
-    // if (session?.user?.role === "ADMIN") {
-    //   return {
-    //     error: false,
-    //     success: true,
-    //     message: "Đăng nhập thành công!",
-    //     redirectTo: "/admin",
-    //     status: 200,
-    //   };
-    // }
 
     // Default successful login response
     return {
       error: false,
       success: true,
       message: "Đăng nhập thành công!",
-      redirectTo: "/",
+      redirectTo: "/chat",
       status: 200,
     };
   } catch (error: any) {
+
     // Handle specific error types
     if (error.name === "AccountNotActivatedError") {
       // Try to get user ID from error or response
@@ -56,6 +43,7 @@ export async function loginUser(phone: string, password: string) {
         redirectTo: `/verify/${userId}`,
       };
     } else if (error.name === "InvalidPhonePasswordError") {
+
       return {
         error: true,
         success: false,
@@ -63,7 +51,14 @@ export async function loginUser(phone: string, password: string) {
         status: 400,
       };
     }
-
+    else if(error.name ==="AccountIsLoggedError"){
+      return {
+        error: true,
+        success: false,
+        message: "Tài khoản đang đăng nhập",
+        status: 400,
+      };
+    }
     // Generic error response
     return {
       error: true,
@@ -75,28 +70,45 @@ export async function loginUser(phone: string, password: string) {
 }
 
 export async function signUpUser(
-  phone: string,
+  email: string,
   password: string,
   fullname: string,
+  otp: string,
 ) {
   try {
-    const result = await fetch(`${API_URL}/auth/register`, {
+    const result = await fetch(`${API_URL}/auth/register-web`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ phone, password, fullname }),
+      body: JSON.stringify({ email, password, fullname, otp }),
     }).then(res => res.json());
     console.log("check result in register>>> ", result);
-    
+
     // Nếu thành công, trả về thông tin để FE xử lý chuyển hướng
-    if (result.message === "Tài khoản đã có người đăng ký") {
+    if (result.message === "Người dùng đã tồn tại") {
         return {
           error: true,
           success: false,
           message: result.message,
           status: 400,
         };
+    }
+    if(result.message === 'OTP đã hết hạn'){
+      return {
+        error: true,
+        success: false,
+        message: result.message,
+        status: 400,
+      }
+    }
+    if (result.message === "OTP không hợp lệ") {
+      return {
+        error: true,
+        success: false,
+        message: result.message,
+        status: 400,
+      };
     }
     return {
       error: false,
@@ -109,6 +121,35 @@ export async function signUpUser(
     };
   } catch (error) {
     console.error("Sign up error:", error)
+    return {
+      error: true,
+      success: false,
+      message: "Đã xảy ra lỗi không xác định. Vui lòng thử lại sau.",
+      status: 500,
+    };
+  }
+}
+export async function sendOtp(email: string) {
+  try {
+    const result = await fetch(`${API_URL}/auth/request-otp-web`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    }).then(res => res.json());
+    console.log("check result in send otp>>> ", result);
+    if (result.message === 'Người dùng đã tồn tại'){
+      return {
+        error: true,
+        success: false,
+        message: result.message,
+        status: 400,
+      };
+    }
+    return result;
+  } catch (error) {
+    console.error("Send OTP error:", error);
     return {
       error: true,
       success: false,
@@ -225,3 +266,36 @@ export async function signUpUser(
 //     };
 //   }
 // }
+
+export async function logoutUser(accessToken: string) {
+  try {
+    const response = await fetch(`${API_URL}/auth/logout/web`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Đăng xuất thất bại');
+    }
+
+    const result = await response.json();
+
+    return {
+      error: false,
+      success: true,
+      message: result.message || "Đăng xuất thành công!",
+      status: 200,
+    };
+  } catch (error) {
+    console.error("Logout error:", error);
+    return {
+      error: true,
+      success: false,
+      message: "Đã xảy ra lỗi khi đăng xuất. Vui lòng thử lại sau.",
+      status: 500,
+    };
+  }
+}

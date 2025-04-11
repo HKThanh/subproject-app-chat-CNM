@@ -6,26 +6,30 @@ const userController = require('../controllers/userController');
 const authController = require('../controllers/authController');
 const authMiddleware = require('../middlewares/authMiddleware');
 
-router.post('/verify-email-and-phone', authController.verifyEmailandPhone);
+const authRoutes = (io) => {
 
-router.post('/verify-otp', authController.verifyOTP);
+    router.post('/verify-email-and-phone', authController.verifyEmailandPhone);
 
-router.post('/register-phone', authController.verifyForPhone);
+    router.post('/verify-otp', authController.verifyOTP);
 
-router.post('/request-otp-web', authController.requestOTPForWeb);
+    router.post('/register-phone', authController.verifyForPhone);
 
-router.post('/register-web', authController.registerForWeb);
+    router.post('/request-otp-web', authController.requestOTPForWeb);
 
-router.post('/login', authController.login);
+    router.post('/register-web', authController.registerForWeb);
 
-router.post('/logout/:platform', authMiddleware, authController.logout);
+    router.post('/login', (req, res) => authController.login(req, res, io));
 
-router.post('/refresh-token', authController.refreshToken);
+    router.post('/logout/:platform', authMiddleware, authController.logout);
 
-router.post('/reset-password/:id', userController.resetPassword);
+    router.post('/refresh-token', authController.refreshToken);
 
-router.post('/reset-password-request', userController.resetPasswordRequest);
+    router.post('/reset-password/:id', userController.resetPassword);
 
-router.post('/update-password', authMiddleware, userController.updatePassword);
+    router.post('/reset-password-request', userController.resetPasswordRequest);
 
-module.exports = router;
+    router.post('/update-password', authMiddleware, userController.updatePassword);
+
+    return router;
+}
+module.exports = authRoutes;

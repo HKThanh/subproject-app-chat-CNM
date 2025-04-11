@@ -27,9 +27,9 @@ export default function AuthSync() {
         urlavatar: session.user.urlavatar,
         birthday: session.user.birthday,
         createdAt: session.user.createdAt,
-        phone: session.user.phone,
         email: session.user.email,
         bio: session.user.bio,
+        phone: session.user.phone,
         coverPhoto: session.user.coverPhoto,
         ismale: session.user.ismale,
       };

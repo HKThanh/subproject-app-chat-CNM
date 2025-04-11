@@ -30,8 +30,9 @@ namespace NodeJS {
 
 declare module "next-auth" {
   interface Session {
-    user: DefaultSession["user"] & IUser; // Kết hợp DefaultUser với IUser
-    accessToken: string; // Thêm accessToken vào Session
+    user: IUser;
+    accessToken: string;
+    refreshToken: string;
   }
 
   interface User extends DefaultUser, IUser {

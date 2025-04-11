@@ -20,12 +20,20 @@ type FormRegisterScreenProps = {
   route?: {
     params?: {
       phoneNumber?: string;
+<<<<<<< HEAD
+=======
+      email?: string;
+>>>>>>> main
     };
   };
 };
 
 const FormRegisterScreen = ({ navigation, route }: FormRegisterScreenProps) => {
   const phoneNumber = route?.params?.phoneNumber || '';
+<<<<<<< HEAD
+=======
+  const email = route?.params?.email || '';
+>>>>>>> main
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -50,7 +58,10 @@ const FormRegisterScreen = ({ navigation, route }: FormRegisterScreenProps) => {
       setPasswordChecked(false);
     }
   };
+<<<<<<< HEAD
 
+=======
+>>>>>>> main
   const handleRegister = async () => {
     if (!name.trim() || !password.trim() || password.length < 6 || password !== confirmPassword) {
       return;
@@ -60,7 +71,11 @@ const FormRegisterScreen = ({ navigation, route }: FormRegisterScreenProps) => {
     setErrorMessage('');
 
     try {
+<<<<<<< HEAD
       const response = await fetch('http://192.168.0.107:3000/auth/register', {
+=======
+      const response = await fetch('http://192.168.0.107:3000/auth/register-phone', {
+>>>>>>> main
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -68,15 +83,30 @@ const FormRegisterScreen = ({ navigation, route }: FormRegisterScreenProps) => {
         body: JSON.stringify({
           fullname: name.trim(),
           password: password,
+<<<<<<< HEAD
+=======
+          email: email,
+>>>>>>> main
           phone: phoneNumber,
         }),
       });
 
+<<<<<<< HEAD
       const data = await response.json();
 
       if (response.ok) {
         // Đăng ký thành công
         navigation.navigate('OTPScreen', { phoneNumber: phoneNumber });
+=======
+      const data = await response.json();      if (response.ok) {
+        // Đăng ký thành công, OTP đã được gửi đến email
+        navigation.navigate('OTPScreen', { 
+          phoneNumber: phoneNumber,
+          email: email,
+          fullname: name.trim(),
+          password: password
+        });
+>>>>>>> main
       } else {
         // Xử lý lỗi từ server
         setErrorMessage(data.message || 'Đăng ký không thành công');

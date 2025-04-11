@@ -1,7 +1,6 @@
 "use client";
 
 import type React from "react";
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,8 +30,9 @@ export default function ProfileEdit({
 }: ProfileEditProps) {
   const [formData, setFormData] = useState<UserProfile>({ ...profile });
 
+  // Hàm xử lý thay đổi giá trị form
   const handleChange = (field: keyof UserProfile, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -40,7 +40,6 @@ export default function ProfileEdit({
     onUpdate(formData);
   };
 
-  // Generate options for days, months, years
   const days = Array.from({ length: 31 }, (_, i) =>
     String(i + 1).padStart(2, "0")
   );
@@ -51,14 +50,7 @@ export default function ProfileEdit({
   const years = Array.from({ length: 100 }, (_, i) => String(currentYear - i));
 
   return (
-    <motion.div
-      className="relative"
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
-      transition={{ duration: 0.3 }}
-    >
-      {/* Header với animation */}
+    <div className="relative">
       <div className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center">
           <Button
@@ -82,7 +74,6 @@ export default function ProfileEdit({
       </div>
 
       <form onSubmit={handleSubmit} className="p-4 space-y-6">
-        {/* Display name - Không dùng animation */}
         <div className="space-y-2">
           <Label htmlFor="name">Tên hiển thị</Label>
           <Input
@@ -92,7 +83,6 @@ export default function ProfileEdit({
           />
         </div>
 
-        {/* Bio - Không dùng animation */}
         <div className="space-y-2">
           <Label htmlFor="bio">Bio</Label>
           <Input
@@ -102,7 +92,6 @@ export default function ProfileEdit({
           />
         </div>
 
-        {/* Gender - Không dùng animation */}
         <div className="space-y-2">
           <Label>Thông tin cá nhân</Label>
           <RadioGroup
@@ -123,10 +112,9 @@ export default function ProfileEdit({
           </RadioGroup>
         </div>
 
-        {/* Birth date - Không dùng animation */}
         <div className="space-y-2">
           <Label>Ngày sinh</Label>
-          <div className="flex gap-2">
+          <div className="flex gap-2 z-10">
             <Select
               value={formData.birthDay}
               onValueChange={(value) => handleChange("birthDay", value)}
@@ -134,7 +122,7 @@ export default function ProfileEdit({
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Ngày" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[200px] overflow-y-auto">
                 {days.map((day) => (
                   <SelectItem key={day} value={day}>
                     {day}
@@ -150,7 +138,7 @@ export default function ProfileEdit({
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Tháng" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[200px] overflow-y-auto">
                 {months.map((month) => (
                   <SelectItem key={month} value={month}>
                     {month}
@@ -166,7 +154,7 @@ export default function ProfileEdit({
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Năm" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[200px] overflow-y-auto">
                 {years.map((year) => (
                   <SelectItem key={year} value={year}>
                     {year}
@@ -177,7 +165,6 @@ export default function ProfileEdit({
           </div>
         </div>
 
-        {/* Phone - Không dùng animation */}
         <div className="space-y-2">
           <Label htmlFor="phone">Điện thoại</Label>
           <Input
@@ -187,7 +174,6 @@ export default function ProfileEdit({
           />
         </div>
 
-        {/* Action buttons - Giữ animation */}
         <motion.div
           className="flex justify-end gap-2 pt-4 border-t mt-6"
           initial={{ opacity: 0, y: 10 }}
@@ -204,6 +190,7 @@ export default function ProfileEdit({
           </motion.div>
         </motion.div>
       </form>
-    </motion.div>
+    </div>
   );
 }
+

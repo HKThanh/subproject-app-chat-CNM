@@ -10,6 +10,10 @@ import {
     Image,
     Keyboard,
     TouchableWithoutFeedback,
+<<<<<<< HEAD
+=======
+    ActivityIndicator,
+>>>>>>> main
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -20,7 +24,50 @@ type RegisterScreenProps = {
 
 const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
     const [phoneNumber, setPhoneNumber] = useState('');
+<<<<<<< HEAD
     const [agreedToTerms, setAgreedToTerms] = useState(true);
+=======
+    const [email, setEmail] = useState('');
+    const [agreedToTerms, setAgreedToTerms] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+
+    const verifyEmailAndPhone = async () => {
+        setIsLoading(true);
+        setErrorMessage('');
+
+        try {
+            const response = await fetch('http://192.168.0.107:3000/auth/verify-email-and-phone', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email.trim(),
+                    phone: phoneNumber.trim()
+                }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.message === "Email và số điện thoại hợp lệ") {
+                // Valid email and phone, navigate to next screen
+                navigation.navigate('FormRegisterScreen', {
+                    phoneNumber: phoneNumber.trim(),
+                    email: email.trim()
+                });
+            } else {
+                // Show error message
+                setErrorMessage(data.message || "Đã xảy ra lỗi khi xác thực thông tin");
+            }
+        } catch (error) {
+            setErrorMessage("Không thể kết nối tới máy chủ. Vui lòng kiểm tra kết nối mạng.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+>>>>>>> main
     return (
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <SafeAreaView style={styles.container}>
@@ -63,6 +110,23 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
                     </View>
                     <View style={styles.phoneLine} />
 
+<<<<<<< HEAD
+=======
+                    {/* Email Input */}
+                    <View style={styles.inputContainer}>
+                        <View style={styles.divider} />
+                        <TextInput
+                            style={styles.phoneInput}
+                            placeholder="Email"
+                            placeholderTextColor="#645C5C"
+                            keyboardType="email-address"
+                            value={email}
+                            onChangeText={setEmail}
+                        />
+                    </View>
+                    <View style={styles.phoneLine} />
+
+>>>>>>> main
                     {/* Terms and Conditions */}
                     <View style={styles.termsContainer}>
                         <TouchableOpacity
@@ -82,6 +146,7 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
                             Tiếp tục nghĩa là bạn đồng ý với các{' '}
                             <Text style={styles.termsLink}>điều khoản sử dụng Welo</Text>
                         </Text>
+<<<<<<< HEAD
                     </View>
 
                     {/* Continue Button */}
@@ -96,6 +161,33 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
                                 <Text>
                                     <Ionicons name="arrow-forward" size={16} color="#FDF8F8" />
                                 </Text>
+=======
+                    </View>           
+                             {/* Error Message */}
+                    {errorMessage ? (
+                        <Text style={styles.errorMessage}>{errorMessage}</Text>
+                    ) : null}
+
+                    {/* Continue Button */}
+                    <TouchableOpacity
+                        style={[styles.continueButton,
+                        (!phoneNumber.trim() || !email.trim() || isLoading) && styles.disabledButton]}
+                        disabled={!phoneNumber.trim() || !email.trim() || isLoading}
+                        onPress={verifyEmailAndPhone}
+                    >
+                        <View style={styles.buttonRow}>
+                            <Text style={styles.continueText}>
+                                {isLoading ? "Đang xác thực..." : "Tiếp tục"}
+                            </Text>
+                            <View style={styles.arrowContainer}>
+                                {isLoading ? (
+                                    <ActivityIndicator size="small" color="#FDF8F8" />
+                                ) : (
+                                    <Text>
+                                        <Ionicons name="arrow-forward" size={16} color="#FDF8F8" />
+                                    </Text>
+                                )}
+>>>>>>> main
                             </View>
                         </View>
                     </TouchableOpacity>
@@ -241,10 +333,22 @@ const styles = StyleSheet.create({
         backgroundColor: '#1FAEEB',
         borderRadius: 10,
         padding: 2,
+<<<<<<< HEAD
     },
     disabledButton: {
         opacity: 0.7,
     },
+=======
+    }, disabledButton: {
+        opacity: 0.7,
+    },
+    errorMessage: {
+        color: '#FF0000',
+        fontSize: 14,
+        marginVertical: 10,
+        textAlign: 'center',
+    },
+>>>>>>> main
 });
 
 export default RegisterScreen;

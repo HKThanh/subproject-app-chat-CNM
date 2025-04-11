@@ -26,13 +26,8 @@ const generateBirthdate = () => {
 //         type: Boolean,
 //         default: true,
 //     },
-//     isVerified: {
-//         type: Boolean,
-//         default: false,
-//     },
+    
 //     phone: String,
-//     urlavatar: String,
-//     birthday: String,
 //     urlavatar: {
 //         type: String,
 //         default: "",
@@ -52,6 +47,10 @@ const generateBirthdate = () => {
 //     friendList: {
 //         type: Array,
 //         schema: [String],
+//     },
+//     isVerified: {
+//         type: Boolean,
+//         default: false,
 //     },
 //     isLoggedin: {
 //         type: Boolean,
@@ -88,7 +87,11 @@ const UserSchema = new Schema({
     phone: String,
     urlavatar: {
         type: String,
-        default: "",
+        default: function() {
+            return this.ismale ? 
+                "https://nodebucketcnm203.s3.ap-southeast-1.amazonaws.com/boy.png" : 
+                "https://nodebucketcnm203.s3.ap-southeast-1.amazonaws.com/girl.png";
+        }
     },
     birthday: {
         type: String,
@@ -100,7 +103,16 @@ const UserSchema = new Schema({
     },
     coverPhoto: {
         type: String,
-        default: "",
+        default: function() {
+            const backgrounds = [
+                "https://nodebucketcnm203.s3.ap-southeast-1.amazonaws.com/background+profile/bg1.jpg",
+                "https://nodebucketcnm203.s3.ap-southeast-1.amazonaws.com/background+profile/bg2.jpg",
+                "https://nodebucketcnm203.s3.ap-southeast-1.amazonaws.com/background+profile/bg3.jpg",
+                "https://nodebucketcnm203.s3.ap-southeast-1.amazonaws.com/background+profile/bg4.jpg"
+            ];
+            const randomIndex = Math.floor(Math.random() * backgrounds.length);
+            return backgrounds[randomIndex];
+        }
     },
     friendList: {
         type: Array,
@@ -115,14 +127,6 @@ const UserSchema = new Schema({
         default: false,
     },
     email: {
-        type: String,
-        default: "",
-    },
-    bio: {
-        type: String,
-        default: "",
-    },
-    coverPhoto: {
         type: String,
         default: "",
     },
