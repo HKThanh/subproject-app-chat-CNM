@@ -1,6 +1,7 @@
 const { Server } = require("socket.io");
 const socketController = require("../controllers/socketController");
 const authController = require("../controllers/authController");
+const redisClient = require("../services/redisClient");
 
 let io;
 
@@ -37,6 +38,16 @@ const initSocket = (server) => {
         socket.on('joinDevice', (deviceKey) => {
             socket.join(deviceKey);
             console.log(`Socket ${socket.id} joined room ${deviceKey}`);
+        });
+
+        socket.on('joinFriendRequest', (userId) => {
+            socket.join(userId);
+            console.log(`Socket ${socket.id} joined room ${userId}`);
+        });
+
+        socket.on('joinUserRoom', (userId) => {
+            socket.join(userId);
+            console.log(`Socket ${socket.id} joined room ${userId}`);
         });
 
         // Chat handlers từ socketController

@@ -4,6 +4,8 @@ const UserModel = require('../models/UserModel');
 const authenticateToken = async (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
+    console.log(token);
+    
 
     if (!token) {
         return res.status(401).json({ message: 'Bạn đã hết phiên đăng nhập' });
@@ -18,14 +20,14 @@ const authenticateToken = async (req, res, next) => {
         
         
         if (!user) {
-            return res.status(404).json({ message: 'User not found!!!' });
+            return res.status(404).json({ message: 'Không tìm thấy người dùng' });
         }
 
         req.user = user;
         next();
     } catch (err) {
         console.error('Auth error:', err);
-        return res.status(403).json({ message: 'Invalid token' });
+        res.status(403).json({ message: 'Token đã hết hạn' });
     }
 };
 
