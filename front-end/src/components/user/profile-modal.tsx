@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
+import { DialogContent, DialogTitle } from "@/components/ui/dialog"
 import ProfileView from "./profile-view"
 import ProfileEdit from "./profile-edit"
 import ImageViewer from "./image-viewer"
@@ -10,6 +9,7 @@ import { AnimatePresence } from "framer-motion"
 import useUserStore from "@/stores/useUserStoree"
 import { useSession } from "next-auth/react"
 import { updateProfile } from "@/actions/userActions"
+import { getAuthToken } from "@/utils/auth-utils"
 
 export type UserProfile = {
   fullname: string
@@ -23,11 +23,17 @@ export type UserProfile = {
   coverUrl: string
 }
 
+interface ProfileModalProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  
+}
+
 export default function ProfileModal() {
-  const [open, setOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [viewingImage, setViewingImage] = useState<string | null>(null)
-  
+  const [imageType, setImageType] = useState<"avatar" | "cover" | null>(null)
+
   const user = useUserStore((state) => state.user)
   const [profile, setProfile] = useState<UserProfile>({
     fullname: "",
@@ -71,11 +77,21 @@ export default function ProfileModal() {
       ? `${profile.birthYear}-${profile.birthMonth}-${profile.birthDay}`
       : user?.birthday || '';
 
+    // Lấy accessToken từ session hoặc zustand
+    const accessToken = await getAuthToken();
+
+    if (!accessToken) {
+      console.error('Không tìm thấy token xác thực. Vui lòng đăng nhập lại.');
+      return;
+    }
+
     const result = await updateProfile(
       updatedProfile.phone || profile.phone,
       updatedProfile.fullname || profile.fullname,
       (updatedProfile.gender || profile.gender) === "Nam" ? "true" : "false",
-      birthday.toString()
+      birthday.toString(),
+      updatedProfile.bio || profile.bio,
+      accessToken
     );
 
     console.log("Result from updateProfile:", result);
@@ -138,39 +154,46 @@ export default function ProfileModal() {
     setViewingImage(null);
   }
 
+  const handleViewImage = (url: string, type: "avatar" | "cover") => {
+    setViewingImage(url);
+    setImageType(type);
+  };
+
   return (
     <>
-      <Button onClick={() => setOpen(true)}>Mở thông tin tài khoản</Button>
+      <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden">
+        <DialogTitle className="sr-only">Thông tin tài khoản</DialogTitle>
+        <AnimatePresence mode="wait" initial={false}>
+          {isEditing ? (
+            <ProfileEdit
+              key="edit"
+              profile={profile}
+              onUpdate={handleUpdateProfile}
+              onCancel={() => setIsEditing(false)}
+            />
+          ) : (
+            <ProfileView
+              key="view"
+              profile={profile}
+              onEdit={() => setIsEditing(true)}
+              onViewImage={handleViewImage}
+            />
+          )}
+        </AnimatePresence>
+      </DialogContent>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden">
-          <DialogTitle className="sr-only">Thông tin tài khoản</DialogTitle>
-          <AnimatePresence mode="wait" initial={false}>
-            {isEditing ? (
-              <ProfileEdit
-                key="edit"
-                profile={profile}
-                onUpdate={handleUpdateProfile}
-                onCancel={() => setIsEditing(false)}
-              />
-            ) : (
-              <ProfileView
-                key="view"
-                profile={profile}
-                onEdit={() => setIsEditing(true)}
-                onViewImage={setViewingImage}
-              />
-            )}
-          </AnimatePresence>
-        </DialogContent>
-      </Dialog>
-
-      <ImageViewer
-        imageUrl={viewingImage}
-        isOpen={!!viewingImage}
-        onClose={() => setViewingImage(null)}
-        onUpdate={handleUpdateImage}
-      />
+      {viewingImage && (
+        <ImageViewer
+          imageUrl={viewingImage}
+          isOpen={!!viewingImage}
+          onClose={() => {
+            setViewingImage(null);
+            setImageType(null);
+          }}
+          onUpdate={handleUpdateImage}
+          imageType={imageType || "avatar"}
+        />
+      )}
     </>
-  )
+  );
 }

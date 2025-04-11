@@ -14,6 +14,9 @@ export class CustomAuthError extends AuthError {
 export class InvalidPhonePasswordError extends AuthError {
   static type = "phone/Password không hợp lệ";
 }
+export class AccountIsLoggedError extends AuthError {
+  static type = "Tài khoản đang đăng nhập";
+}
 export class AccountNotActivatedError extends AuthError {
   static type = "Tài khoản chưa được kích hoạt";
   _id: string;

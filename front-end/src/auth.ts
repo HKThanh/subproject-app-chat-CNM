@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 
 // import { authApi } from "./lib/api/authApi";
 import {
+    AccountIsLoggedError,
     AccountNotActivatedError,
     InvalidPhonePasswordError,
     ServerError,
@@ -49,7 +50,7 @@ export const {
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({ email, password }),
+                        body: JSON.stringify({ email, password, platform:"web" }),
                     }).then(res => res.json());
                     console.log("Authorize response:", response);
                 } catch (error) {
@@ -57,16 +58,14 @@ export const {
                     throw new ServerError();
                 }
                 if (!response.user || !response.accessToken) {
-                    if (response.message === "Sai tên đăng nhập") {
+                    if (response.message === "Nhập sai email hoặc mật khẩu") {
                         throw new InvalidPhonePasswordError()
                     }
                     else if (response.message === "Nhập sai mật khẩu") {
                         throw new InvalidPhonePasswordError()
                         
-                    } else if (response.message === "Tài khoản chưa được xác thực")
-                        throw new AccountNotActivatedError(response._id);
-                    else if (response.message === "Số điện thoại hoặc mật khẩu không đúng")
-                        throw new InvalidPhonePasswordError()
+                    } else if (response.message === "Người dùng đang đăng nhập")
+                        throw new AccountIsLoggedError();
                     else {
                         throw new ServerError();
                     }
@@ -170,7 +169,6 @@ export const {
             return token;
         },
         async session({ session, token }) {
-            console.log("Session callback token:", token);
             return {
                 ...session,
                 user: {

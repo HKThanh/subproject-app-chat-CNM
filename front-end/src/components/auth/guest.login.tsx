@@ -93,7 +93,7 @@ export default function LoginForm() {
         />
         <CardHeader className="text-center">
           <h2 className="text-3xl font-extrabold text-gray-900">
-            WeChat - kết nối ngay!
+            WeLo - kết nối ngay!
           </h2>
         </CardHeader>
         <CardContent className="pt-6">

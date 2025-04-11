@@ -9,7 +9,7 @@ import { motion } from "framer-motion"
 interface ProfileViewProps {
   profile: UserProfile
   onEdit: () => void
-  onViewImage: (url: string) => void
+  onViewImage: (url: string, type: "avatar" | "cover") => void
 }
 
 export default function ProfileView({ profile, onEdit, onViewImage }: ProfileViewProps) {
@@ -30,15 +30,18 @@ export default function ProfileView({ profile, onEdit, onViewImage }: ProfileVie
       </div>
 
       {/* Cover photo */}
-      <div className="relative h-40 w-full cursor-pointer" onClick={() => onViewImage(profile.coverUrl)}>
-<Image src={profile.coverUrl || `https://ui-avatars.com/api/?name=${profile.fullname}`} alt="Cover photo" fill className="object-cover" />
+      <div 
+        className="relative h-40 w-full cursor-pointer" 
+        onClick={() => onViewImage(profile.coverUrl || `https://ui-avatars.com/api/?name=${profile.fullname}`, "cover")}
+      >
+        <Image src={profile.coverUrl || `https://ui-avatars.com/api/?name=${profile.fullname}`} alt="Cover photo" fill className="object-cover" />
       </div>
 
       {/* Profile picture */}
       <div className="relative">
         <div
           className="absolute -top-12 left-4 rounded-full border-4 border-white overflow-hidden cursor-pointer"
-          onClick={() => onViewImage(profile.avatarUrl)}
+          onClick={() => onViewImage(profile.avatarUrl || `https://ui-avatars.com/api/?name=${profile.fullname}`, "avatar")}
         >
           <div className="relative h-24 w-24">
             <Image src={profile.avatarUrl || `https://ui-avatars.com/api/?name=${profile.fullname}`} alt="Profile picture" fill className="object-cover" />
