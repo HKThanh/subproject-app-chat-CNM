@@ -63,7 +63,7 @@ export const {
                     }
                     else if (response.message === "Nhập sai mật khẩu") {
                         throw new InvalidPhonePasswordError()
-                        
+
                     } else if (response.message === "Người dùng đang đăng nhập")
                         throw new AccountIsLoggedError();
                     else {
@@ -100,27 +100,53 @@ export const {
     },
     callbacks: {
         async jwt({ token, user, session, trigger }) {
-            // Thêm logic check expired token
             if (token.accessToken) {
+
                 const expired = typeof token.accessToken === 'string' && isTokenExpired(token.accessToken);
                 if (expired && token.refreshToken) {
+                    console.log('Token expired, attempting to refresh...');
                     try {
                         const response = await fetch('http://localhost:3000/auth/refresh-token', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                             },
-                            body: JSON.stringify({ refreshToken: token.refreshToken }),
-                        }).then(res => res.json());
+                            body: JSON.stringify({ refreshToken: token.refreshToken, platform: "web" }),
+                        });
 
-                        if (response.accessToken) {
-                            token.accessToken = response.accessToken;
+                        if (!response.ok) {
+                            throw new Error(`Refresh token failed with status: ${response.status}`);
+                        }
+
+                        const data = await response.json();
+                        console.log('Refresh token response:', data);
+
+                        if (data.accessToken) {
+                            console.log('New access token received');
+                            token.accessToken = data.accessToken;
+
+                            // Nếu có refreshToken mới, cập nhật luôn
+                            if (data.refreshToken) {
+                                token.refreshToken = data.refreshToken;
+                            }
+
+                            // Cập nhật thông tin user nếu có
+                            if (data.user) {
+                                token.id = data.user.id || token.id;
+                                token.fullname = data.user.fullname || token.fullname;
+                                token.email = data.user.email || token.email;
+                                token.urlavatar = data.user.urlavatar || token.urlavatar;
+                                // Cập nhật các thông tin khác nếu cần
+                            }
+                        } else {
+                            console.error('No access token in refresh response');
+                            throw new Error('No access token in refresh response');
                         }
                     } catch (error) {
                         console.error('Error refreshing token:', error);
-                        // Clear tokens on refresh error
-                        delete token.accessToken;
-                        delete token.refreshToken;
+                        // // Clear tokens on refresh error
+                        // delete token.accessToken;
+                        // delete token.refreshToken;
                     }
                 }
             }
@@ -194,9 +220,23 @@ export const {
 // Helper function to check token expiration
 function isTokenExpired(token: string): boolean {
     try {
-        const decoded = JSON.parse(atob(token.split('.')[1]));
-        return decoded.exp * 1000 < Date.now();
-    } catch {
+        // Decode JWT payload
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+
+        const decoded = JSON.parse(jsonPayload);
+        const currentTime = Math.floor(Date.now() / 1000);
+
+        console.log('Token expiration:', new Date(decoded.exp * 1000).toLocaleString());
+        console.log('Current time:', new Date(currentTime * 1000).toLocaleString());
+        console.log('Token expired:', decoded.exp < currentTime);
+
+        return decoded.exp < currentTime;
+    } catch (error) {
+        console.error('Error decoding token:', error);
         return true;
     }
 }

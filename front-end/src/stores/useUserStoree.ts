@@ -7,6 +7,7 @@ interface UserState {
   refreshToken: string | null;
   setUser: (user: IUser, accessToken: string) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
+  refreshTokens: (refreshToken: string) => Promise<boolean>;
   clearUser: () => void;
 }
 
@@ -24,6 +25,35 @@ const useUserStore = create<UserState>()(
       },
       setTokens: (accessToken, refreshToken) => {
         set({ accessToken, refreshToken });
+      },
+      refreshTokens: async (refreshToken) => {
+        try {
+          const response = await fetch('http://localhost:3000/auth/refresh-token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ refreshToken, platform: "web" }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Refresh token failed with status: ${response.status}`);
+          }
+
+          const data = await response.json();
+
+          if (data.accessToken) {
+            set({
+              accessToken: data.accessToken,
+              refreshToken: data.refreshToken || refreshToken
+            });
+            return true;
+          }
+          return false;
+        } catch (error) {
+          console.error('Error refreshing token in store:', error);
+          return false;
+        }
       },
       clearUser: () => {
         set({ user: null, accessToken: null, refreshToken: null });
