@@ -330,20 +330,38 @@ const handleDeleteMessage = async (io, socket) => {
     socket.on("delete_message", async (payload) => {
         try {
             const { idMessage, idSender } = payload;
-            const message = await MessageDetail.findOneAndUpdate(
+            
+            // Tìm và kiểm tra tin nhắn
+            const message = await MessageDetail.findOne({ idMessage });
+            if (!message) {
+                throw new Error("Không tìm thấy tin nhắn");
+            }
+
+            // Kiểm tra xem người xóa có phải người gửi không
+            if (message.idSender !== idSender) {
+                throw new Error("Không có quyền xóa tin nhắn này");
+            }
+
+            // Cập nhật trạng thái tin nhắn (chỉ xóa ở phía người gửi)
+            const updatedMessage = await MessageDetail.findOneAndUpdate(
                 { idMessage },
                 { isRemove: true },
                 { new: true }
             );
             
-            if (message) {
-                socket.emit("message_deleted", {
-                    messageId: idMessage,
-                    updatedMessage: message
-                });
-            }
+
+            // Gửi thông báo thành công cho người gửi
+            socket.emit("delete_message_success", {
+                messageId: idMessage,
+                updatedMessage
+            });
+
         } catch (error) {
-            socket.emit("error", { message: "Lỗi khi xóa tin nhắn" });
+            console.error("Error deleting message:", error);
+            socket.emit("error", {
+                message: "Lỗi khi xóa tin nhắn",
+                error: error.message
+            });
         }
     });
 };
@@ -411,46 +429,73 @@ const handleForwardMessage = async (io, socket) => {
         try {
             const { IDMessageDetail, targetConversations, IDSender } = payload;
             
+            // Tìm tin nhắn gốc
             const originalMessage = await MessageDetail.findOne({ idMessage: IDMessageDetail });
-            
             if (!originalMessage) {
-                throw new Error("Message not found");
+                throw new Error("Không tìm thấy tin nhắn gốc");
             }
 
             const results = [];
-            const userSender = await User.findOne({ id: IDSender });
-            
+            const senderInfo = await User.findOne({ id: IDSender })
+                .select('id fullname avatar phone status');
+
+            // Forward tới từng conversation
             for (const IDConversation of targetConversations) {
+                // Tìm conversation để lấy receiver
+                const conversation = await Conversation.findOne({ idConversation: IDConversation });
+                if (!conversation) continue;
+
+                const IDReceiver = conversation.idSender === IDSender ? 
+                    conversation.idReceiver : conversation.idSender;
+
+                // Tạo tin nhắn mới
                 const forwardedMessage = await MessageDetail.create({
                     idMessage: uuidv4(),
                     idSender: IDSender,
+                    idReceiver: IDReceiver,
                     idConversation: IDConversation,
                     type: originalMessage.type,
                     content: originalMessage.content,
                     dateTime: new Date().toISOString(),
-                    isForward: true
+                    isForwarded: true,
+                    originalMessageId: IDMessageDetail
                 });
 
+                // Cập nhật lastChange của conversation
                 await updateLastChangeConversation(
                     IDConversation,
                     forwardedMessage.idMessage
                 );
 
-                io.to(IDConversation).emit("receive_message", {
+                const messageWithUser = {
                     ...forwardedMessage.toObject(),
-                    userSender
-                });
+                    senderInfo
+                };
+
+                // Gửi tin nhắn tới receiver nếu online
+                const receiverOnline = getUser(IDReceiver);
+                if (receiverOnline) {
+                    io.to(receiverOnline.socketId).emit("receive_message", messageWithUser);
+                }
 
                 results.push({
                     conversationId: IDConversation,
-                    messageId: forwardedMessage.idMessage
+                    message: messageWithUser
                 });
             }
 
-            socket.emit("forward_message_success", { results });
+            // Gửi kết quả về cho sender
+            socket.emit("forward_message_success", {
+                success: true,
+                results
+            });
+
         } catch (error) {
             console.error("Error forwarding message:", error);
-            socket.emit("error", { message: "Lỗi khi chuyển tiếp tin nhắn" });
+            socket.emit("error", {
+                message: "Lỗi khi chuyển tiếp tin nhắn",
+                error: error.message
+            });
         }
     });
 };
@@ -552,6 +597,91 @@ const handleLoadMessages = (io, socket) => {
     });
 };
 
+const getNewestMessages = async (conversations) => {
+    try {
+        const newestMessages = await Promise.all(
+            conversations.map(async (conversation) => {
+                // Tìm tin nhắn mới nhất trong conversation
+                const newestMessage = await MessageDetail.findOne({
+                    idConversation: conversation.idConversation,
+                    // Không lấy tin nhắn đã xóa bởi người gửi
+                    isDeletedBySender: { $ne: true }
+                })
+                .sort({ dateTime: -1 })
+                .limit(1);
+
+                if (!newestMessage) {
+                    return {
+                        conversationId: conversation.idConversation,
+                        message: null
+                    };
+                }
+
+                // Lấy thông tin người gửi
+                const sender = await User.findOne({ id: newestMessage.idSender })
+                    .select('id fullname avatar phone status');
+
+                // Lấy thông tin người nhận
+                const receiver = await User.findOne({ id: newestMessage.idReceiver })
+                    .select('id fullname avatar phone status');
+
+                return {
+                    conversationId: conversation.idConversation,
+                    message: {
+                        ...newestMessage.toObject(),
+                        dateTime: moment.tz(newestMessage.dateTime, "Asia/Ho_Chi_Minh").format(),
+                        senderInfo: sender,
+                        receiverInfo: receiver
+                    }
+                };
+            })
+        );
+
+        return newestMessages;
+
+    } catch (error) {
+        console.error("Error getting newest messages:", error);
+        throw error;
+    }
+};
+
+const handleGetNewestMessages = async (io, socket) => {
+    socket.on("get_newest_messages", async (payload) => {
+        try {
+            const { conversationIds } = payload;
+
+            if (!Array.isArray(conversationIds)) {
+                throw new Error("conversationIds phải là một mảng");
+            }
+
+            // Lấy thông tin các conversation
+            const conversations = await Promise.all(
+                conversationIds.map(id => 
+                    Conversation.findOne({ idConversation: id })
+                )
+            );
+
+            // Lọc bỏ các conversation không tồn tại
+            const validConversations = conversations.filter(conv => conv !== null);
+
+            // Lấy tin nhắn mới nhất cho mỗi conversation
+            const newestMessages = await getNewestMessages(validConversations);
+
+            socket.emit("newest_messages_result", {
+                success: true,
+                messages: newestMessages
+            });
+
+        } catch (error) {
+            console.error("Error handling get newest messages:", error);
+            socket.emit("error", {
+                message: "Lỗi khi lấy tin nhắn mới nhất",
+                error: error.message
+            });
+        }
+    });
+};
+
 module.exports = {
     handleUserOnline,
     handleLoadConversation,
@@ -564,5 +694,6 @@ module.exports = {
     getUser,
     handleMarkMessageRead,
     handleMarkMessagesRead,
-    handleLoadMessages
+    handleLoadMessages,
+    handleGetNewestMessages
 };
