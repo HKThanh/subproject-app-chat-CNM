@@ -11,8 +11,14 @@ interface ProfileModalWrapperProps {
 
 export default function ProfileModalWrapper({ isOpen, onClose }: ProfileModalWrapperProps) {
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <ProfileModal open={isOpen} onOpenChange={onClose} />
+    <Dialog 
+      open={isOpen} 
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <ProfileModal />
     </Dialog>
   );
 }
+

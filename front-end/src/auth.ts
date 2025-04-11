@@ -50,7 +50,7 @@ export const {
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({ email, password }),
+                        body: JSON.stringify({ email, password, platform:"web" }),
                     }).then(res => res.json());
                     console.log("Authorize response:", response);
                 } catch (error) {

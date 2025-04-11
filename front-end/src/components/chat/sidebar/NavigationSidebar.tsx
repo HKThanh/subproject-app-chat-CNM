@@ -30,12 +30,19 @@ import useUserStore from "@/stores/useUserStoree"
 
 export default function NavigationSidebar() {
   const router = useRouter()
-  useSession() // Đảm bảo session được load
+  const { data: session } = useSession()
   const [activeItem, setActiveItem] = useState('messages')
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  // Lấy thông tin người dùng từ Zustand store
   const user = useUserStore((state) => state.user)
   const clearUser = useUserStore((state) => state.clearUser)
+
+  // Fallback values nếu chưa có thông tin người dùng
+  const userName = user?.fullname || session?.user?.fullname || 'User'
+  const userEmail = user?.email || session?.user?.email || ''
+  const userAvatar = (user?.urlavatar?.toString() || session?.user?.urlavatar?.toString() || `https://ui-avatars.com/api/?name=${userName}`) as string
 
   // Hàm xử lý đăng xuất
   const handleLogout = async () => {
@@ -83,6 +90,10 @@ export default function NavigationSidebar() {
     { id: 'documents', icon: FolderOpen, label: 'Tài liệu' },
   ]
 
+  const handleCloseModal = () => {
+    setIsProfileModalOpen(false);
+  };
+
   return (
     <>
       <div className="fixed left-0 top-0 h-screen w-[70px] bg-[#2563eb] flex flex-col items-center py-4">
@@ -92,18 +103,18 @@ export default function NavigationSidebar() {
             <DropdownMenuTrigger asChild>
               <Avatar className="h-10 w-10 border-2 border-white hover:opacity-90 transition-opacity cursor-pointer">
                 <AvatarImage
-                  src={user?.urlavatar?.toString() || `https://ui-avatars.com/api/?name=${user?.fullname || 'User'}`}
-                  alt="Avatar"
+                  src={userAvatar}
+                  alt={`${userName}'s avatar`}
                 />
               </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="start">
               <div className="p-2">
-                <p className="font-semibold">{user?.fullname}</p>
-                <p className="text-sm text-muted-foreground">{user?.email}</p>
+                <p className="font-semibold">{userName}</p>
+                <p className="text-sm text-muted-foreground">{userEmail}</p>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setIsProfileModalOpen(true)}>
+              <DropdownMenuItem onSelect={() => setIsProfileModalOpen(true)}>
                 <User className="mr-2 h-4 w-4" />
                 Trang cá nhân
               </DropdownMenuItem>
@@ -154,12 +165,10 @@ export default function NavigationSidebar() {
       </div>
 
       {/* Profile Modal */}
-      {isProfileModalOpen && (
-        <ProfileModalWrapper
-          isOpen={isProfileModalOpen}
-          onClose={() => setIsProfileModalOpen(false)}
-        />
-      )}
+      <ProfileModalWrapper
+        isOpen={isProfileModalOpen}
+        onClose={handleCloseModal}
+      />
     </>
   )
 }

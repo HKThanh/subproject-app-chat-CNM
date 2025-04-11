@@ -269,7 +269,7 @@ export async function sendOtp(email: string) {
 
 export async function logoutUser(accessToken: string) {
   try {
-    const response = await fetch(`${API_URL}/auth/logout`, {
+    const response = await fetch(`${API_URL}/auth/logout/web`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -29,7 +29,7 @@ interface ProfileModalProps {
   
 }
 
-export default function ProfileModal({ open = false, onOpenChange }: ProfileModalProps) {
+export default function ProfileModal() {
   const [isEditing, setIsEditing] = useState(false)
   const [viewingImage, setViewingImage] = useState<string | null>(null)
   const [imageType, setImageType] = useState<"avatar" | "cover" | null>(null)
@@ -182,16 +182,18 @@ export default function ProfileModal({ open = false, onOpenChange }: ProfileModa
         </AnimatePresence>
       </DialogContent>
 
-      <ImageViewer
-        imageUrl={viewingImage}
-        isOpen={!!viewingImage}
-        onClose={() => {
-          setViewingImage(null);
-          setImageType(null);
-        }}
-        onUpdate={handleUpdateImage}
-        imageType={imageType || "avatar"} // Fallback to avatar if somehow type is null
-      />
+      {viewingImage && (
+        <ImageViewer
+          imageUrl={viewingImage}
+          isOpen={!!viewingImage}
+          onClose={() => {
+            setViewingImage(null);
+            setImageType(null);
+          }}
+          onUpdate={handleUpdateImage}
+          imageType={imageType || "avatar"}
+        />
+      )}
     </>
-  )
+  );
 }
