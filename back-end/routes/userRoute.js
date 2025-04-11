@@ -7,7 +7,7 @@ const authMiddleware = require("../middlewares/authMiddleware");
 const fileService = require("../services/fileService");
 
 router.get("/get-all", userController.getAllUsers);
-router.get("/", authMiddleware, userController.getUserByPhone);
+router.get("/", authMiddleware, userController.getUser);
 router.post("/friend-requests", authMiddleware, userController.getAllFriendRequests);
 
 router.put(

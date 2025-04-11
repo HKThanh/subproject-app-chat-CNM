@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const { JWT_SECRET } = process.env;
 const { v4: uuidv4 } = require("uuid");
 const qrcode = require("qrcode");
+const { getIO } = require("../config/socket");
 
 const UserModel = require("../models/UserModel");
 const FriendRequestModel = require("../models/FriendRequestModel");
@@ -22,18 +23,33 @@ userController.getAllUsers = async (req, res) => {
   }
 };
 
-userController.getUserByPhone = async (req, res) => {
+userController.getUser = async (req, res) => {
   const id = req.user.id;
 
   try {
-    const user = await UserModel.get(id);
+    const user = await UserModel.get(id); 
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "không tìm thấy người dùng" });
     }
-    res.status(200).json(user);
+
+    const dataReturn = {
+      id: user.id,
+      email: user.email,
+      fullname: user.fullname,
+      urlavatar: user.urlavatar,
+      birthday: user.birthday,
+      bio: user.bio,
+      phone: user.phone,
+      coverPhoto: user.coverPhoto,
+      ismale: user.ismale,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    }
+
+    res.status(200).json(dataReturn);
   } catch (error) {
-    res.status(500).json({ message: "Failed to get user" });
+    res.status(500).json({ message: "Lỗi server không thể lấy người dùng" });
   }
 };
 
@@ -211,35 +227,16 @@ userController.updateProfile = async (req, res) => {
 userController.sendFriendRequest = async (req, res) => {
   const senderId = req.user.id;
   const { receiverId } = req.body;
+  const io = getIO();
 
   if (senderId === receiverId) {
-    return res
-      .status(400)
-      .json({ code: -2, message: "Gửi cho bản thân làm gì" });
+    return res.status(400).json({ 
+      code: -2, 
+      message: "Gửi cho bản thân làm gì" 
+    });
   }
 
   const existing = await FriendRequestModel.findOne({ senderId, receiverId });
-
-  // const existing = await FriendRequestModel.scan({
-  //   senderId,
-  //   receiverId,
-  // }).exec();
-
-  // if (existing.length > 0) {
-  //   if (existing[0].status === "ACCEPTED") {
-  //     return res.json({ code: 2, message: "Already friends" });
-  //   }
-  //   return res.json({ code: 0, message: "Request already sent" });
-  // }
-
-  // const newRequest = new FriendRequestModel({
-  //   id: uuidv4(),
-  //   senderId,
-  //   receiverId,
-  //   status: "PENDING",
-  // });
-
-  // await newRequest.save();
 
   if (existing) {
     if (existing.status === "ACCEPTED") {
@@ -248,46 +245,74 @@ userController.sendFriendRequest = async (req, res) => {
     return res.json({ code: 0, message: "Yêu cầu đã được gửi" });
   }
 
-  await FriendRequestModel.create({ senderId, receiverId, status: "PENDING" });
+  const sender = await UserModel.get(senderId);
+  const newRequest = await FriendRequestModel.create({ 
+    senderId, 
+    receiverId, 
+    status: "PENDING" 
+  });
+
+  // Emit socket event cho người nhận
+  io.to(receiverId).emit('newFriendRequest', {
+    requestId: newRequest._id,
+    sender: {
+      id: sender.id,
+      fullname: sender.fullname,
+      urlavatar: sender.urlavatar
+    }
+  });
+
   return res.json({
     code: 1,
     message: "Request sent",
-    data: { senderId, receiverId },
+    data: { senderId, receiverId }
   });
 };
 
+// Sửa lại hàm handleFriendRequest
 userController.handleFriendRequest = async (req, res) => {
   const { id, type } = req.body;
-
-  // const requests = await FriendRequestModel.scan({ id, status: "PENDING" }).exec();
-  // if (requests.length === 0) {
-  //   return res.json({ code: 0, message: "Không tìm thấy yêu cầu kết bạn" });
-  // }
-
-  // const request = requests[0];
+  const io = getIO();
 
   const request = await FriendRequestModel.findOne({
     id: id,
     status: "PENDING",
   });
-  if (!request)
+
+  if (!request) {
     return res.json({ code: 0, message: "Không tìm thấy yêu cầu kết bạn" });
+  }
 
   request.status = type;
   await request.save();
 
   if (type === "ACCEPTED") {
     await userController.addToFriendList(request.senderId, request.receiverId);
+    
+    // Emit socket event cho cả người gửi và người nhận
+    io.to(request.senderId).emit('friendRequestAccepted', {
+      requestId: request._id,
+      userId: request.receiverId
+    });
+    
+    io.to(request.receiverId).emit('friendRequestAccepted', {
+      requestId: request._id, 
+      userId: request.senderId
+    });
   }
 
   if (type === "DECLINED") {
     await FriendRequestModel.updateOne({ id: id }, { status: "DECLINED" });
-    // await FriendRequestModel.update({ id: id }, { status: "DECLINED" }).exec();
+    
+    // Emit socket event cho người gửi
+    io.to(request.senderId).emit('friendRequestDeclined', {
+      requestId: request._id
+    });
   }
 
   return res.json({
     code: 1,
-    message: `Friend request ${type.toLowerCase()} successfully`,
+    message: `Friend request ${type.toLowerCase()} successfully`
   });
 };
 
@@ -311,16 +336,61 @@ userController.addToFriendList = async (senderId, receiverId) => {
 userController.getAllFriendRequests = async (req, res) => {
   try {
     const id = req.user.id;
+    const io = getIO();
+    
+    // Lấy tất cả yêu cầu kết bạn đang pending
     const friendRequests = await FriendRequestModel.find({
       receiverId: id,
       status: "PENDING",
     });
+
+    // Lấy thông tin người gửi cho mỗi yêu cầu
     const requestsWithSenderInfo = await Promise.all(
       friendRequests.map(async (request) => {
         const sender = await UserModel.get(request.senderId);
-        return { ...request.toObject(), sender };
+        return { 
+          ...request.toObject(), 
+          sender: {
+            id: sender.id,
+            fullname: sender.fullname,
+            urlavatar: sender.urlavatar
+          }
+        };
       })
     );
+
+    // Lưu vào Redis để tracking real-time requests
+    await redisClient.setEx(
+      `friend_requests:${id}`,
+      3600, // 1 hour expiration
+      JSON.stringify(requestsWithSenderInfo)
+    );
+
+    // Đăng ký socket listener cho user này
+    io.on('connection', (socket) => {
+      socket.join(id); // Join room với userId
+      
+      socket.on('newFriendRequest', async (data) => {
+        // Lấy requests hiện tại từ Redis
+        const currentRequests = JSON.parse(
+          await redisClient.get(`friend_requests:${id}`) || '[]'
+        );
+        
+        // Thêm request mới
+        currentRequests.push(data);
+        
+        // Cập nhật Redis
+        await redisClient.setEx(
+          `friend_requests:${id}`,
+          3600,
+          JSON.stringify(currentRequests)
+        );
+
+        // Gửi update cho client
+        io.to(id).emit('friendRequestsUpdated', currentRequests);
+      });
+    });
+
     res.status(200).json(requestsWithSenderInfo);
   } catch (error) {
     console.error("Error fetching friend requests:", error);
@@ -401,28 +471,64 @@ userController.updateCoverPhoto = async (req, res) => {
 userController.cancelFriendRequest = async (req, res) => {
   const senderId = req.user.id;
   const { receiverId } = req.params;
+  const io = getIO();
 
   try {
-    // const request = await FriendRequestModel.scan({
-    //   senderId,
-    //   receiverId,
-    //   status: "PENDING",
-    // }).exec();
-
     const request = await FriendRequestModel.findOne({
       senderId,
       receiverId,
       status: "PENDING",
     });
 
-    // if (request.length === 0) {
-    //   return res.status(404).json({ message: "No pending request found" });
-    // }
+    if (!request) {
+      return res.status(404).json({ 
+        code: 0,
+        message: "Không tìm thấy yêu cầu kết bạn" 
+      });
+    }
 
-    await FriendRequestModel.delete(request[0].id);
-    return res.json({ message: "Friend request cancelled successfully" });
-  } catch (e) {
-    return res.status(500).json({ message: "Server error", error: e });
+    // Xóa yêu cầu kết bạn
+    await FriendRequestModel.findByIdAndDelete(request._id);
+
+    // Xóa khỏi Redis cache nếu có
+    const redisKey = `friend_requests:${receiverId}`;
+    const cachedRequests = await redisClient.get(redisKey);
+    
+    if (cachedRequests) {
+      const requests = JSON.parse(cachedRequests);
+      const updatedRequests = requests.filter(
+        req => req.id.toString() !== request.id.toString()
+      );
+      await redisClient.setEx(
+        redisKey,
+        3600,
+        JSON.stringify(updatedRequests)
+      );
+    }
+
+    // Emit socket event cho người nhận
+    io.to(receiverId).emit('friendRequestCancelled', {
+      requestId: request.id,
+      senderId: senderId
+    });
+
+    return res.status(200).json({ 
+      code: 1,
+      message: "Đã hủy yêu cầu kết bạn",
+      data: {
+        requestId: request.id,
+        senderId,
+        receiverId
+      }
+    });
+
+  } catch (error) {
+    console.error("Error cancelling friend request:", error);
+    return res.status(500).json({ 
+      code: -1,
+      message: "Lỗi server khi hủy yêu cầu kết bạn",
+      error: error.message 
+    });
   }
 };
 
@@ -458,39 +564,53 @@ userController.updatePhone = async (req, res) => {
 };
 
 userController.findUserByText = async (req, res) => {
-  const { text } = req.body;
-
-  if (text.slice(1) === "0") {
-    const regex = new RegExp(`^${text}`);
-
-    try {
-      let numberTest = Number.parseInt(text);
-      const user = await UserModel.find({ phone: regex });
-
-      if (!user) {
-        return res.status(404).json({ message: "Không tìm thấy người dùng" });
-      }
-
-      return res.status(200).json(user);
-    } catch (e) {
-      const regex = new RegExp(`^${text}`, "i"); // tìm kiếm tương đối
-      const user = await UserModel.find({ fullname: regex }); // tìm kiếm tương đối
-
-      if (!user) {
-        return res.status(404).json({ message: "Không tìm thấy người dùng" });
-      }
-
-      return res.status(200).json(user);
+  try {
+    const { text } = req.body;
+    
+    if (!text || text.trim().length === 0) {
+      return res.status(400).json({ 
+        code: 0,
+        message: "Vui lòng nhập từ khóa tìm kiếm" 
+      });
     }
-  } else {
-    const regex = new RegExp(`^${text}`, "i"); // tìm kiếm tương đối
-    const user = await UserModel.find({ fullname: regex }); // tìm kiếm tương đối
-    if (!user) {
-      return res.status(404).json({ message: "Không tìm thấy người dùng" });
+
+    // Tạo regex pattern cho tìm kiếm tương đối
+    const searchPattern = new RegExp(text, "i");
+
+    // Tìm kiếm song song theo cả fullname và phone
+    const users = await UserModel.find({
+      $or: [
+      { fullname: searchPattern },
+      { phone: searchPattern }
+      ]
+    }, { _id: 0, id: 1, fullname: 1, urlavatar: 1, phone: 1, email: 1 });
+
+    if (!users || users.length === 0) {
+      return res.status(404).json({ 
+        code: 0,
+        message: "Không tìm thấy người dùng" 
+      });
     }
+
+    // Loại bỏ trùng lặp nếu có
+    const uniqueUsers = users.filter((user, index, self) =>
+      index === self.findIndex((u) => u.id === user.id)
+    );
+
+    return res.status(200).json({
+      code: 1,
+      message: "Tìm kiếm thành công",
+      data: uniqueUsers
+    });
+
+  } catch (error) {
+    console.error("Search error:", error);
+    return res.status(500).json({
+      code: -1,
+      message: "Lỗi server khi tìm kiếm",
+      error: error.message
+    });
   }
-
-  res.status(200).json(user);
 };
 
 module.exports = userController;

@@ -2,7 +2,7 @@
   "users": [
     {
       "id": "user001",
-      "username": "0912345678",
+      "username": "example@gmail.com",
       "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
       "fullname": "John Doe",
       "ismale": true,
@@ -20,7 +20,7 @@
     },
     {
       "id": "user002",
-      "username": "0987654321",
+      "username": "jane.smith@example.com",
       "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
       "fullname": "Jane Smith",
       "ismale": false,
@@ -38,7 +38,7 @@
     },
     {
       "id": "user003",
-      "username": "0933445566",
+      "username": "alice.johnson@example.com",
       "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
       "fullname": "Alice Johnson",
       "ismale": false,
