@@ -1,14 +1,43 @@
-version: '3.8'
-
 services:
   mongo:
     image: mongo:latest
     ports:
       - "27018:27017"
     volumes:
-      - mongo-data:/data/db
+      - ./data-test/mongodb/data:/data/db
+      - ./data-test/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js
     environment:
       - MONGO_INITDB_DATABASE=chat-app
+    networks:
+      - mongodb-net
+
+  mongo-express:
+    image: mongo-express:latest
+    restart: always
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongo
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongodb
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=root
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=123456
+      - ME_CONFIG_MONGODB_AUTH_DATABASE=admin
+      - ME_CONFIG_MONGODB_AUTH_USERNAME=root
+      - ME_CONFIG_MONGODB_AUTH_PASSWORD=123456
+      - ME_CONFIG_MONGODB_ENABLE_ADMIN=true
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=admin123
+    networks:
+      - mongodb-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+        reservations:
+          memory: 128M
+
 
   redis:
     image: redis:latest
@@ -21,3 +50,7 @@ services:
 volumes:
   mongo-data:
   redis-data:
+
+networks:
+  mongodb-net:
+    driver: bridge

@@ -10,6 +10,7 @@ const connectDB = () => {
         region: process.env.AWS_REGION,
     });
     dynamoose.aws.ddb.set(ddb);
+    console.log("Connected to DynamoDB");
 }
 
 

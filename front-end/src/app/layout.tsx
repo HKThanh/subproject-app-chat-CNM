@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
+import { SessionProvider } from "next-auth/react";
+import AuthSync from "@/components/auth/auth.sync";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -31,7 +33,10 @@ export default function RootLayout({
       <body
         className={`${inter.variable} antialiased`}
       >
-        {children}
+        <SessionProvider>
+          <AuthSync />
+          {children}
+        </SessionProvider>
       </body>
     </html>
   );

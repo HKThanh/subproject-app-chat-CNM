@@ -3,23 +3,46 @@ const app = express();
 const port = 3000;
 const bodyParser = require("body-parser");
 const { createServer } = require("node:http");
-const cors = require("cors");
 const connectDB = require("./config/connectMongo");
+const { initSocket, getIO } = require("./config/socket");
+const redisClient = require("./services/redisClient");
+const cors = require("cors")
 
 const authRoutes = require("./routes/authRoute");
 const userRoutes = require("./routes/userRoute");
+const friendRequestRoutes = require("./routes/friendRequestRoute");
 
-app.use(cors());
+const corsOptions = {
+    origin: ['http://localhost:3001', 'http://localhost:8082'], // Add your frontend URLs
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+    optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+
+// Kết nối database
 connectDB();
 
-app.use("/auth", authRoutes);
-app.use("/user", userRoutes);
+// Tạo HTTP server
+const server = createServer(app);
 
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+// Khởi tạo Socket.IO
+initSocket(server);
+const io = getIO();
+
+// Routes
+app.use("/auth", authRoutes(io));
+app.use("/user", userRoutes);
+app.use("/friend-request", friendRequestRoutes);
+
+server.listen(port, '0.0.0.0', () => {
+    console.log(`Server is running on port ${port} and accessible from all network interfaces`);
+    console.log(`API địa chỉ: http://localhost:${port}`);
 });
 
 process.on('SIGINT', async () => {
