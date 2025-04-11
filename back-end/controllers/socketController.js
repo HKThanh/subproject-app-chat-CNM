@@ -73,7 +73,8 @@ const handleLoadConversation = (io, socket) => {
             const conversations = await Conversation.find({
                 $or: [
                     { idSender: IDUser },
-                    { groupMembers: IDUser }
+                    { groupMembers: IDUser },
+                    { idReceiver: IDUser } // Thêm điều kiện này nếu cần
                 ]
             })
             .sort({ lastChange: -1 })
