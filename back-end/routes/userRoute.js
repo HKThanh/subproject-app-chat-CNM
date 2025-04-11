@@ -10,7 +10,7 @@ const userRoutes = (io) => {
 
   router.get("/get-all", userController.getAllUsers);
   router.get("/", authMiddleware, userController.getUser);
-  router.post("/friend-requests", authMiddleware, userController.getAllFriendRequests);
+  router.get("/friend-requests", authMiddleware, userController.getAllFriendRequests);
 
   router.put(
     "/avatar/upload",
@@ -41,6 +41,8 @@ const userRoutes = (io) => {
   router.put("/phone", authMiddleware, userController.updatePhone);
 
   router.post("/search", authMiddleware, userController.findUserByText);
+
+  router.get("/:id", authMiddleware, userController.getUserById);
 
   return router;
 }

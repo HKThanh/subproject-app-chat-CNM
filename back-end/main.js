@@ -41,23 +41,6 @@ app.use("/auth", authRoutes(io));
 app.use("/user", userRoutes(io));
 app.use("/friend-request", friendRequestRoutes);
 
-<<<<<<< HEAD
-
-// io.on('connection', (socket) => {
-//     console.log('Client connected:', socket.id);
-//     authController.generateQR(null, null, io, socket);
-
-//     socket.on('verifyToken', (token) => {
-//         authController.verifyToken(io, socket, token);
-//     });
-
-//     socket.on('disconnect', () => {
-//         console.log('Client disconnected:', socket.id);
-//     });
-// });
-
-=======
->>>>>>> main
 server.listen(port, '0.0.0.0', () => {
     console.log(`Server is running on port ${port} and accessible from all network interfaces`);
     console.log(`API địa chỉ: http://localhost:${port}`);

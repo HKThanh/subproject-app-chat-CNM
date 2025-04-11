@@ -20,14 +20,14 @@ const authenticateToken = async (req, res, next) => {
         
         
         if (!user) {
-            return res.status(404).json({ message: 'User not found!!!' });
+            return res.status(404).json({ message: 'Không tìm thấy người dùng' });
         }
 
         req.user = user;
         next();
     } catch (err) {
         console.error('Auth error:', err);
-        return res.status(403).json({ message: 'Invalid token' });
+        res.status(403).json({ message: 'Token đã hết hạn' });
     }
 };
 

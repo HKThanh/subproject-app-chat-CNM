@@ -25,7 +25,7 @@ db.users.insertMany([
     },
     {
         "id": "user002",
-        "username": "jane.smith@gmail.com",
+        "username": "jane.smith@example.com",
         "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
         "fullname": "Jane Smith",
         "ismale": false,
