@@ -11,7 +11,11 @@ const MessageDetailSchema = new Schema({
     idSender: String,
     idReceiver: String,
     idConversation: String,
-    type: String,
+    type: {
+        type: String,
+        enum: ['text', 'image', 'video', 'file', 'sticker', 'link', 'audio', 'document'],
+        default: 'text'
+    },
     content: String,
     dateTime: {
         type: String,
@@ -29,7 +33,7 @@ const MessageDetailSchema = new Schema({
         type: Boolean,
         default: false
     },
-    isFoward: {
+    isForward: {
         type: Boolean,
         default: false
     },

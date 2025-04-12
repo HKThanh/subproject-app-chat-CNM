@@ -15,9 +15,9 @@ const updateMessageBucket = async (bucket) => {
     return data;
 
 }
-const createNewMessageBucket = async () => {
+const createNewBucketMessage = async () => {
     const dataBucket = {
-        IDMessageBucket: uuidv4(),
+        IDBucketMessage: uuidv4(),
         listIDMessageDetail: [],
         IDNextBucket: ""
     }
@@ -29,5 +29,5 @@ module.exports = {
     getMessageBucketByID,
     createMessageBucket,
     updateMessageBucket,
-    createNewMessageBucket
+    createNewBucketMessage
 };

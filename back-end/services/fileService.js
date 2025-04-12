@@ -12,6 +12,24 @@ const imageFileFilter = (req, file, cb) => {
   }
 }
 
+const chatFileFilter = (req, file, cb) => {
+  const allowedTypes = {
+    'image': ['image/jpeg','image/jpg', 'image/png', 'image/gif'],
+    'video': ['video/mp4', 'video/quicktime'],
+    'document': ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+  };
+
+  // Check if file type is in any of the allowed categories
+  const isAllowed = Object.values(allowedTypes).some(types => 
+    types.includes(file.mimetype)
+  );
+
+  if (isAllowed) {
+    cb(null, true);
+  } else {
+    cb(new Error("Chỉ chấp nhận file hình ảnh, video hoặc tài liệu"), false);
+  }
+};
 
 // func lưu file vào memory
 fileService.uploadFile = multer({
@@ -31,6 +49,43 @@ fileService.uploadAvatar = multer({
   fileFilter: imageFileFilter,
 })
 
+
+fileService.uploadChatFile = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB
+  },
+  fileFilter: chatFileFilter,
+});
+
+
+// Add new utility functions for chat files
+
+
+fileService.processChatFile = async (req, res, next) => {
+  if (!req.file) {
+    return res.status(400).json({ message: "No file uploaded" });
+  }
+
+  const random = (num) => `${Math.random().toString(36).substring(2, num + 2)}`;
+  const filePath = `${random(4)}-${new Date().getTime()}-${req.file.originalname}`;
+
+  const uploadParams = {
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Body: req.file.buffer,
+    Key: filePath,
+    ContentType: req.file.mimetype,
+  };
+
+  try {
+    const data = await s3.upload(uploadParams).promise();
+    req.fileUrl = data.Location;
+    next();
+  } catch (error) {
+    console.error("Error uploading to S3:", error);
+    return res.status(500).json({ message: "Error uploading file to S3" });
+  }
+};
 
 // Hàm xử lí hình ảnh (để lưu hình vào db hoặc s3)
 fileService.processAvatar = async (req, res, next) => {

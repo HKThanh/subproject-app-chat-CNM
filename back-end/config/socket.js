@@ -1,6 +1,7 @@
 const { Server } = require("socket.io");
 const socketController = require("../controllers/socketController");
 const authController = require("../controllers/authController");
+const redisClient = require("../services/redisClient");
 
 let io;
 
@@ -39,6 +40,16 @@ const initSocket = (server) => {
             console.log(`Socket ${socket.id} joined room ${deviceKey}`);
         });
 
+        socket.on('joinFriendRequest', (userId) => {
+            socket.join(userId);
+            console.log(`Socket ${socket.id} joined room ${userId}`);
+        });
+
+        socket.on('joinUserRoom', (userId) => {
+            socket.join(userId);
+            console.log(`Socket ${socket.id} joined room ${userId}`);
+        });
+
         // Chat handlers từ socketController
         socketController.handleUserOnline(socket);
         socketController.handleLoadConversation(io, socket);
@@ -49,6 +60,7 @@ const initSocket = (server) => {
         socketController.handleForwardMessage(io, socket);
         socketController.handleLoadMessages(io, socket);
         socketController.handleMarkMessagesRead(socket);
+        socketController.handleCheckUsersStatus(socket);
         socket.on("disconnect", () => {
             console.log("Client disconnected: " + socket.id);
             const user = socketController.getUserBySocketId(socket.id);

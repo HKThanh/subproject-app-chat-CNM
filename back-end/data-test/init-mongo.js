@@ -20,12 +20,13 @@ db.users.insertMany([
         "bio": "",
         "coverPhoto": "",
         "friendList": ["user003"],
+        "blockedUsers": [""],
         "createdAt": "2025-04-02T10:00:00Z",
         "updatedAt": "2025-04-02T10:00:00Z"
     },
     {
         "id": "user002",
-        "username": "jane.smith@gmail.com",
+        "username": "jane.smith@example.com",
         "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
         "fullname": "Jane Smith",
         "ismale": false,
@@ -38,6 +39,7 @@ db.users.insertMany([
         "urlavatar": "https://example.com/avatars/jane.jpg",
         "birthday": "1992-08-25",
         "friendList": ["user003"],
+        "blockedUsers": ["user001"],
         "createdAt": "2025-04-02T11:00:00Z",
         "updatedAt": "2025-04-02T11:00:00Z"
     },
@@ -56,6 +58,26 @@ db.users.insertMany([
         "urlavatar": "https://example.com/avatars/alice.jpg",
         "birthday": "1988-12-10",
         "friendList": ["user002", "user001"],
+        "blockedUsers": [""],
+        "createdAt": "2025-04-02T12:00:00Z",
+        "updatedAt": "2025-04-02T12:00:00Z"
+    },
+    {
+        "id": "user004",
+        "username": "test4@example.com",
+        "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
+        "fullname": "Alice Johnson",
+        "ismale": false,
+        "isLoggedin": false,
+        "isVerified": true,
+        "email": "test4@example.com",
+        "bio": "Exploring the world one step at a time.",
+        "coverPhoto": "https://example.com/covers/alice.jpg",
+        "phone": "0933445566",
+        "urlavatar": "https://example.com/avatars/alice.jpg",
+        "birthday": "1988-12-10",
+        "friendList": [""],
+        "blockedUsers": [""],
         "createdAt": "2025-04-02T12:00:00Z",
         "updatedAt": "2025-04-02T12:00:00Z"
     }

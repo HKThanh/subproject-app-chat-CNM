@@ -6,36 +6,53 @@ const userController = require("../controllers/userController");
 const authMiddleware = require("../middlewares/authMiddleware");
 const fileService = require("../services/fileService");
 
-router.get("/get-all", userController.getAllUsers);
-router.get("/", authMiddleware, userController.getUser);
-router.post("/friend-requests", authMiddleware, userController.getAllFriendRequests);
+const userRoutes = (io) => {
 
-router.put(
-  "/avatar/upload",
-  authMiddleware,
-  fileService.uploadAvatar.single("avatar"),
-  fileService.processAvatar,
-  userController.updateAvatar,
-);
+  router.get("/get-all", userController.getAllUsers);
+  router.get("/", authMiddleware, userController.getUser);
+  router.get("/get-received-friend-requests", authMiddleware, userController.getAllReceivedFriendRequests);
+  router.get("/get-sended-friend-requests", authMiddleware, userController.getAllSendedFriendRequest);
 
-router.put("/profile", authMiddleware,   userController.updateProfile);
+  router.put(
+    "/avatar/upload",
+    authMiddleware,
+    fileService.uploadAvatar.single("avatar"),
+    fileService.processAvatar,
+    userController.updateAvatar,
+  );
 
-router.post("/send", authMiddleware, userController.sendFriendRequest);
+  router.put("/profile", authMiddleware, userController.updateProfile);
 
-router.post("/handle", authMiddleware, userController.handleFriendRequest);
+  router.post("/send", authMiddleware, (req, res) => userController.sendFriendRequest(req, res, io));
 
-router.post("/cancel/:receiverId", authMiddleware, userController.cancelFriendRequest); 
-router.put("/bio", authMiddleware, userController.updateBio);
-router.put(
-  "/cover/upload",
-  authMiddleware,
-  fileService.uploadAvatar.single("cover"),
-  fileService.processAvatar,
-  userController.updateCoverPhoto
-);
+  router.post("/handle", authMiddleware, (req, res) => userController.handleFriendRequest(req, res, io));
 
-router.put("/phone", authMiddleware, userController.updatePhone);
+  router.post("/cancel/:requestId", authMiddleware, (req, res) => userController.cancelFriendRequest(req, res, io));
 
-router.post("/search", authMiddleware, userController.findUserByText);
+  router.put("/bio", authMiddleware, userController.updateBio);
 
-module.exports = router;
+  router.put(
+    "/cover/upload",
+    authMiddleware,
+    fileService.uploadAvatar.single("coverPhoto"),
+    fileService.processAvatar,
+    userController.updateCoverPhoto
+  );
+
+  router.put("/phone", authMiddleware, userController.updatePhone);
+
+  router.post("/search", authMiddleware, userController.findUserByText);
+
+  router.get("/:id", authMiddleware, userController.getUserById);
+
+  // Block user
+  router.post('/blocked/block', authMiddleware, (req, res) => userController.blockUser(req, res, io));
+
+  router.post('/blocked/unblock', authMiddleware, (req, res) => userController.unblockUser(req, res, io));
+
+  router.get('/blocked/get-blocked', authMiddleware, (req, res) => userController.getBlockedUsers(req, res));
+
+  return router;
+}
+
+module.exports = userRoutes;
