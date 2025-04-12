@@ -12,7 +12,7 @@ let onlineUsers = [];
 
 const addNewUser = (id, socketId) => {
     !onlineUsers.some((user) => user.id === id) &&
-        onlineUsers.push({ id, socketId });
+        onlineUsers.push({ check_users_statusid, socketId });
 };
 
 const removeUser = (socketId) => {
@@ -694,6 +694,22 @@ const handleGetNewestMessages = async (io, socket) => {
     });
 };
 
+const handleCheckUsersStatus = (socket) => {
+    socket.on('check_users_status', ({ userIds }) => {
+        try {
+            const statuses = {};
+            userIds.forEach(userId => {
+                const user = getUser(userId);
+                statuses[userId] = !!user;
+            });
+            
+            socket.emit('users_status', { statuses });
+        } catch (error) {
+            console.error('Error checking users status:', error);
+        }
+    });
+};
+
 module.exports = {
     handleUserOnline,
     handleLoadConversation,
@@ -707,5 +723,6 @@ module.exports = {
     handleMarkMessageRead,
     handleMarkMessagesRead,
     handleLoadMessages,
-    handleGetNewestMessages
+    handleGetNewestMessages,
+    handleCheckUsersStatus
 };
