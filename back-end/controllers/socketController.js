@@ -12,7 +12,7 @@ let onlineUsers = [];
 
 const addNewUser = (id, socketId) => {
     !onlineUsers.some((user) => user.id === id) &&
-        onlineUsers.push({ check_users_statusid, socketId });
+        onlineUsers.push({ id, socketId });
 };
 
 const removeUser = (socketId) => {
