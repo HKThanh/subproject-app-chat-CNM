@@ -93,7 +93,7 @@ const handleLoadConversation = (io, socket) => {
                     
                     // Lấy thông tin người nhận
                     const otherUser = await User.findOne({ id: otherUserId })
-                        .select('id fullname avatar phone status');
+                        .select('id fullname urlavatar phone status');
 
                     // Lấy tin nhắn mới nhất
                     const latestMessage = await MessageDetail.findOne({
