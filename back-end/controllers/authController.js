@@ -200,6 +200,8 @@ authController.login = async (req, res, io) => {
                 coverPhoto: user.coverPhoto,
                 ismale: user.ismale,
                 isVerified: user.isVerified,
+                friendList: user.friendList,
+                blockedUsers: user.blockedUsers,
             }
 
             // Kiểm tra và quản lý đăng nhập theo platform

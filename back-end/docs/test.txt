@@ -1,0 +1,483 @@
+*localhost:3000/auth/request-otp-web
+input
+{
+    "email": "test@example.com"
+}
+output
+{
+    "message": "Email đã tồn tại"
+}
+
+*localhost:3000/auth/request-otp-web
+input
+{
+    "email": "test123@example.com"
+}
+output
+{
+    "message": "OTP đã được gửi đến email của bạn",
+    "email": "test123@example.com"
+}
+
+*localhost:3000/auth/register-web
+input
+{
+    "email": "test123@example.com",
+    "password": "test123",
+    "fullname": "Test User",
+    "otp": "189777"
+}
+output
+{
+    "message": "Đăng ký thành công",
+    "email": "test123@example.com"
+}
+
+*localhost:3000/auth/register-web
+input
+{
+    "email": "test123@example.com",
+    "password": "test123",
+    "fullname": "Test User",
+    "otp": ""
+}
+output
+{
+    "message": "Hãy nhập thông tin cần thiết"
+}
+
+*localhost:3000/auth/register-web
+input
+{
+    "email": "test123@example.com",
+    "password": "test123",
+    "fullname": "",
+    "otp": "862434"
+}
+output
+{
+    "message": "Hãy nhập thông tin cần thiết"
+}
+
+*localhost:3000/auth/register-web
+input
+{
+    "email": "test123@example.com",
+    "password": "",
+    "fullname": "Test User",
+    "otp": "862434"
+}
+output
+{
+    "message": "Hãy nhập thông tin cần thiết"
+}
+
+*localhost:3000/auth/register-web
+input
+{
+    "email": "",
+    "password": "test123",
+    "fullname": "Test User",
+    "otp": "862434"
+}
+output
+{
+    "message": "Hãy nhập thông tin cần thiết"
+}
+
+*localhost:3000/auth/register-web
+input
+{
+    "email": "",
+    "password": "",
+    "fullname": "",
+    "otp": ""
+}
+output
+{
+    "message": "Hãy nhập thông tin cần thiết"
+}
+
+*localhost:3000/auth/register-web (Nhập sai OTP)
+input
+{
+    "email": "test123@example.com",
+    "password": "test123",
+    "fullname": "Test User",
+    "otp": "428810"
+}
+output
+{
+    "message": "OTP không hợp lệ",
+    "status": 401
+}
+
+
+*localhost:3000/auth/verify-email-and-password
+input
+{
+    "email": "example@gmail.com",
+    "phone": "0912345678"
+}
+{
+    "message": "Email hoặc số điện thoại đã tồn tại"
+}
+
+*localhost:3000/auth/verify-email-and-password
+input
+{
+    "email": "thanhakira15t@gmail.com",
+    "phone": "0912345678"
+}
+{
+    "message": "Email hoặc số điện thoại đã tồn tại"
+}
+
+*localhost:3000/auth/verify-email-and-password
+input
+{
+    "email": "thanhakira15t@gmail.com",
+    "phone": "0912345679"
+}
+{
+    "message": "Email và số điện thoại hợp lệ",
+    "phone": "0912345679",
+    "email": "thanhakira15t@gmail.com"
+}
+
+*localhost:3000/auth/register-phone
+input
+{
+    "email": "thanhakira15t@gmail.com",
+    "phone": "0777777777",
+    "password": "123456",
+    "fullname": "Test"
+}
+output
+{
+    "message": "OTP đã được gửi đến email của bạn",
+    "email": "thanhakira15t@gmail.com",
+    "otp": "otp",
+}
+
+*localhost:3000/auth/register-phone
+input
+{
+    "email": "thanhakira15t@gmail.com",
+    "phone": "0777777777",
+    "password": "",
+    "fullname": "Test"
+}
+output
+{
+    "message": "Hãy nhập thông tin cần thiết"
+}
+
+*localhost:3000/auth/register-phone
+input
+{
+    "email": "thanhakira15t@gmail.com",
+    "phone": "",
+    "password": "123456",
+    "fullname": "Test"
+}
+output
+{
+    "message": "Hãy nhập thông tin cần thiết"
+}
+
+*localhost:3000/auth/register-phone
+input
+{
+    "email": "",
+    "phone": "0777777777",
+    "password": "123456",
+    "fullname": "Test"
+}
+output
+{
+    "message": "Hãy nhập thông tin cần thiết"
+}
+
+*localhost:3000/auth/register-phone
+input
+{
+    "email": "thanhakira15t@gmail.com",
+    "phone": "0777777777",
+    "password": "123456",
+    "fullname": ""
+}
+output
+{
+    "message": "Hãy nhập thông tin cần thiết"
+}
+
+*localhost:3000/auth/register-phone lần 2 sau khi đã báo gửi OTP thành công
+input
+{
+    "email": "thanhakira15t@gmail.com",
+    "phone": "0777777777",
+    "password": "123456",
+    "fullname": "Test"
+}
+output
+{
+    "message": "Email hoặc số điện thoại đã tồn tại"
+}
+
+input
+{
+    "email": "thanhakira15t@gmail.com",
+    "phone": "0777777788",
+    "password": "123456",
+    "fullname": "Test"
+}
+output
+{
+    "message": "Email hoặc số điện thoại đã tồn tại"
+}
+
+input
+{
+    "email": "thanhakira18t@gmail.com",
+    "phone": "0777777777",
+    "password": "123456",
+    "fullname": "Test"
+}
+output
+{
+    "message": "Email hoặc số điện thoại đã tồn tại"
+}
+
+*localhost:3000/auth/verify-otp
+input
+{
+    "email": "example@gmail.com",
+    "phone": "0777777777"
+}
+output
+{
+    "message": ""
+}
+
+*localhost:3000/auth/login
+input
+{
+    "email": "test@example.com",
+    "password": "test123",
+    "platform": "web"
+}
+output
+{
+    "message": "Đăng nhập thành công",
+    "accessToken": "...",
+    "refreshToken": "...",
+    "user": {
+        "id": "81610b21-b3ee-4ea6-8756-fa9f8297888f",
+        "fullname": "Test User",
+        "urlavatar": "",
+        "birthday": "1976-07-19",
+        "createdAt": "2025-04-10T09:30:27.697Z",
+        "email": "test@example.com",
+        "bio": "",
+        "phone": "0123456789",
+        "coverPhoto": "",
+        "ismale": true,
+        "isVerified": true
+    }
+}
+
+*localhost:3000/auth/login
+input
+{
+    "email": "test@example.com",
+    "password": "test",
+    "platform": "web"
+}
+output
+{
+    "message": "Nhập sai email hoặc mật khẩu"
+}
+
+*localhost:3000/auth/login
+input
+{
+    "email": "test123@example.com",
+    "password": "test123",
+    "platform": "web"
+}
+output
+{
+    "message": "Nhập sai email hoặc mật khẩu"
+}
+
+*localhost:3000/auth/login
+input
+{
+    "email": "test123@example.com",
+    "password": "test1234",
+    "platform": "web"
+}
+output
+{
+    "message": "Nhập sai email hoặc mật khẩu"
+}
+
+*localhost:3000/auth/login
+input
+{
+    "email": "",
+    "password": "test123",
+    "platform": "web"
+}
+output
+{
+    "message": "Hãy nhập cả email và mật khẩu"
+}
+
+*localhost:3000/auth/login
+input
+{
+    "email": "test123@example.com",
+    "password": "",
+    "platform": "web"
+}
+output
+{
+    "message": "Hãy nhập cả email và mật khẩu"
+}
+
+socket event: forceLogout
+input
+{
+ message: "tk đăng nhập-web"
+}
+output
+{
+    "platform": "web",
+    "message": "Tài khoản của bạn đã đăng nhập ở thiết bị khác"
+}
+
+*localhost:3000/auth/logout/web
+input: accessToken
+output
+{
+    "message": "Bạn đã đăng xuất"
+}
+
+*localhost:3000/user
+input: 
+output
+{
+    "message": "Token đã hết hạn"
+}
+
+*localhost:3000/user
+input: accessToken
+output
+{
+    "id": "c567f656-e71c-4a11-aa33-d62dc68efbe6",
+    "email": "test123@example.com",
+    "fullname": "Test User",
+    "urlavatar": "",
+    "birthday": "1955-10-02",
+    "bio": "",
+    "coverPhoto": "",
+    "ismale": true,
+    "createdAt": "2025-04-11T03:56:03.060Z",
+    "updatedAt": "2025-04-11T03:56:03.060Z"
+}
+
+*localhost:3000/user/search
+input
+{
+	"text": "078"
+}
+output
+{
+    "code": 0,
+    "message": "Không tìm thấy người dùng"
+}
+
+*localhost:3000/user/search
+input
+{
+    "text": ""
+}
+output
+{
+    "code": 0,
+    "message": "Vui lòng nhập từ khóa tìm kiếm"
+}
+
+*localhost:3000/user/search
+input
+{
+    "text": ""
+}
+output
+{
+    "code": 0,
+    "message": "Vui lòng nhập từ khóa tìm kiếm"
+}
+
+*localhost:3000/user/search
+input
+{
+    "text": "J"
+}
+output
+{
+    "code": 1,
+    "message": "Tìm kiếm thành công",
+    "data": [
+        {
+            "id": "user002",
+            "fullname": "Jane Smith",
+            "email": "jane.smith@example.com",
+            "phone": "0987654321",
+            "urlavatar": "https://example.com/avatars/jane.jpg"
+        },
+        {
+            "id": "user003",
+            "fullname": "Alice Johnson",
+            "email": "alice.johnson@example.com",
+            "phone": "0933445566",
+            "urlavatar": "https://example.com/avatars/alice.jpg"
+        }
+    ]
+}
+
+*localhost:3000/user/search
+input
+{
+    "text": "09"
+}
+output
+{
+    "code": 1,
+    "message": "Tìm kiếm thành công",
+    "data": [
+        {
+            "id": "user001",
+            "fullname": "ahihi",
+            "email": "example@gmail.com",
+            "phone": "0912345678",
+            "urlavatar": "https://example.com/avatars/john.jpg"
+        },
+        {
+            "id": "user002",
+            "fullname": "Jane Smith",
+            "email": "jane.smith@example.com",
+            "phone": "0987654321",
+            "urlavatar": "https://example.com/avatars/jane.jpg"
+        },
+        {
+            "id": "user003",
+            "fullname": "Alice Johnson",
+            "email": "alice.johnson@example.com",
+            "phone": "0933445566",
+            "urlavatar": "https://example.com/avatars/alice.jpg"
+        }
+    ]
+}

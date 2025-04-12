@@ -130,6 +130,13 @@ const UserSchema = new Schema({
         type: String,
         default: "",
     },
+    blockedUsers: [
+        {
+            type: String,
+            ref: "User",
+            default: [],
+        }
+    ],
     createdAt: {
         type: Date,
         default: Date.now,
