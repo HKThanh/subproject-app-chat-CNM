@@ -13,7 +13,7 @@ const MessageDetailSchema = new Schema({
     idConversation: String,
     type: {
         type: String,
-        enum: ['text', 'image', 'video', 'file', 'sticker', 'link', 'audio'],
+        enum: ['text', 'image', 'video', 'file', 'sticker', 'link', 'audio', 'document'],
         default: 'text'
     },
     content: String,

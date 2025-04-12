@@ -1,4 +1,4 @@
-const MessageController = require("./MessageController");
+// const MessageController = require("./MessageController");
 const MessageDetailController = require("./MessageDetailController");
 const Conversation = require("../models/ConversationModel");
 const { v4: uuidv4 } = require("uuid");
@@ -312,6 +312,7 @@ const handleSendMessage = async (io, socket) => {
             const receiverOnline = getUser(IDReceiver);
             if (receiverOnline) {
                 io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers);
+                console.log("Emitting message to receiver:", IDReceiver);
             }
 
             // Emit success cho sender

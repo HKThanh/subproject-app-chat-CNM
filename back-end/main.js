@@ -1,6 +1,5 @@
 const express = require("express");
 const app = express();
-;
 const port = 3000;
 const bodyParser = require("body-parser");
 const { createServer } = require("node:http");
@@ -12,6 +11,7 @@ const cors = require("cors")
 const authRoutes = require("./routes/authRoute");
 const userRoutes = require("./routes/userRoute");
 const friendRequestRoutes = require("./routes/friendRequestRoute");
+const uploadRoutes = require("./routes/upload");
 
 const corsOptions = {
     origin: ['http://localhost:3001', 'http://localhost:8082'], // Add your frontend URLs
@@ -40,6 +40,7 @@ const io = getIO();
 app.use("/auth", authRoutes(io));
 app.use("/user", userRoutes(io));
 app.use("/friend-request", friendRequestRoutes);
+app.use("/upload", uploadRoutes);
 
 server.listen(port, '0.0.0.0', () => {
     console.log(`Server is running on port ${port} and accessible from all network interfaces`);
