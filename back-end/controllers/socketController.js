@@ -460,7 +460,7 @@ const handleForwardMessage = async (io, socket) => {
                     type: originalMessage.type,
                     content: originalMessage.content,
                     dateTime: new Date().toISOString(),
-                    isForwarded: true,
+                    isFoward: true,  // Sửa từ isForwarded thành isFoward để match với schema
                     originalMessageId: IDMessageDetail
                 });
 

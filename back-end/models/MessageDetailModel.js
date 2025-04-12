@@ -33,7 +33,7 @@ const MessageDetailSchema = new Schema({
         type: Boolean,
         default: false
     },
-    isFoward: {
+    isForward: {
         type: Boolean,
         default: false
     },
