@@ -10,12 +10,15 @@ export default function ChatMessage({ message, timestamp, isOwn = false }: ChatM
   return (
     <div className={`mb-4 ${isOwn ? 'flex justify-end' : ''}`}>
       <div
-        className={`rounded-lg p-3 max-w-xs md:max-w-md lg:max-w-lg ${
-          isOwn ? 'bg-[#4285F4] text-white' : 'bg-gray-100 text-gray-800'
+        className={`rounded-lg p-3 ${
+          isOwn
+            ? 'bg-[#4285F4] text-white max-w-xs md:max-w-md lg:max-w-lg'
+            : 'bg-gray-100 text-gray-800 inline-block'
         }`}
         style={{
           backgroundColor: isOwn ? '#4285F4' : '',
-          color: isOwn ? 'white' : ''
+          color: isOwn ? 'white' : '',
+          maxWidth: !isOwn ? '80%' : '' // Giới hạn độ rộng tối đa cho tin nhắn của người nhận
         }}
       >
         <div className="whitespace-pre-wrap break-words">
