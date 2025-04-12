@@ -10,17 +10,21 @@ const moment = require("moment-timezone");
 
 let onlineUsers = [];
 
-const addNewUser = (phone, socketId) => {
-    !onlineUsers.some((user) => user.phone === phone) &&
-        onlineUsers.push({ phone, socketId });
+const addNewUser = (id, socketId) => {
+    !onlineUsers.some((user) => user.id === id) &&
+        onlineUsers.push({ id, socketId });
 };
 
 const removeUser = (socketId) => {
     onlineUsers = onlineUsers.filter((item) => item.socketId !== socketId);
 };
 
-const getUser = (phone) => {
-    return onlineUsers.find((user) => user.phone === phone);
+const getUser = (id) => {
+    return onlineUsers.find((user) => user.id === id);
+};
+
+const getUserBySocketId = (socketId) => {
+    return onlineUsers.find((user) => user.socketId === socketId);
 };
 
 
@@ -28,15 +32,15 @@ const getUser = (phone) => {
 const handleUserOnline = (socket) => {
     socket.on("new_user_connect", async (payload) => {
         try {
-            const { phone } = payload;
-            addNewUser(phone, socket.id);
+            const { id } = payload;
+            addNewUser(id, socket.id);
             
-            // Join user vào room với ID là số điện thoại
-            socket.join(phone);
+            // Join user vào room với ID
+            socket.join(id);
 
             // Load unread messages khi user online
             const unreadMessages = await MessageDetail.find({
-                idReceiver: phone,
+                idReceiver: id,
                 isRead: false
             })
             .sort({ dateTime: 1 })
@@ -54,7 +58,7 @@ const handleUserOnline = (socket) => {
                 socketId: socket.id
             });
 
-            console.log(`User ${phone} connected with socket ${socket.id}`);
+            console.log(`User ${id} connected with socket ${socket.id}`);
         } catch (error) {
             console.error("Error handling user online:", error);
         }
@@ -497,10 +501,6 @@ const handleForwardMessage = async (io, socket) => {
             });
         }
     });
-};
-
-const getUserBySocketId = (socketId) => {
-    return onlineUsers.find((user) => user.socketId === socketId);
 };
 
 const handleMarkMessageRead = (socket) => {
