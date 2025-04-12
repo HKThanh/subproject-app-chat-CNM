@@ -15,9 +15,8 @@ const authenticateToken = async (req, res, next) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const user = await UserModel.get(decoded.id);
 
-        console.log('Decoded token:', decoded);
+        // console.log('Decoded token:', decoded);
         console.log('User from token:', user);
-        
         
         if (!user) {
             return res.status(404).json({ message: 'Không tìm thấy người dùng' });
