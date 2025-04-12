@@ -68,18 +68,28 @@ export const useSocket = () => {
     socketInstance.on('disconnect', () => {
       console.log('Socket disconnected');
       setIsConnected(false);
+
+      // Tự động thử kết nối lại ngay lập tức
+      console.log('Attempting to reconnect socket immediately...');
+      socketInstance.connect();
     });
 
     socketInstance.on('connect_error', (error) => {
       console.error('Socket connection error:', error.message);
       setIsConnected(false);
 
-      // Tự động thử kết nối lại sau 2 giây
+      // Tự động thử kết nối lại sau 1 giây
       setTimeout(() => {
-        console.log('Attempting to reconnect socket...');
+        console.log('Attempting to reconnect socket after error...');
         socketInstance.connect();
-      }, 2000);
+      }, 1000);
     });
+
+    // Đảm bảo socket được kết nối
+    if (!socketInstance.connected) {
+      console.log('Socket not connected, connecting now...');
+      socketInstance.connect();
+    }
 
     // Thêm log cho các sự kiện khác
     socketInstance.onAny((event, ...args) => {
