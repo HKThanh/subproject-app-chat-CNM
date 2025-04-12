@@ -77,7 +77,7 @@ export default function Home() {
         <ChatDetail
           onToggleInfo={() => setShowChatInfo(!showChatInfo)}
           showChatInfo={showChatInfo}
-          activeConversation={activeConversation ? conversations.find(c => c.idConversation === activeConversation) : null}
+          activeConversation={activeConversation ? conversations.find(c => c.idConversation === activeConversation) ||null : null}
           messages={activeConversation ? messages[activeConversation] || [] : []}
           onSendMessage={handleSendMessage}
           loading={loading}
@@ -86,7 +86,7 @@ export default function Home() {
       {showChatInfo && (
         <div className="w-1/5 flex flex-col transition-all duration-300">
           <ChatInfo
-            activeConversation={activeConversation ? conversations.find(c => c.idConversation === activeConversation) : null}
+            activeConversation={activeConversation ? conversations.find(c => c.idConversation === activeConversation) || null : null}
           />
         </div>
       )}

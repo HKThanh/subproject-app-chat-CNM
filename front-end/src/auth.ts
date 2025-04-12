@@ -105,15 +105,32 @@ export const {
                 const expired = typeof token.accessToken === 'string' && isTokenExpired(token.accessToken);
                 if (expired && token.refreshToken) {
                     try {
+                        // Giải mã refresh token để lấy userId
+                        const refreshToken = token.refreshToken as string;
+                        const base64Url = refreshToken.split('.')[1];
+                        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                        }).join(''));
+
+                        const decoded = JSON.parse(jsonPayload);
+                        console.log('Decoded refresh token in auth.ts:', decoded);
+
                         const response = await fetch('http://localhost:3000/auth/refresh-token', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                             },
-                            body: JSON.stringify({ refreshToken: token.refreshToken, platform: "web" }),
+                            body: JSON.stringify({
+                                refreshToken: token.refreshToken,
+                                platform: "web",
+                                userId: decoded.id // Thêm userId để backend có thể xác minh
+                            }),
                         });
 
                         if (!response.ok) {
+                            const errorData = await response.json().catch(() => ({}));
+                            console.error('Refresh token error in auth.ts:', errorData);
                             throw new Error(`Refresh token failed with status: ${response.status}`);
                         }
 

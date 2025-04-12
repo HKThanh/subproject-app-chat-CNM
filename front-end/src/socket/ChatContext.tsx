@@ -12,9 +12,10 @@ interface ChatContextType {
   unreadMessages: Message[];
   loadConversations: () => void;
   loadMessages: (conversationId: string) => void;
-  sendMessage: (conversationId: string, text: string) => void;
+  sendMessage: (conversationId: string, text: string, type?: "text" | "image" | "video" | "document" | "file", fileUrl?: string) => void;
   markMessagesAsRead: (messageIds: string[], conversationId: string) => void;
   deleteMessage: (messageId: string, conversationId: string) => void;
+  forwardMessage: (messageId: string, targetConversationIds: string[]) => void;
 }
 
 // Tạo context với giá trị mặc định
@@ -29,6 +30,7 @@ const ChatContext = createContext<ChatContextType>({
   sendMessage: () => {},
   markMessagesAsRead: () => {},
   deleteMessage: () => {},
+  forwardMessage: () => {},
 });
 
 // Hook để sử dụng chat context
@@ -52,6 +54,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children, userId }) 
     sendMessage,
     markMessagesAsRead,
     deleteMessage,
+    forwardMessage,
   } = useChat(userId);
 
   return (
@@ -67,6 +70,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children, userId }) 
         sendMessage,
         markMessagesAsRead,
         deleteMessage,
+        forwardMessage,
       }}
     >
       {children}

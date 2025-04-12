@@ -35,15 +35,34 @@ export function isTokenExpired(token: string): boolean {
 async function refreshAccessToken(refreshToken: string): Promise<{accessToken: string, refreshToken?: string} | null> {
   try {
     console.log('Refreshing access token...');
+
+    // Giải mã token để lấy thông tin
+    const base64Url = refreshToken.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+
+    const decoded = JSON.parse(jsonPayload);
+    console.log('Decoded refresh token:', decoded);
+
+    // Gửi request refresh token với platform
     const response = await fetch('http://localhost:3000/auth/refresh-token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ refreshToken, platform: "web" }),
+      body: JSON.stringify({
+        refreshToken,
+        platform: "web",
+        // Thêm userId từ token để backend có thể xác minh
+        userId: decoded.id
+      }),
     });
 
     if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Refresh token error response:', errorData);
       throw new Error(`Refresh token failed with status: ${response.status}`);
     }
 
@@ -62,7 +81,7 @@ async function refreshAccessToken(refreshToken: string): Promise<{accessToken: s
 
     return {
       accessToken: data.accessToken,
-      refreshToken: data.refreshToken
+      refreshToken: data.refreshToken || refreshToken // Giữ lại token cũ nếu không có token mới
     };
   } catch (error) {
     console.error('Error refreshing token:', error);
