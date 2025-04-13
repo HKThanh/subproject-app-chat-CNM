@@ -2,6 +2,7 @@ const { Server } = require("socket.io");
 const socketController = require("../controllers/socketController");
 const authController = require("../controllers/authController");
 const redisClient = require("../services/redisClient");
+const webRTCController = require("../controllers/webRTCController");
 
 let io;
 
@@ -61,6 +62,8 @@ const initSocket = (server) => {
         socketController.handleLoadMessages(io, socket);
         socketController.handleMarkMessagesRead(socket);
         socketController.handleCheckUsersStatus(socket);
+
+        webRTCController.handleCall(io, socket);
         socket.on("disconnect", () => {
             console.log("Client disconnected: " + socket.id);
             const user = socketController.getUserBySocketId(socket.id);
