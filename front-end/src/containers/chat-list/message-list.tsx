@@ -74,11 +74,14 @@ export default function MessageList({
         // Check if there are unread messages
         const hasUnread = (conversation.unreadCount ?? 0) > 0;
         
+        // Xác định xem cuộc trò chuyện có đang được chọn không
+        const isActive = activeConversationId === conversation.idConversation;
+        
         return (
           <div
             key={conversation.idConversation}
             className={`flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200 ${
-              activeConversationId === conversation.idConversation ? "bg-blue-500" : ""
+              isActive ? "bg-blue-100 text-blue-800" : ""
             }`}
             onClick={() => onSelectConversation(conversation.idConversation)}
           >
@@ -99,14 +102,14 @@ export default function MessageList({
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex justify-between">
-                <h3 className={`${hasUnread ? 'font-bold' : 'font-medium'} text-gray-900 truncate text-sm`}>
+                <h3 className={`${hasUnread ? 'font-bold' : 'font-medium'} ${isActive ? 'text-blue-800' : 'text-gray-900'} truncate text-sm`}>
                   {conversation.otherUser?.fullname || "Người dùng"}
                 </h3>
                 <span className="text-xs text-gray-500 whitespace-nowrap">
                   {formatTime(conversation.lastChange)}
                 </span>
               </div>
-              <p className={`text-xs ${hasUnread ? 'font-semibold text-gray-700' : 'font-normal text-gray-500'} truncate`}>
+              <p className={`text-xs ${hasUnread ? 'font-semibold text-gray-700' : 'font-normal text-gray-500'} ${isActive ? 'text-blue-600' : ''} truncate`}>
                 {conversation.latestMessage?.content || "Không có tin nhắn"}
               </p>
             </div>

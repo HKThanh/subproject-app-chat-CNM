@@ -12,7 +12,9 @@ import { useEffect, useState } from "react";
 
 export default function Home() {
   const [showChatInfo, setShowChatInfo] = useState(false);
-  const [activeConversation, setActiveConversation] = useState<string | null>(null);
+  const [activeConversation, setActiveConversation] = useState<string | null>(
+    null
+  );
 
   // Lấy dữ liệu từ Socket.IO context
   const { socket, isConnected } = useSocketContext();
@@ -24,7 +26,7 @@ export default function Home() {
     loadConversations,
     loadMessages,
     sendMessage,
-    markMessagesAsRead
+    markMessagesAsRead,
   } = useChatContext();
 
   // Tải danh sách cuộc trò chuyện khi component được mount
@@ -40,6 +42,24 @@ export default function Home() {
       loadMessages(activeConversation);
     }
   }, [activeConversation, isConnected, loadMessages]);
+
+  // Thêm useEffect để đánh dấu tin nhắn đã đọc khi có tin nhắn mới trong cuộc trò chuyện đang mở
+  useEffect(() => {
+    if (activeConversation && messages[activeConversation]) {
+      // Lấy danh sách tin nhắn chưa đọc trong cuộc trò chuyện hiện tại
+      const unreadMessages = messages[activeConversation].filter(
+        msg => !msg.isRead && !msg.isOwn
+      );
+      
+      // Nếu có tin nhắn chưa đọc, đánh dấu đã đọc
+      if (unreadMessages.length > 0) {
+        const unreadMessageIds = unreadMessages.map(msg => msg.idMessage);
+        markMessagesAsRead(unreadMessageIds, activeConversation);
+        
+        console.log(`Đánh dấu ${unreadMessageIds.length} tin nhắn đã đọc trong cuộc trò chuyện đang mở`);
+      }
+    }
+  }, [activeConversation, messages, markMessagesAsRead]);
 
   // Xử lý khi chọn một cuộc trò chuyện
   const handleSelectConversation = (conversationId: string) => {
@@ -61,6 +81,7 @@ export default function Home() {
       }
     };
   }
+
   // Xử lý gửi tin nhắn
   const handleSendMessage = (text: string) => {
     if (activeConversation) {
@@ -71,8 +92,9 @@ export default function Home() {
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900">
       <div
-        className={`${showChatInfo ? "w-1/5" : "w-1/4"
-          } flex flex-col border-r border-gray-200 transition-all duration-300`}
+        className={`${
+          showChatInfo ? "w-1/5" : "w-1/4"
+        } flex flex-col border-r border-gray-200 transition-all duration-300`}
       >
         <div className="p-4">
           <SearchBar />
@@ -88,14 +110,23 @@ export default function Home() {
         </div>
       </div>
       <div
-        className={`${showChatInfo ? "w-3/5" : "w-3/4"
-          } flex flex-col border-r border-gray-200 transition-all duration-300`}
+        className={`${
+          showChatInfo ? "w-3/5" : "w-3/4"
+        } flex flex-col border-r border-gray-200 transition-all duration-300`}
       >
         <ChatDetail
           onToggleInfo={() => setShowChatInfo(!showChatInfo)}
           showChatInfo={showChatInfo}
-          activeConversation={activeConversation ? conversations.find(c => c.idConversation === activeConversation) ||null : null}
-          messages={activeConversation ? messages[activeConversation] || [] : []}
+          activeConversation={
+            activeConversation
+              ? conversations.find(
+                  (c) => c.idConversation === activeConversation
+                ) || null
+              : null
+          }
+          messages={
+            activeConversation ? messages[activeConversation] || [] : []
+          }
           onSendMessage={handleSendMessage}
           loading={loading}
         />
@@ -103,7 +134,13 @@ export default function Home() {
       {showChatInfo && (
         <div className="w-1/5 flex flex-col transition-all duration-300">
           <ChatInfo
-            activeConversation={activeConversation ? conversations.find(c => c.idConversation === activeConversation) || null : null}
+            activeConversation={
+              activeConversation
+                ? conversations.find(
+                    (c) => c.idConversation === activeConversation
+                  ) || null
+                : null
+            }
           />
         </div>
       )}
