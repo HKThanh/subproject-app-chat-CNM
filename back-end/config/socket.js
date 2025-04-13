@@ -61,6 +61,7 @@ const initSocket = (server) => {
         socketController.handleLoadMessages(io, socket);
         socketController.handleMarkMessagesRead(socket);
         socketController.handleCheckUsersStatus(socket);
+        socketController.handleUserDisconnect(socket);
         socket.on("disconnect", () => {
             console.log("Client disconnected: " + socket.id);
             const user = socketController.getUserBySocketId(socket.id);

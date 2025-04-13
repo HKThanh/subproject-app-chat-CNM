@@ -52,6 +52,8 @@ const handleUserDisconnect = (socket) => {
 
 const handleUserOffline = (socket) => {
     const user = getUserBySocketId(socket.id);
+    console.log(user)
+    console.log(user.id)
     if (user) {
         removeUser(user.id);
         // Thông báo cho các user khác về việc user này offline
@@ -768,5 +770,6 @@ module.exports = {
     handleMarkMessagesRead,
     handleLoadMessages,
     handleGetNewestMessages,
-    handleCheckUsersStatus
+    handleCheckUsersStatus,
+    handleUserDisconnect
 };
