@@ -756,6 +756,76 @@ const handleCheckUsersStatus = (socket) => {
     });
 };
 
+const handleCreateConversation = async (io, socket) => {
+    socket.on("create_conversation", async (payload) => {
+        try {
+            const { IDSender, IDReceiver } = payload;
+
+            // Kiểm tra xem conversation đã tồn tại chưa
+            let conversation = await Conversation.findOne({
+                $or: [
+                    { idSender: IDSender, idReceiver: IDReceiver },
+                    { idSender: IDReceiver, idReceiver: IDSender }
+                ]
+            });
+
+            // Nếu đã tồn tại, trả về conversation đó
+            if (conversation) {
+                socket.emit("create_conversation_response", {
+                    success: true,
+                    conversation,
+                    message: "Conversation already exists"
+                });
+                return;
+            }
+
+            // Tạo conversation mới
+            conversation = await Conversation.create({
+                idConversation: uuidv4(),
+                idSender: IDSender,
+                idReceiver: IDReceiver,
+                isGroup: false,
+                lastChange: new Date().toISOString()
+            });
+
+            // Lấy thông tin người dùng
+            const [senderInfo, receiverInfo] = await Promise.all([
+                User.findOne({ id: IDSender }).select('id fullname avatar phone status'),
+                User.findOne({ id: IDReceiver }).select('id fullname avatar phone status')
+            ]);
+
+            const conversationWithUsers = {
+                ...conversation.toObject(),
+                senderInfo,
+                receiverInfo
+            };
+
+            // Emit cho người tạo
+            socket.emit("create_conversation_response", {
+                success: true,
+                conversation: conversationWithUsers,
+                message: "Conversation created successfully"
+            });
+
+            // Emit cho người nhận nếu online
+            const receiverSocket = getUser(IDReceiver);
+            if (receiverSocket) {
+                io.to(receiverSocket.socketId).emit("new_conversation", {
+                    conversation: conversationWithUsers
+                });
+            }
+
+        } catch (error) {
+            console.error("Error creating conversation:", error);
+            socket.emit("create_conversation_response", {
+                success: false,
+                message: "Lỗi khi tạo cuộc trò chuyện",
+                error: error.message
+            });
+        }
+    });
+};
+
 module.exports = {
     handleUserOnline,
     handleLoadConversation,
@@ -771,5 +841,6 @@ module.exports = {
     handleLoadMessages,
     handleGetNewestMessages,
     handleCheckUsersStatus,
-    handleUserDisconnect
+    handleUserDisconnect,
+    handleCreateConversation
 };
