@@ -4,23 +4,15 @@ const CallLog = require("../models/CallLogModel");
 const handleCall = (io, socket) => {
     // Event socket for offer call
     socket.on("pre-offer-single", async (data) => {
-        // IDCaller = SDT người gọi
-        // IDCallee = SDT người nhận cuộc gọi
+        console.log("Received pre-offer-single:", data);
         const { IDCaller, IDCallee, callType } = data;
-
-        const callLog = new CallLog({
-            callerId: IDCaller,
-            calleeId: IDCallee,
-            callType,
-            status: "INITIATED",
-            startTime: new Date(),
-        });
-        await callLog.save();
-
         const connectedPeer = socketController.getUser(IDCallee);
         const socketIDConnectedPeer = connectedPeer?.socketId;
 
+        console.log(`Looking up callee ${IDCallee}:`, connectedPeer);
+
         if (connectedPeer) {
+            console.log(`Forwarding call to ${IDCallee} (socket: ${socketIDConnectedPeer})`);
             const data = {
                 IDCaller,
                 socketIDCaller: socket.id,
@@ -30,8 +22,9 @@ const handleCall = (io, socket) => {
             };
             io.to(socketIDConnectedPeer).emit("pre-offer-single", data);
         } else {
+            console.log(`Callee ${IDCallee} not found`);
             const data = {
-                preOfferAnswer: "CALLEE_NOT_FOUND", // Callee không online
+                preOfferAnswer: "CALLEE_NOT_FOUND",
             };
             io.to(socket.id).emit("pre-offer-single-answer", data);
         }

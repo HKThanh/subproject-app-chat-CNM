@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.IO Call Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        video { width: 300px; border: 1px solid #ccc; margin: 5px; }
+        #callStatus { margin: 10px 0; font-weight: bold; }
+        .controls { margin: 10px 0; }
+        .controls input, .controls button { margin: 5px; padding: 5px; }
+        #log { margin-top: 10px; max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Socket.IO Call Testing</h1>
+    <div class="controls">
+        <input type="text" id="userId" placeholder="Your User ID">
+        <button onclick="registerUser()">Register</button>
+    </div>
+    <div class="controls">
+        <input type="text" id="calleeId" placeholder="Callee ID (for 1:1 call)">
+        <button onclick="startCall('video')">Start Video Call</button>
+        <button onclick="startCall('voice')">Start Voice Call</button>
+    </div>
+    <div class="controls">
+        <input type="text" id="groupParticipants" placeholder="Participant IDs (comma-separated)">
+        <button onclick="startGroupCall('video')">Start Group Video Call</button>
+    </div>
+    <div class="controls">
+        <button id="endCallBtn" style="display:none" onclick="endCall()">End Call</button>
+        <button id="leaveGroupBtn" style="display:none" onclick="leaveGroupCall()">Leave Group Call</button>
+    </div>
+    <div id="callStatus">Status: Idle</div>
+    <video id="localVideo" autoplay muted></video>
+    <div id="remoteVideos"></div>
+    <div id="log">Event Log:<br></div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="client.js"></script>
+</body>
+</html>
