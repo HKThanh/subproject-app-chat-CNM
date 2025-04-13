@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { useSocketContext } from "./SocketContext";
+import throttle from 'lodash/throttle';
 
 export interface Message {
   idMessage: string;
@@ -37,13 +38,23 @@ export interface Conversation {
   idConversation: string;
   idSender: string;
   idReceiver: string;
-  lastMessage: string;
+  latestMessage: {
+    content: string;
+    dateTime: string;
+    isRead: boolean;
+    isRemove?: boolean;
+    isRecall?: boolean;
+    isReply?: boolean;
+  };
   lastChange: string;
   unreadCount?: number;
-  userInfo?: {
+  otherUser?: {
     fullname?: string;
-    avatar?: string;
+    id?: string;
+    urlavatar?: string;
     phone?: string;
+    status?: string;
+    isOnline?: boolean;
   };
 }
 
@@ -74,7 +85,7 @@ export const useChat = (userId: string) => {
     Items: Conversation[];
     LastEvaluatedKey: number;
   }) => {
-    console.log("Nhận danh sách cuộc trò chuyện:", data.Items.length);
+    console.log("Nhận danh sách cuộc trò chuyện:", data);
     setConversations(data.Items);
     setLoading(false);
   }, []);
@@ -941,6 +952,91 @@ export const useChat = (userId: string) => {
       socket.off("send_message_success", handleSendMessageSuccess);
     };
   }, [socket, isUserConnected]);
+  const userIds = useMemo(() =>
+    conversations
+      .map(conv => conv.otherUser?.id)
+      .filter((id): id is string => Boolean(id)),
+    [conversations]
+  );
+  // Xử lý trạng thái online/offline của người dùng
+  useEffect(() => {
+    if (!socket) return;
+
+    console.log('Danh sách userIds để kiểm tra trạng thái:', userIds);
+
+    // Hàm kiểm tra trạng thái cơ bản
+    const checkUsersStatusBase = () => {
+      if (userIds.length === 0) {
+        console.log('Không có userIds để kiểm tra trạng thái');
+        return;
+      }
+
+      console.log('Gửi yêu cầu kiểm tra trạng thái cho users:', userIds);
+      socket.emit('check_users_status', { userIds });
+    };
+
+    // Tạo phiên bản throttled của hàm kiểm tra trạng thái
+    const throttledCheckStatus = throttle(() => {
+      if (userIds.length === 0) {
+        console.log('Không có userIds để kiểm tra trạng thái');
+        return;
+      }
+      console.log('Gửi yêu cầu kiểm tra trạng thái cho users:', userIds);
+      socket.emit('check_users_status', { userIds });
+    }, 3000); // Chỉ gọi tối đa 1 lần trong 3 giây
+
+    // Xử lý phản hồi trạng thái từ server
+    const handleUsersStatus = (data: { statuses: Record<string, boolean> }) => {
+      console.log('Nhận trạng thái người dùng:', data.statuses);
+
+      if (!data?.statuses) {
+        console.error('Dữ liệu trạng thái không hợp lệ:', data);
+        return;
+      }
+
+      setConversations(prev => prev.map(conv => {
+        if (!conv.otherUser?.id || !data.statuses.hasOwnProperty(conv.otherUser.id)) {
+          return conv;
+        }
+
+        const isOnline = Boolean(data.statuses[conv.otherUser.id]);
+        console.log(`Cập nhật trạng thái cho user ${conv.otherUser.id}: ${isOnline}`);
+
+        return {
+          ...conv,
+          otherUser: {
+            ...conv.otherUser,
+            isOnline
+          }
+        };
+      }));
+    };
+
+    // Xử lý lỗi
+    const handleError = (error: { message: string, error: string }) => {
+      console.error('Lỗi kiểm tra trạng thái:', error);
+      setError(error.message);
+    };
+
+    // Đăng ký lắng nghe sự kiện
+    console.log("Đăng ký lắng nghe các sự kiện trạng thái người dùng");
+    socket.on('users_status', handleUsersStatus);
+    socket.on('error', handleError);
+
+    // Kiểm tra trạng thái lần đầu khi mount
+    throttledCheckStatus();
+
+    // Thiết lập interval để kiểm tra định kỳ (60 giây)
+    const intervalId = setInterval(throttledCheckStatus, 60000);
+
+    return () => {
+      console.log('Hủy đăng ký các sự kiện trạng thái người dùng');
+      socket.off('users_status', handleUsersStatus);
+      socket.off('error', handleError);
+      clearInterval(intervalId);
+      throttledCheckStatus.cancel(); // Hủy các hàm throttle đang chờ
+    };
+  }, [socket, userIds]); // Chỉ phụ thuộc vào socket và userIds
 
   return {
     conversations,

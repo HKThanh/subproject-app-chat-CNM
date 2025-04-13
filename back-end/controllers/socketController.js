@@ -45,13 +45,11 @@ const removeUser = (id) => {
 
 const getUser = (id) => {
     const user = onlineUsers.find((user) => user.id === id);
-    console.log(`Looking for user with ID ${id}:`, user || "Not found");
     return user;
 };
 
 const getUserBySocketId = (socketId) => {
     const user = onlineUsers.find((user) => user.socketId === socketId);
-    console.log(`Looking for user with socket ID ${socketId}:`, user || "Not found");
     return user;
 };
 
@@ -342,7 +340,7 @@ const handleSendMessage = async (io, socket) => {
     socket.on("send_message", async (payload) => {
         try {
             const { IDSender, IDReceiver, textMessage, type = 'text', fileUrl } = payload;
-
+            console.log("Received message:", payload);
             let conversation = await Conversation.findOne({
                 $or: [
                     { idSender: IDSender, idReceiver: IDReceiver },

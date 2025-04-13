@@ -3,6 +3,7 @@ import Image from "next/image";
 import { Conversation } from "@/socket/useChat";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
+import { useEffect } from "react";
 
 interface MessageListProps {
   conversations: Conversation[];
@@ -49,41 +50,61 @@ export default function MessageList({
       return "Không rõ";
     }
   };
+  useEffect(() => {
+    // Log thông tin về trạng thái online của tất cả các cuộc trò chuyện
+    console.log("Danh sách trạng thái online của các cuộc trò chuyện:");
+    conversations.forEach((conv, index) => {
+      console.log(`Conversation ${index}:`, {
+        id: conv.otherUser?.id || null,
+        fullname: conv.otherUser?.fullname || null,
+        isOnline: conv.otherUser?.isOnline || false
+      });
+    });
+
+    // Kiểm tra xem có bất kỳ người dùng nào online không
+    const anyUserOnline = conversations.some(conv => conv.otherUser?.isOnline === true);
+    console.log("Có người dùng online:", anyUserOnline);
+  }, [conversations]);
 
   return (
     <div className="flex-1 overflow-y-auto">
       {conversations.map((conversation) => (
         <div
           key={conversation.idConversation}
-          className={`flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200 ${
-            activeConversationId === conversation.idConversation ? "bg-blue-50" : ""
-          }`}
+          className={`flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200 ${activeConversationId === conversation.idConversation ? "bg-blue-500" : ""
+            }`}
           onClick={() => onSelectConversation(conversation.idConversation)}
         >
           <div className="relative mr-2">
             <Image
-              src={conversation.userInfo?.avatar || `https://ui-avatars.com/api/?name=${conversation.userInfo?.fullname || "User"}`}
-              alt={conversation.userInfo?.fullname || "User"}
+              src={conversation.otherUser?.urlavatar || `https://ui-avatars.com/api/?name=${conversation.otherUser?.fullname || "User"}`}
+              alt={conversation.otherUser?.fullname || "User"}
               width={40}
               height={40}
               className="rounded-full"
             />
-            <span className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 border-2 border-white rounded-full"></span>
+            {/* Thêm log để debug trạng thái online */}
+            {conversation.otherUser?.id && (console.log(`User ${conversation.otherUser?.id} isOnline: ${conversation.otherUser?.isOnline}`), null)}
+            <span
+              className={`absolute bottom-0 right-0 w-30 h-30 rounded-full border-2 border-white ${conversation.otherUser?.isOnline ? 'bg-green-500' : 'bg-green-500'
+                }`}
+              title={conversation.otherUser?.isOnline ? 'Online' : 'Offline'}
+            ></span>
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex justify-between">
               <h3 className="font-medium text-gray-900 truncate text-sm">
-                {conversation.userInfo?.fullname || "Người dùng"}
+                {conversation.otherUser?.fullname || "Người dùng"}
               </h3>
               <span className="text-xs text-gray-500 whitespace-nowrap">
                 {formatTime(conversation.lastChange)}
               </span>
             </div>
-            <p className="text-xs text-gray-500 truncate">{conversation.lastMessage}</p>
+            <p className="text-xs text-gray-500 truncate">{conversation.latestMessage?.content || "Không có tin nhắn"}</p>
           </div>
-          {conversation.unreadCount && conversation.unreadCount > 0 && (
-            <div className="ml-1 bg-blue-500 text-white text-xs rounded-full h-4 min-w-4 flex items-center justify-center px-1 text-[10px]">
-              {conversation.unreadCount > 9 ? "9+" : conversation.unreadCount}
+          {(conversation.unreadCount ?? 0) > 0 && (
+            <div className="ml-1 bg-red-500 text-white text-xs rounded-full h-4 min-w-4 flex items-center justify-center px-1 text-[12px]">
+              {(conversation.unreadCount ?? 0) > 9 ? "9+" : conversation.unreadCount ?? 0}
             </div>
           )}
         </div>

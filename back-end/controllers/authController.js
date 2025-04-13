@@ -260,10 +260,11 @@ authController.login = async (req, res, io) => {
 };
 authController.refreshToken = async (req, res) => {
     const { refreshToken, platform } = req.body;
-
+    console.log("is refreshToken>>> ");
+    
     if (!refreshToken || !platform) {
-        return res.status(400).json({ 
-            message: 'Refresh token and platform are required' 
+        return res.status(400).json({
+            message: 'Refresh token and platform are required'
         });
     }
 
@@ -275,8 +276,8 @@ authController.refreshToken = async (req, res) => {
         const user = await UserModel.findOne({ id: decoded.id });
 
         if (!user) {
-            return res.status(404).json({ 
-                message: 'User not found' 
+            return res.status(404).json({
+                message: 'User not found'
             });
         }
 
@@ -284,21 +285,44 @@ authController.refreshToken = async (req, res) => {
         const deviceKey = `${user.email}-${platform}`;
         const storedRefreshToken = await redisClient.get(`${deviceKey}-refresh`);
 
-        if (!storedRefreshToken || storedRefreshToken !== refreshToken) {
-            return res.status(403).json({ 
-                message: 'Invalid refresh token' 
+        if (!storedRefreshToken) {
+            return res.status(403).json({
+                message: 'No refresh token found for this device'
+            });
+        }
+
+        // Verify the provided token is valid by checking the decoded ID
+        try {
+            // We already verified the provided token above, now just check if IDs match
+            const storedTokenDecoded = jwt.verify(storedRefreshToken, JWT_REFRESH_SECRET);
+
+            if (storedTokenDecoded.id !== decoded.id) {
+                console.log('Token ID mismatch');
+                console.log('Stored token ID:', storedTokenDecoded.id);
+                console.log('Provided token ID:', decoded.id);
+                return res.status(403).json({
+                    message: 'Invalid refresh token'
+                });
+            }
+
+            // Log for debugging
+            console.log('Refresh token validation passed');
+        } catch (err) {
+            console.log('Error verifying stored token:', err);
+            return res.status(403).json({
+                message: 'Invalid stored refresh token'
             });
         }
 
         // Generate new tokens
-        const newToken = jwt.sign({ 
+        const newToken = jwt.sign({
             id: user.id,
-            platform: platform 
+            platform: platform
         }, JWT_SECRET, { expiresIn: '30m' });
 
-        const newRefreshToken = jwt.sign({ 
+        const newRefreshToken = jwt.sign({
             id: user.id,
-            platform: platform 
+            platform: platform
         }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
 
         // Update tokens in Redis
@@ -311,8 +335,8 @@ authController.refreshToken = async (req, res) => {
         });
 
     } catch (err) {
-        return res.status(403).json({ 
-            message: 'Invalid refresh token' 
+        return res.status(403).json({
+            message: 'Invalid refresh token'
         });
     }
 };

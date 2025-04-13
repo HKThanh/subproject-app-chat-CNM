@@ -19,8 +19,8 @@ export default function ChatHeader({
     <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
       <div className="flex items-center">
         <Image
-          src={conversation.userInfo?.avatar || `https://ui-avatars.com/api/?name=${conversation.userInfo?.fullname || "User"}`}
-          alt={conversation.userInfo?.fullname || "User"}
+          src={conversation.otherUser?.urlavatar || `https://ui-avatars.com/api/?name=${conversation.otherUser?.fullname || "User"}`}
+          alt={conversation.otherUser?.fullname || "User"}
           width={40}
           height={40}
           className="rounded-full"
@@ -28,11 +28,20 @@ export default function ChatHeader({
 
         <div className="ml-3">
           <h2 className="text-base font-medium text-gray-900">
-            {conversation.userInfo?.fullname || "Người dùng"}
+            {conversation.otherUser?.fullname || "Người dùng"}
           </h2>
           <div className="flex items-center">
-            <div className="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
-            <span className="text-xs text-gray-500">Trực tuyến</span>
+            {conversation.otherUser?.isOnline ? (
+            <div className="flex items-center">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
+              <span className="text-xs text-gray-500">Trực tuyến</span>
+            </div>
+            ):(
+              <div className="flex items-center">
+                <div className="w-2 h-2 rounded-full bg-gray-500 mr-1"></div>
+                <span className="text-xs text-gray-500">Không trực tuyến</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
