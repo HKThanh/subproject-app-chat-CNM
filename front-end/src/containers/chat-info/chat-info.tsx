@@ -31,8 +31,8 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
         <div className="relative mb-2">
           <div className="w-20 h-20 rounded-full overflow-hidden">
             <Image
-              src={activeConversation?.userInfo?.avatar || `https://ui-avatars.com/api/?name=${activeConversation?.userInfo?.fullname || "User"}`}
-              alt={activeConversation?.userInfo?.fullname || "User"}
+              src={activeConversation?.otherUser?.urlavatar || `https://ui-avatars.com/api/?name=${activeConversation?.otherUser?.fullname || "User"}`}
+              alt={activeConversation?.otherUser?.fullname || "User"}
               width={80}
               height={80}
               className="object-cover"
@@ -43,7 +43,7 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
           </button>
         </div>
         <h3 className="text-lg font-medium mb-4">
-          {activeConversation?.userInfo?.fullname || "Người dùng"}
+          {activeConversation?.otherUser?.fullname || "Người dùng"}
         </h3>
 
         {/* Action buttons */}

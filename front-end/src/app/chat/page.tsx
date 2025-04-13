@@ -7,6 +7,7 @@ import TabNavigation from "@/containers/chat-list/tab-navigation";
 import ChatDetail from "@/containers/chat-main/chat-detail";
 import { useChatContext } from "@/socket/ChatContext";
 import { useSocketContext } from "@/socket/SocketContext";
+import { useChat } from "@/socket/useChat";
 import { useEffect, useState } from "react";
 
 export default function Home() {
@@ -22,7 +23,8 @@ export default function Home() {
     error,
     loadConversations,
     loadMessages,
-    sendMessage
+    sendMessage,
+    markMessagesAsRead
   } = useChatContext();
 
   // Tải danh sách cuộc trò chuyện khi component được mount
@@ -42,8 +44,23 @@ export default function Home() {
   // Xử lý khi chọn một cuộc trò chuyện
   const handleSelectConversation = (conversationId: string) => {
     setActiveConversation(conversationId);
-  };
-
+    loadMessages(conversationId);
+    
+    // Mark messages as read when selecting a conversation
+    const conversation = conversations.find(conv => conv.idConversation === conversationId);
+    if (conversation && (conversation.unreadCount ?? 0) > 0) {
+      // Get unread messages for this conversation
+      const conversationMessages = messages[conversationId] || [];
+      const unreadMessageIds = conversationMessages
+        .filter(msg => !msg.isRead && !msg.isOwn)
+        .map(msg => msg.idMessage);
+      
+      // Mark messages as read if there are any unread messages
+      if (unreadMessageIds.length > 0) {
+        markMessagesAsRead(unreadMessageIds, conversationId);
+      }
+    };
+  }
   // Xử lý gửi tin nhắn
   const handleSendMessage = (text: string) => {
     if (activeConversation) {

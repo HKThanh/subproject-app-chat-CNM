@@ -66,49 +66,58 @@ export default function MessageList({
     console.log("Có người dùng online:", anyUserOnline);
   }, [conversations]);
 
+  // Hàm xử lý khi chọn cuộc trò chuyện
+
   return (
     <div className="flex-1 overflow-y-auto">
-      {conversations.map((conversation) => (
-        <div
-          key={conversation.idConversation}
-          className={`flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200 ${activeConversationId === conversation.idConversation ? "bg-blue-500" : ""
+      {conversations.map((conversation) => {
+        // Check if there are unread messages
+        const hasUnread = (conversation.unreadCount ?? 0) > 0;
+        
+        return (
+          <div
+            key={conversation.idConversation}
+            className={`flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200 ${
+              activeConversationId === conversation.idConversation ? "bg-blue-500" : ""
             }`}
-          onClick={() => onSelectConversation(conversation.idConversation)}
-        >
-          <div className="relative mr-2">
-            <Image
-              src={conversation.otherUser?.urlavatar || `https://ui-avatars.com/api/?name=${conversation.otherUser?.fullname || "User"}`}
-              alt={conversation.otherUser?.fullname || "User"}
-              width={40}
-              height={40}
-              className="rounded-full"
-            />
-            {/* Thêm log để debug trạng thái online */}
-            {conversation.otherUser?.id && (console.log(`User ${conversation.otherUser?.id} isOnline: ${conversation.otherUser?.isOnline}`), null)}
-            <span
-              className={`absolute bottom-0 right-0 w-30 h-30 rounded-full border-2 border-white ${conversation.otherUser?.isOnline ? 'bg-green-500' : 'bg-green-500'
+            onClick={() => onSelectConversation(conversation.idConversation)}
+          >
+            <div className="relative mr-2">
+              <Image
+                src={conversation.otherUser?.urlavatar || `https://ui-avatars.com/api/?name=${conversation.otherUser?.fullname || "User"}`}
+                alt={conversation.otherUser?.fullname || "User"}
+                width={40}
+                height={40}
+                className="rounded-full"
+              />
+              <span
+                className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${
+                  conversation.otherUser?.isOnline ? 'bg-green-500' : 'bg-gray-400'
                 }`}
-              title={conversation.otherUser?.isOnline ? 'Online' : 'Offline'}
-            ></span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex justify-between">
-              <h3 className="font-medium text-gray-900 truncate text-sm">
-                {conversation.otherUser?.fullname || "Người dùng"}
-              </h3>
-              <span className="text-xs text-gray-500 whitespace-nowrap">
-                {formatTime(conversation.lastChange)}
-              </span>
+                title={conversation.otherUser?.isOnline ? 'Online' : 'Offline'}
+              ></span>
             </div>
-            <p className="text-xs text-gray-500 truncate">{conversation.latestMessage?.content || "Không có tin nhắn"}</p>
-          </div>
-          {(conversation.unreadCount ?? 0) > 0 && (
-            <div className="ml-1 bg-red-500 text-white text-xs rounded-full h-4 min-w-4 flex items-center justify-center px-1 text-[12px]">
-              {(conversation.unreadCount ?? 0) > 9 ? "9+" : conversation.unreadCount ?? 0}
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between">
+                <h3 className={`${hasUnread ? 'font-bold' : 'font-medium'} text-gray-900 truncate text-sm`}>
+                  {conversation.otherUser?.fullname || "Người dùng"}
+                </h3>
+                <span className="text-xs text-gray-500 whitespace-nowrap">
+                  {formatTime(conversation.lastChange)}
+                </span>
+              </div>
+              <p className={`text-xs ${hasUnread ? 'font-semibold text-gray-700' : 'font-normal text-gray-500'} truncate`}>
+                {conversation.latestMessage?.content || "Không có tin nhắn"}
+              </p>
             </div>
-          )}
-        </div>
-      ))}
+            {hasUnread && (
+              <div className="ml-1 bg-red-500 text-white text-xs rounded-full h-4 min-w-4 flex items-center justify-center px-1 text-[12px]">
+                {(conversation.unreadCount ?? 0) > 9 ? "9+" : conversation.unreadCount ?? 0}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
