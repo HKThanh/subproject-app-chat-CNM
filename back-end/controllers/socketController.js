@@ -1,4 +1,4 @@
-const MessageController = require("./MessageController");
+// const MessageController = require("./MessageController");
 const MessageDetailController = require("./MessageDetailController");
 const Conversation = require("../models/ConversationModel");
 const { v4: uuidv4 } = require("uuid");
@@ -15,8 +15,8 @@ const addNewUser = (id, socketId) => {
         onlineUsers.push({ id, socketId });
 };
 
-const removeUser = (socketId) => {
-    onlineUsers = onlineUsers.filter((item) => item.socketId !== socketId);
+const removeUser = (id) => {
+    onlineUsers = onlineUsers.filter((item) => item.id !== id);
 };
 
 const getUser = (id) => {
@@ -27,6 +27,43 @@ const getUserBySocketId = (socketId) => {
     return onlineUsers.find((user) => user.socketId === socketId);
 };
 
+const handleUserDisconnect = (socket) => {
+    // Sự kiện user ngắt kết nối thông thường
+    socket.on("disconnect", () => {
+        handleUserOffline(socket);
+    });
+
+    // Sự kiện mất kết nối do lỗi mạng
+    socket.on("disconnecting", () => {
+        handleUserOffline(socket);
+    });
+
+    // Sự kiện user chủ động ngắt kết nối
+    socket.on("logout", () => {
+        handleUserOffline(socket);
+    });
+
+    // Sự kiện lỗi kết nối
+    socket.on("connect_error", (error) => {
+        console.error(`Connection error for socket ${socket.id}:`, error);
+        handleUserOffline(socket);
+    });
+};
+
+const handleUserOffline = (socket) => {
+    const user = getUserBySocketId(socket.id);
+    console.log(user)
+    
+    if (user) {
+        removeUser(user.id);
+        // Thông báo cho các user khác về việc user này offline
+        socket.broadcast.emit("user_offline", {
+            userId: user.id,
+            timestamp: new Date().toISOString()
+        });
+        console.log(`User ${user.id} is offline (socket: ${socket.id})`);
+    }
+};
 
 // Handler để quản lý user online
 const handleUserOnline = (socket) => {
@@ -93,7 +130,7 @@ const handleLoadConversation = (io, socket) => {
                     
                     // Lấy thông tin người nhận
                     const otherUser = await User.findOne({ id: otherUserId })
-                        .select('id fullname avatar phone status');
+                        .select('id fullname urlavatar phone status');
 
                     // Lấy tin nhắn mới nhất
                     const latestMessage = await MessageDetail.findOne({
@@ -312,6 +349,7 @@ const handleSendMessage = async (io, socket) => {
             const receiverOnline = getUser(IDReceiver);
             if (receiverOnline) {
                 io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers);
+                console.log("Emitting message to receiver:", IDReceiver);
             }
 
             // Emit success cho sender
@@ -693,7 +731,9 @@ const handleGetNewestMessages = async (io, socket) => {
         }
     });
 };
-
+//{
+ //   "userIds":["user002"]
+// }
 const handleCheckUsersStatus = (socket) => {
     socket.on('check_users_status', ({ userIds }) => {
         try {
@@ -717,6 +757,75 @@ const handleCheckUsersStatus = (socket) => {
         }
     });
 };
+const handleCreateConversation = async (io, socket) => {
+    socket.on("create_conversation", async (payload) => {
+        try {
+            const { IDSender, IDReceiver } = payload;
+
+            // Kiểm tra xem conversation đã tồn tại chưa
+            let conversation = await Conversation.findOne({
+                $or: [
+                    { idSender: IDSender, idReceiver: IDReceiver },
+                    { idSender: IDReceiver, idReceiver: IDSender }
+                ]
+            });
+
+            // Nếu đã tồn tại, trả về conversation đó
+            if (conversation) {
+                socket.emit("create_conversation_response", {
+                    success: true,
+                    conversation,
+                    message: "Conversation already exists"
+                });
+                return;
+            }
+
+            // Tạo conversation mới
+            conversation = await Conversation.create({
+                idConversation: uuidv4(),
+                idSender: IDSender,
+                idReceiver: IDReceiver,
+                isGroup: false,
+                lastChange: new Date().toISOString()
+            });
+
+            // Lấy thông tin người dùng
+            const [senderInfo, receiverInfo] = await Promise.all([
+                User.findOne({ id: IDSender }).select('id fullname avatar phone status'),
+                User.findOne({ id: IDReceiver }).select('id fullname avatar phone status')
+            ]);
+
+            const conversationWithUsers = {
+                ...conversation.toObject(),
+                senderInfo,
+                receiverInfo
+            };
+
+            // Emit cho người tạo
+            socket.emit("create_conversation_response", {
+                success: true,
+                conversation: conversationWithUsers,
+                message: "Conversation created successfully"
+            });
+
+            // Emit cho người nhận nếu online
+            const receiverSocket = getUser(IDReceiver);
+            if (receiverSocket) {
+                io.to(receiverSocket.socketId).emit("new_conversation", {
+                    conversation: conversationWithUsers
+                });
+            }
+
+        } catch (error) {
+            console.error("Error creating conversation:", error);
+            socket.emit("create_conversation_response", {
+                success: false,
+                message: "Lỗi khi tạo cuộc trò chuyện",
+                error: error.message
+            });
+        }
+    });
+};
 
 module.exports = {
     handleUserOnline,
@@ -732,5 +841,8 @@ module.exports = {
     handleMarkMessagesRead,
     handleLoadMessages,
     handleGetNewestMessages,
-    handleCheckUsersStatus
+    handleCheckUsersStatus,
+    handleCheckUsersStatus,
+    handleUserDisconnect,
+    handleCreateConversation
 };

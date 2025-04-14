@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import WelcomeScreen from './screens/WelcomeScreen';
@@ -8,23 +8,46 @@ import FormRegisterScreen from './screens/FormRegisterScreen';
 import OTPScreen from './screens/OTPScreen';
 import HomeScreen from './screens/HomeScreen';
 import InfoScreen from './screens/InfoScreen';
-<<<<<<< HEAD
-=======
 import DetailInfoScreen from './screens/DetailInfoScreen';
 import BioScreen from './screens/BioScreen';
 import ResetPassScreen from './screens/ResetPassScreen';
 import ChangePasswordScreen from './screens/ChangePasswordScreen';
-// Khai báo các biến toàn cục
-
->>>>>>> main
-
+import ChatScreen from './screens/ChatScreen';
+import SearchUserScreen from './screens/SearchUserScreen';
+import SocketService from './services/SocketService';
+import ForwardMessageScreen from './screens/ForwardMessageScreen';
 const Stack = createNativeStackNavigator();
 
 export default function App() {
+  const [initialRoute, setInitialRoute] = useState<string>("WelcomeScreen");
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const initializeApp = async () => {
+      // Initialize socket service and check for stored user credentials
+      const socketService = SocketService.getInstance();
+      const isAuthenticated = await socketService.initialize();
+
+      // If user is authenticated, start from HomeScreen
+      if (isAuthenticated) {
+        setInitialRoute("HomeScreen");
+      }
+
+      setIsLoading(false);
+    };
+
+    initializeApp();
+  }, []);
+
+  if (isLoading) {
+    // You could add a splash screen or loading indicator here
+    return null;
+  }
+
   return (
     <NavigationContainer>
       <Stack.Navigator 
-        initialRouteName="WelcomeScreen"
+        initialRouteName={initialRoute}
         screenOptions={{
           headerShown: false
         }}
@@ -34,17 +57,19 @@ export default function App() {
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="FormRegisterScreen" component={FormRegisterScreen} />
         <Stack.Screen name="OTPScreen" component={OTPScreen} />
-<<<<<<< HEAD
-        <Stack.Screen name="HomeScreen" component={HomeScreen} />
-        <Stack.Screen name="InfoScreen" component={InfoScreen} />
-=======
         <Stack.Screen name="ResetPassScreen" component={ResetPassScreen} />
         <Stack.Screen name="HomeScreen" component={HomeScreen} />
         <Stack.Screen name="InfoScreen" component={InfoScreen} />
         <Stack.Screen name="BioScreen" component={BioScreen} />
+        <Stack.Screen name="ChatScreen" component={ChatScreen} />
+        <Stack.Screen name="ForwardMessageScreen" component={ForwardMessageScreen} />
         <Stack.Screen name="ChangePasswordScreen" component={ChangePasswordScreen} />
         <Stack.Screen name="DetailInfoScreen" component={DetailInfoScreen} />
->>>>>>> main
+        <Stack.Screen
+          name="SearchUserScreen"
+          component={SearchUserScreen}
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

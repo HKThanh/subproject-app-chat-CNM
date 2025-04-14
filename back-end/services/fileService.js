@@ -12,6 +12,24 @@ const imageFileFilter = (req, file, cb) => {
   }
 }
 
+const chatFileFilter = (req, file, cb) => {
+  const allowedTypes = {
+    'image': ['image/jpeg','image/jpg', 'image/png', 'image/gif'],
+    'video': ['video/mp4', 'video/quicktime'],
+    'document': ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+  };
+
+  // Check if file type is in any of the allowed categories
+  const isAllowed = Object.values(allowedTypes).some(types => 
+    types.includes(file.mimetype)
+  );
+
+  if (isAllowed) {
+    cb(null, true);
+  } else {
+    cb(new Error("Chỉ chấp nhận file hình ảnh, video hoặc tài liệu"), false);
+  }
+};
 
 // func lưu file vào memory
 fileService.uploadFile = multer({
@@ -31,28 +49,18 @@ fileService.uploadAvatar = multer({
   fileFilter: imageFileFilter,
 })
 
-// Add new utility functions for chat files
-fileService.chatFileFilter = (req, file, cb) => {
-  const allowedTypes = {
-    'image': ['image/jpeg', 'image/png', 'image/gif'],
-    'video': ['video/mp4', 'video/quicktime'],
-    'document': ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-  };
-
-  const fileType = req.body.fileType;
-  if (!allowedTypes[fileType]?.includes(file.mimetype)) {
-    return cb(new Error(`Invalid file type for ${fileType}`), false);
-  }
-  cb(null, true);
-};
 
 fileService.uploadChatFile = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
+    fileSize: 1024 * 1024 * 1024, // 10MB
   },
-  fileFilter: fileService.chatFileFilter,
+  fileFilter: chatFileFilter,
 });
+
+
+// Add new utility functions for chat files
+
 
 fileService.processChatFile = async (req, res, next) => {
   if (!req.file) {

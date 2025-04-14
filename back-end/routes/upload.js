@@ -1,10 +1,14 @@
-const router = require("express").Router();
+const express = require("express");
+const router = express.Router();
+const multer = require("multer");
+const upload = multer();
+const userController = require("../controllers/userController");
+const authMiddleware = require("../middlewares/authMiddleware");
 const fileService = require("../services/fileService");
-const auth = require("../middleware/auth");
 
 // Route chỉ để upload file trong chat
 router.post("/chat-file", 
-    auth,
+    authMiddleware,
     fileService.uploadChatFile.single('file'),
     fileService.processChatFile,
     (req, res) => {
@@ -27,6 +31,3 @@ router.use((error, req, res, next) => {
 });
 
 module.exports = router;
-
-
-

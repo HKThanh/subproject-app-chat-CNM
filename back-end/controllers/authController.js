@@ -54,8 +54,8 @@ authController.verifyForPhone = async (req, res) => {
                 password: hash,
                 fullname: fullname,
                 email: email,
-  		coverPhoto: "https://static.vecteezy.com/system/resources/previews/009/292/244/non_2x/default-avatar-icon-of-social-media-user-vector.jpg",
-                urlavatar: "https://cellphones.com.vn/sforum/wp-content/uploads/2023/07/hinh-nen-zalo-23-1.jpg",
+                urlavatar: "https://static.vecteezy.com/system/resources/previews/009/292/244/non_2x/default-avatar-icon-of-social-media-user-vector.jpg",
+                coverPhoto: "https://cellphones.com.vn/sforum/wp-content/uploads/2023/07/hinh-nen-zalo-23-1.jpg",
                 isVerified: false,
             });
             // Send OTP to the user's email
@@ -199,6 +199,7 @@ authController.login = async (req, res, io) => {
                 phone: user.phone,
                 coverPhoto: user.coverPhoto,
                 ismale: user.ismale,
+                friendList: user.friendList,
                 isVerified: user.isVerified,
             }
 

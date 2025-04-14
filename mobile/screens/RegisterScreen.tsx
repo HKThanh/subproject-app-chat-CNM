@@ -10,10 +10,7 @@ import {
     Image,
     Keyboard,
     TouchableWithoutFeedback,
-<<<<<<< HEAD
-=======
     ActivityIndicator,
->>>>>>> main
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -24,9 +21,6 @@ type RegisterScreenProps = {
 
 const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
     const [phoneNumber, setPhoneNumber] = useState('');
-<<<<<<< HEAD
-    const [agreedToTerms, setAgreedToTerms] = useState(true);
-=======
     const [email, setEmail] = useState('');
     const [agreedToTerms, setAgreedToTerms] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
@@ -37,7 +31,7 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
         setErrorMessage('');
 
         try {
-            const response = await fetch('http://192.168.0.107:3000/auth/verify-email-and-phone', {
+            const response = await fetch('http://192.168.1.9:3000/auth/verify-email-and-phone', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -67,7 +61,6 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
         }
     };
 
->>>>>>> main
     return (
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <SafeAreaView style={styles.container}>
@@ -110,8 +103,6 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
                     </View>
                     <View style={styles.phoneLine} />
 
-<<<<<<< HEAD
-=======
                     {/* Email Input */}
                     <View style={styles.inputContainer}>
                         <View style={styles.divider} />
@@ -126,7 +117,6 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
                     </View>
                     <View style={styles.phoneLine} />
 
->>>>>>> main
                     {/* Terms and Conditions */}
                     <View style={styles.termsContainer}>
                         <TouchableOpacity
@@ -146,22 +136,6 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
                             Tiếp tục nghĩa là bạn đồng ý với các{' '}
                             <Text style={styles.termsLink}>điều khoản sử dụng Welo</Text>
                         </Text>
-<<<<<<< HEAD
-                    </View>
-
-                    {/* Continue Button */}
-                    <TouchableOpacity
-                        style={[styles.continueButton, !phoneNumber.trim() && styles.disabledButton]}
-                        disabled={!phoneNumber.trim()}
-                        onPress={() => navigation?.navigate('FormRegisterScreen', { phoneNumber: phoneNumber })}
-                    >
-                        <View style={styles.buttonRow}>
-                            <Text style={styles.continueText}>Tiếp tục</Text>
-                            <View style={styles.arrowContainer}>
-                                <Text>
-                                    <Ionicons name="arrow-forward" size={16} color="#FDF8F8" />
-                                </Text>
-=======
                     </View>           
                              {/* Error Message */}
                     {errorMessage ? (
@@ -187,7 +161,6 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
                                         <Ionicons name="arrow-forward" size={16} color="#FDF8F8" />
                                     </Text>
                                 )}
->>>>>>> main
                             </View>
                         </View>
                     </TouchableOpacity>
@@ -333,12 +306,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#1FAEEB',
         borderRadius: 10,
         padding: 2,
-<<<<<<< HEAD
-    },
-    disabledButton: {
-        opacity: 0.7,
-    },
-=======
     }, disabledButton: {
         opacity: 0.7,
     },
@@ -348,7 +315,6 @@ const styles = StyleSheet.create({
         marginVertical: 10,
         textAlign: 'center',
     },
->>>>>>> main
 });
 
 export default RegisterScreen;
