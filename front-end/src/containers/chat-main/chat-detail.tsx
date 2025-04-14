@@ -3,7 +3,20 @@ import ChatInput from "./chat-input";
 import ChatMessage from "./chat-message";
 import { Conversation, Message } from "@/socket/useChat";
 import { Loader2 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSocketContext } from "@/socket/SocketContext";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 interface ChatDetailProps {
   onToggleInfo: () => void;
@@ -12,6 +25,7 @@ interface ChatDetailProps {
   messages: Message[];
   onSendMessage: (text: string, type?: string, fileUrl?: string) => void;
   loading: boolean;
+  onDeleteMessage?: (messageId: string) => void;
 }
 
 export default function ChatDetail({
@@ -20,10 +34,29 @@ export default function ChatDetail({
   activeConversation,
   messages: chatMessages,
   onSendMessage,
-  loading
+  loading,
+  onDeleteMessage
 }: ChatDetailProps) {
   // Tham chiếu đến container tin nhắn để tự động cuộn xuống
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { socket } = useSocketContext();
+  
+  // State for reply functionality
+  const [replyingTo, setReplyingTo] = useState<{
+    messageId: string;
+    content: string;
+    type: string;
+  } | null>(null);
+  
+  // State for forward functionality
+  const [forwardingMessage, setForwardingMessage] = useState<string | null>(null);
+  const [showForwardDialog, setShowForwardDialog] = useState(false);
+  const [selectedConversations, setSelectedConversations] = useState<string[]>([]);
+  const [availableConversations, setAvailableConversations] = useState<Conversation[]>([]);
+  
+  // State for delete confirmation
+  const [deletingMessage, setDeletingMessage] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Tự động cuộn xuống khi có tin nhắn mới
   useEffect(() => {
@@ -31,6 +64,90 @@ export default function ChatDetail({
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatMessages]);
+  
+  // Load available conversations for forwarding
+  useEffect(() => {
+    if (showForwardDialog && socket) {
+      // This would typically come from your context or a separate API call
+      // For now, we'll use a placeholder
+      // In a real implementation, you'd fetch this from your API or context
+      socket.emit("load_conversations", { IDUser: "current_user_id" });
+      
+      // Handle the response
+      const handleConversationsResponse = (data: any) => {
+        if (data && data.Items) {
+          setAvailableConversations(data.Items);
+        }
+      };
+      
+      socket.on("load_conversations_response", handleConversationsResponse);
+      
+      return () => {
+        socket.off("load_conversations_response", handleConversationsResponse);
+      };
+    }
+  }, [showForwardDialog, socket]);
+
+  // Handle reply to message
+  const handleReply = (messageId: string, content: string, type: string) => {
+    setReplyingTo({
+      messageId,
+      content,
+      type
+    });
+    // Focus on input field would be handled in ChatInput component
+  };
+  
+  // Handle forward message
+  const handleForward = (messageId: string) => {
+    setForwardingMessage(messageId);
+    setShowForwardDialog(true);
+    setSelectedConversations([]);
+  };
+  
+  // Handle delete message
+  const handleDelete = (messageId: string) => {
+    setDeletingMessage(messageId);
+    setShowDeleteDialog(true);
+  };
+  
+  // Confirm forward message
+  const confirmForward = () => {
+    if (forwardingMessage && selectedConversations.length > 0 && socket) {
+      socket.emit("forward_message", {
+        IDMessageDetail: forwardingMessage,
+        targetConversations: selectedConversations,
+        IDSender: "current_user_id" // This should come from your auth context
+      });
+      
+      setShowForwardDialog(false);
+      setForwardingMessage(null);
+      setSelectedConversations([]);
+    }
+  };
+  
+  // Confirm delete message
+  const confirmDelete = () => {
+    if (deletingMessage && onDeleteMessage) {
+      onDeleteMessage(deletingMessage);
+      setShowDeleteDialog(false);
+      setDeletingMessage(null);
+    }
+  };
+  
+  // Toggle conversation selection for forwarding
+  const toggleConversationSelection = (conversationId: string) => {
+    setSelectedConversations(prev => 
+      prev.includes(conversationId)
+        ? prev.filter(id => id !== conversationId)
+        : [...prev, conversationId]
+    );
+  };
+  
+  // Cancel reply
+  const cancelReply = () => {
+    setReplyingTo(null);
+  };
 
   if (loading) {
     return (
@@ -102,11 +219,16 @@ export default function ChatDetail({
                 return (
                   <ChatMessage
                     key={msg.idMessage || index}
+                    messageId={msg.idMessage}
                     message={displayMessage}
+                    isRemove={msg.isRemove || false}
                     timestamp={msg.dateTime ? new Date(msg.dateTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                     isOwn={Boolean(msg.isOwn)}
                     type={msg.type}
                     fileUrl={fileUrl}
+                    onReply={handleReply}
+                    onForward={handleForward}
+                    onDelete={handleDelete}
                   />
                 );
               }).filter(Boolean)}
@@ -119,7 +241,92 @@ export default function ChatDetail({
           </div>
         )}
       </div>
-      <ChatInput onSendMessage={onSendMessage} />
+      <ChatInput 
+        onSendMessage={onSendMessage} 
+        replyingTo={replyingTo}
+        onCancelReply={cancelReply}
+      />
+      
+      {/* Forward Dialog */}
+      <Dialog open={showForwardDialog} onOpenChange={setShowForwardDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Chuyển tiếp tin nhắn</DialogTitle>
+            <DialogDescription>
+              Chọn cuộc trò chuyện để chuyển tiếp tin nhắn này
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-72 mt-4">
+            <div className="space-y-4">
+              {availableConversations.map(conv => (
+                <div key={conv.idConversation} className="flex items-center space-x-2">
+                  <Checkbox 
+                    id={conv.idConversation} 
+                    checked={selectedConversations.includes(conv.idConversation)}
+                    onCheckedChange={() => toggleConversationSelection(conv.idConversation)}
+                  />
+                  <Label htmlFor={conv.idConversation} className="flex items-center">
+                    {conv.otherUser?.urlavatar && (
+                      <div className="w-8 h-8 rounded-full overflow-hidden mr-2">
+                        <img 
+                          src={conv.otherUser.urlavatar} 
+                          alt={conv.otherUser.fullname || "User"} 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <span>{conv.otherUser?.fullname || "Người dùng"}</span>
+                  </Label>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+          <DialogFooter className="sm:justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setShowForwardDialog(false)}
+            >
+              Hủy
+            </Button>
+            <Button 
+              type="button" 
+              onClick={confirmForward}
+              disabled={selectedConversations.length === 0}
+            >
+              Chuyển tiếp
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Xóa tin nhắn</DialogTitle>
+            <DialogDescription>
+              Bạn có chắc chắn muốn xóa tin nhắn này không?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setShowDeleteDialog(false)}
+            >
+              Hủy
+            </Button>
+            <Button 
+              type="button" 
+              variant="destructive"
+              onClick={confirmDelete}
+            >
+              Xóa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

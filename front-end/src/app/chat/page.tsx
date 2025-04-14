@@ -27,6 +27,7 @@ export default function Home() {
     loadMessages,
     sendMessage,
     markMessagesAsRead,
+    deleteMessage
   } = useChatContext();
 
   // Tải danh sách cuộc trò chuyện khi component được mount
@@ -109,6 +110,26 @@ export default function Home() {
     }
   };
 
+  // Xử lý xóa tin nhắn
+  const handleDeleteMessage = (messageId: string) => {
+    if (activeConversation) {
+      // Gọi hàm xóa tin nhắn từ context
+      const conversation = conversations.find(
+        (conv) => conv.idConversation === activeConversation
+      );
+      
+      if (conversation) {
+        // Lấy thông tin người nhận từ cuộc trò chuyện
+        const receiverId = conversation.idSender === conversation.otherUser?.id 
+          ? conversation.idReceiver 
+          : conversation.idSender;
+          
+        // Gọi hàm xóa tin nhắn từ context
+        deleteMessage(messageId, activeConversation);
+      }
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900">
       <div
@@ -148,6 +169,7 @@ export default function Home() {
             activeConversation ? messages[activeConversation] || [] : []
           }
           onSendMessage={handleSendMessage}
+          onDeleteMessage={handleDeleteMessage}
           loading={loading}
         />
       </div>

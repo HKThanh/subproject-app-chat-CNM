@@ -14,9 +14,15 @@ import { useState, useRef, useEffect } from "react";
 
 interface ChatInputProps {
   onSendMessage: (text: string, type?: string, fileUrl?: string) => void;
+  replyingTo?: {
+    messageId: string;
+    content: string;
+    type: string;
+  } | null;
+  onCancelReply?: () => void;
 }
 
-export default function ChatInput({ onSendMessage }: ChatInputProps) {
+export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [accessToken, setAccessToken] = useState<string | null>(null);
 
@@ -33,7 +39,14 @@ export default function ChatInput({ onSendMessage }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
-  const API_URL = process.env.NODE_PUBLIC_API_URL;
+  const messageInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus on input when replying
+  useEffect(() => {
+    if (replyingTo && messageInputRef.current) {
+      messageInputRef.current.focus();
+    }
+  }, [replyingTo]);
 
   const handleSendMessage = () => {
     if (selectedFile) {
@@ -43,6 +56,11 @@ export default function ChatInput({ onSendMessage }: ChatInputProps) {
       // Nếu chỉ có text, gửi tin nhắn text
       onSendMessage(message.trim(), "text");
       setMessage("");
+      
+      // Clear reply state if exists
+      if (replyingTo && onCancelReply) {
+        onCancelReply();
+      }
     }
   };
 
@@ -137,6 +155,22 @@ export default function ChatInput({ onSendMessage }: ChatInputProps) {
 
   return (
     <div className="p-3 border-t border-gray-200 bg-gray-50">
+      {/* Reply bar */}
+      {replyingTo && (
+        <div className="mb-3 bg-blue-50 p-2 rounded-lg border-l-4 border-blue-500 flex items-center justify-between">
+          <div className="flex flex-col">
+            <span className="text-xs text-blue-600 font-medium">Trả lời Thơ</span>
+            <p className="text-sm text-gray-700 truncate">{replyingTo.content}</p>
+          </div>
+          <button
+            className="p-1 rounded-full hover:bg-gray-200"
+            onClick={onCancelReply}
+          >
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+      )}
+
       {/* File preview */}
       {filePreview && (
         <div className="mb-3 relative bg-gray-100 p-2 rounded-lg">
@@ -220,8 +254,9 @@ export default function ChatInput({ onSendMessage }: ChatInputProps) {
       <div className="flex items-center">
         <input
           type="text"
+          ref={messageInputRef}
           className="flex-1 bg-gray-100 rounded-full py-2 px-4 text-gray-900 placeholder-gray-500 focus:outline-none"
-          placeholder="Nhập tin nhắn..."
+          placeholder={replyingTo ? "Nhập phản hồi..." : "Nhập tin nhắn..."}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
