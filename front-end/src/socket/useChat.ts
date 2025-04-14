@@ -215,7 +215,7 @@ type ChatAction =
   // Kiểm tra userId hợp lệ
   const isValidUserId = userId && userId.trim().length > 0;
 
-  // Log userId để debug - giữ nguyên
+  // Log userId để debug 
   useEffect(() => {
     console.log("useChat hook initialized with userId:", userId);
     console.log("isValidUserId:", isValidUserId);
@@ -913,7 +913,34 @@ type ChatAction =
     },
     [socket, userId, dispatch]
   );
-
+  const recallMessage = useCallback((messageId: string, conversationId: string) => {
+    if (!socket || !isConnected || !isValidUserId) {
+      console.log("Không thể thu hồi tin nhắn: Socket chưa kết nối hoặc userId không hợp lệ");
+      return;
+    }
+  
+    console.log(`Đang thu hồi tin nhắn ${messageId} trong cuộc trò chuyện ${conversationId}`);
+    
+    // Gửi yêu cầu thu hồi tin nhắn đến server
+    socket.emit("recall_message", {
+      idMessage: messageId,
+      idConversation: conversationId,
+    });
+    
+    // Cập nhật UI ngay lập tức (optimistic update)
+    dispatch({
+      type: 'UPDATE_MESSAGE',
+      payload: {
+        conversationId,
+        messageId,
+        updates: { 
+          isRecall: true,
+          content: "Tin nhắn đã được thu hồi"
+        }
+      }
+    });
+    
+  }, [socket, isConnected, isValidUserId, userId]);
   // Chuyển tiếp tin nhắn - tối ưu dependencies
   const forwardMessage = useCallback(
     (messageId: string, targetConversationIds: string[]) => {
@@ -933,7 +960,53 @@ type ChatAction =
     },
     [socket, userId]
   );
-
+// Thêm xử lý sự kiện recall_message_success và message_recalled
+useEffect(() => {
+  if (!socket) return;
+  
+  // Xử lý phản hồi thu hồi tin nhắn thành công
+  const handleRecallMessageSuccess = (data: any) => {
+    console.log("Nhận phản hồi thu hồi tin nhắn:", data);
+    
+    if (data.success) {
+      // Cập nhật tin nhắn trong state đã được thực hiện trong optimistic update
+      console.log(`Tin nhắn ${data.messageId} đã được thu hồi thành công`);
+    } else {
+      console.error("Lỗi khi thu hồi tin nhắn:", data.error);
+      // Khôi phục trạng thái tin nhắn nếu thu hồi thất bại
+      // Cần biết conversationId để khôi phục
+      // Có thể lưu trữ một bản đồ messageId -> conversationId để sử dụng ở đây
+    }
+  };
+  
+  socket.on("recall_message_success", handleRecallMessageSuccess);
+  
+  // Xử lý thông báo tin nhắn bị thu hồi từ người khác
+  const handleMessageRecalled = (data: any) => {
+    console.log("Nhận thông báo tin nhắn bị thu hồi:", data);
+    
+    if (data.updatedMessage && data.updatedMessage.idConversation) {
+      dispatch({
+        type: 'UPDATE_MESSAGE',
+        payload: {
+          conversationId: data.updatedMessage.idConversation,
+          messageId: data.messageId,
+          updates: { 
+            isRecall: true,
+            content: "Tin nhắn đã được thu hồi"
+          }
+        }
+      });
+    }
+  };
+  
+  socket.on("message_recalled", handleMessageRecalled);
+  
+  return () => {
+    socket.off("recall_message_success", handleRecallMessageSuccess);
+    socket.off("message_recalled", handleMessageRecalled);
+  };
+}, [socket]);
   // Tối ưu hóa userIds bằng useMemo
   const userIds = useMemo(() =>
     conversations
@@ -998,6 +1071,7 @@ type ChatAction =
     loadConversations,
     loadMessages,
     sendMessage,
+    recallMessage,
     markMessagesAsRead,
     deleteMessage,
     forwardMessage,

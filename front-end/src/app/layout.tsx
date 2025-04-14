@@ -11,7 +11,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "WeChat - Ứng dụng nhắn tin trực tuyến",
+  title: "WeLo - Ứng dụng nhắn tin trực tuyến",
   description: "WeChat là ứng dụng nhắn tin trực tuyến giúp bạn kết nối và trò chuyện với bạn bè một cách nhanh chóng và tiện lợi",
   keywords: "chat app, nhắn tin trực tuyến, chat realtime, messenger",
   authors: [{ name: "WeChat Team" }],

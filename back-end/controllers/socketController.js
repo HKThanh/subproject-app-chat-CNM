@@ -431,7 +431,7 @@ const handleDeleteMessage = async (io, socket) => {
     socket.on("delete_message", async (payload) => {
         try {
             const { idMessage, idSender } = payload;
-
+console.log("Received delete_message event with payload:", payload);
             // Tìm và kiểm tra tin nhắn
             const message = await MessageDetail.findOne({ idMessage });
             if (!message) {
