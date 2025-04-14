@@ -6,7 +6,6 @@ const ConversationSchema = new Schema({
     idConversation: {
         type: String,
         required: true,
-        unique: true
     },
     idSender: {
         type: String,
@@ -50,6 +49,7 @@ const ConversationSchema = new Schema({
 });
 
 // Thêm indexes để tối ưu queries
+ConversationSchema.index({ idConversation: 1, idSender: 1 }, { unique: true });
 ConversationSchema.index({ idSender: 1, lastChange: -1 });
 ConversationSchema.index({ groupMembers: 1 });
 

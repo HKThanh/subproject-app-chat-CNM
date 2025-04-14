@@ -1,0 +1,503 @@
+// API
+
+*localhost:3000/conversation/createNewGroupConversation
+input
+{
+    "groupName": "ABC",
+    "groupMembers": ["user002", "user003"],
+    "groupAvatar": "" //Nếu không truyền thì lấy ảnh mặc định
+}
+output
+{
+    "message": "Tạo nhóm thành công",
+    "status": 1,
+    "data": [
+        {
+            "idConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+            "idSender": "user002",
+            "isGroup": true,
+            "groupName": "ABC",
+            "groupAvatar": "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp",
+            "idNewestMessage": null,
+            "isBlock": false,
+            "rules": {
+                "IDOwner": "user001",
+                "listIDCoOwner": []
+            },
+            "groupMembers": [
+                "user002",
+                "user003",
+                "user001"
+            ],
+            "listImage": [],
+            "listFile": [],
+            "lastChange": "2025-04-14T10:41:01.176",
+            "_id": "67fc83cd651800c24b70648d",
+            "createdAt": "2025-04-14T03:41:01.186Z",
+            "updatedAt": "2025-04-14T03:41:01.186Z",
+            "__v": 0
+        },
+        {
+            "idConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+            "idSender": "user003",
+            "isGroup": true,
+            "groupName": "ABC",
+            "groupAvatar": "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp",
+            "idNewestMessage": null,
+            "isBlock": false,
+            "rules": {
+                "IDOwner": "user001",
+                "listIDCoOwner": []
+            },
+            "groupMembers": [
+                "user002",
+                "user003",
+                "user001"
+            ],
+            "listImage": [],
+            "listFile": [],
+            "lastChange": "2025-04-14T10:41:01.180",
+            "_id": "67fc83cd651800c24b70648e",
+            "createdAt": "2025-04-14T03:41:01.186Z",
+            "updatedAt": "2025-04-14T03:41:01.186Z",
+            "__v": 0
+        },
+        {
+            "idConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+            "idSender": "user001",
+            "isGroup": true,
+            "groupName": "ABC",
+            "groupAvatar": "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp",
+            "idNewestMessage": null,
+            "isBlock": false,
+            "rules": {
+                "IDOwner": "user001",
+                "listIDCoOwner": []
+            },
+            "groupMembers": [
+                "user002",
+                "user003",
+                "user001"
+            ],
+            "listImage": [],
+            "listFile": [],
+            "lastChange": "2025-04-14T10:41:01.183",
+            "_id": "67fc83cd651800c24b70648f",
+            "createdAt": "2025-04-14T03:41:01.186Z",
+            "updatedAt": "2025-04-14T03:41:01.186Z",
+            "__v": 0
+        }
+    ]
+}
+
+input
+{
+    "groupName": "ABC",
+    "groupMembers": [],
+    "groupAvatar": "" //Nếu không truyền thì lấy ảnh mặc định
+}
+
+output
+{
+    "message": "phải thêm 1 thành viên để tạo nhóm",
+    "status": 0
+}
+
+input
+{
+    "groupName": "",
+    "groupMembers": [],
+    "groupAvatar": "" //Nếu không truyền thì lấy ảnh mặc định
+}
+output
+{
+    "message": "Tên nhóm không được để trống",
+    "status": -1
+}
+
+*localhost:3000/conversation/addCoOwnerToGroup
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDCoOwner": "user003"
+}
+output
+{
+    "success": true,
+    "message": "Thêm nhóm phó thành công",
+    "modifiedCount": 3
+}
+
+*localhost:3000/conversation/addCoOwnerToGroup (lần 2)
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDCoOwner": "user003"
+}
+output
+{
+    "message": "Người dùng đã là phó nhóm",
+    "status": -1
+}
+
+*localhost:3000/conversation/addCoOwnerToGroup
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDCoOwner": ""
+}
+output
+{
+    "message": "Thiếu IDConversation hoặc IDCoOwner",
+    "status": -1
+}
+
+*localhost:3000/conversation/addCoOwnerToGroup
+input
+{
+    "IDConversation": "",
+    "IDCoOwner": "user003"
+}
+output
+{
+    "message": "Thiếu IDConversation hoặc IDCoOwner",
+    "status": -1
+}
+
+*localhost:3000/conversation/addCoOwnerToGroup
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDCoOwner": "user001"
+}
+output
+{
+    "message": "Không thể thêm chính mình làm phó nhóm",
+    "status": -1
+}
+
+*localhost:3000/conversation/addCoOwnerToGroup
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDCoOwner": "user008"
+}
+output
+{
+    "message": "Người dùng không tồn tại",
+    "status": -1
+}
+
+*localhost:3000/conversation/removeCoOwnerToGroup
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDCoOwner": "user003"
+}
+output
+{
+    "success": true,
+    "message": "Thu hồi quyền nhóm phó thành công",
+    "modifiedCount": 3
+}
+
+*localhost:3000/conversation/removeCoOwnerToGroup
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDCoOwner": ""
+}
+output
+{
+    "message": "Thiếu IDConversation hoặc IDCoOwner",
+    "status": -1
+}
+
+*localhost:3000/conversation/removeCoOwnerToGroup
+input
+{
+    "IDConversation": "",
+    "IDCoOwner": "user003"
+}
+output
+{
+    "message": "Thiếu IDConversation hoặc IDCoOwner",
+    "status": -1
+}
+
+*localhost:3000/conversation/removeCoOwnerToGroup
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDCoOwner": "user001"
+}
+output
+{
+    "message": "Bạn đã là nhóm trưởng",
+    "status": -1
+}
+
+*localhost:3000/conversation/removeCoOwnerToGroup
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDCoOwner": "user008"
+}
+output
+{
+    "message": "Người dùng không tồn tại",
+    "status": -1
+}
+
+*localhost:3000/conversation/removeCoOwnerToGroup (Trường hợp người dùng không có trong danh sách nhóm phó)
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDCoOwner": "user003"
+}
+output
+{
+    "message": "Người dùng không phải là phó nhóm",
+    "status": -1
+}
+
+*localhost:3000/conversation/get-member-info
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13"
+}
+output
+{
+    "success": true,
+    "data": {
+        "totalMembers": 3,
+        "owner": {
+            "id": "user001",
+            "fullname": "John Doe",
+            "urlavatar": "https://example.com/avatars/john.jpg",
+            "email": "example@gmail.com",
+            "roles": {
+                "isOwner": true,
+                "isCoOwner": false
+            },
+            "status": "active"
+        },
+        "coOwners": [
+            {
+                "id": "user003",
+                "fullname": "Alice Johnson",
+                "urlavatar": "https://example.com/avatars/alice.jpg",
+                "email": "alice.johnson@example.com",
+                "roles": {
+                    "isOwner": false,
+                    "isCoOwner": true
+                },
+                "status": "active"
+            }
+        ],
+        "members": [
+            {
+                "id": "user002",
+                "fullname": "Jane Smith",
+                "urlavatar": "https://example.com/avatars/jane.jpg",
+                "email": "jane.smith@example.com",
+                "roles": {
+                    "isOwner": false,
+                    "isCoOwner": false
+                },
+                "status": "active"
+            }
+        ],
+        "groupInfo": {
+            "groupName": "ABC",
+            "groupAvatar": "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp",
+            "createdAt": "2025-04-14T03:41:01.186Z"
+        }
+    }
+}
+
+*localhost:3000/conversation/leave-group (đăng nhập người tạo nhóm)
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13"
+}
+output
+{
+    "message": "Người tạo nhóm không thể rời nhóm",
+    "status": -1
+}
+
+*localhost:3000/conversation/leave-group (đăng nhập bằng thành viên trong nhóm - kể cả phó nhóm)
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13"
+}
+output
+{
+    "success": true,
+    "message": "Rời nhóm thành công",
+    "modifiedCount": 2
+}
+
+*localhost:3000/conversation/leave-group (đăng nhập bằng người không có trong nhóm)
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13"
+}
+output
+{
+    "message": "Người dùng không phải là thành viên nhóm",
+    "status": -1
+}
+
+*localhost:3000/conversation/leave-group
+input
+{
+    "IDConversation": "abc"
+}
+output
+{
+    "message": "Nhóm không tồn tại",
+    "status": -1
+}
+
+*localhost:3000/conversation/leave-group
+input
+{
+}
+output
+{
+    "message": "Thiếu IDConversation",
+    "status": -1
+}
+
+*localhost:3000/conversation/get-conversation-by-user-friend
+input
+{
+    "IDReceiver": "user003"
+}
+output
+{
+    "success": false,
+    "message": "Không tìm thấy cuộc hội thoại"
+}
+
+*localhost:3000/conversation/search-group (Đăng nhập bằng user có hội thoại nhóm)
+input
+{
+    "keyword": "A"
+}
+output
+{
+    "success": true,
+    "data": [
+        {
+            "_id": "67fc83cd651800c24b70648f",
+            "idConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+            "idSender": "user001",
+            "isGroup": true,
+            "groupName": "ABC",
+            "groupAvatar": "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp",
+            "idNewestMessage": null,
+            "isBlock": false,
+            "rules": {
+                "IDOwner": "user001",
+                "listIDCoOwner": []
+            },
+            "groupMembers": [
+                "user002",
+                "user001"
+            ],
+            "listImage": [],
+            "listFile": [],
+            "lastChange": "2025-04-14T11:49:26.502",
+            "createdAt": "2025-04-14T03:41:01.186Z",
+            "updatedAt": "2025-04-14T04:49:26.509Z",
+            "__v": 0
+        }
+    ]
+}
+
+*localhost:3000/conversation/search-group
+input
+{
+    "keyword": "Team"
+}
+output
+{
+    "success": true,
+    "data": []
+}
+
+*localhost:3000/conversation/change-owner
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDNewOwner": ""
+}
+output
+{
+    "message": "Thiếu IDConversation hoặc IDNewOwner",
+    "status": -1
+}
+
+*localhost:3000/conversation/change-owner
+input
+{
+    "IDConversation": "",
+    "IDNewOwner": "user002"
+}
+output
+{
+    "message": "Thiếu IDConversation hoặc IDNewOwner",
+    "status": -1
+}
+
+*localhost:3000/conversation/change-owner
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDNewOwner": "user006"
+}
+output
+{
+    "message": "Người dùng không tồn tại trong nhóm",
+    "status": -1
+}
+
+*localhost:3000/conversation/change-owner //đăng nhập trưởng nhóm
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDNewOwner": "user001"
+}
+output
+{
+    "message": "Bạn đã là trưởng nhóm",
+    "status": -1
+}
+
+*localhost:3000/conversation/change-owner
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDNewOwner": "user002"
+}
+output
+{
+    "success": true,
+    "message": "Thay đổi trưởng nhóm thành công",
+    "modifiedCount": 2,
+    "updatedData": {
+        "IDOwner": "user002",
+        "groupName": "ABC",
+        "groupAvatar": "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp",
+        "groupMembers": [
+            "user002",
+            "user001"
+        ],
+        "rules": {
+            "IDOwner": "user002",
+            "listIDCoOwner": []
+        }
+    }
+}

@@ -86,10 +86,21 @@ const createNewMessage = async (MessageDetail) => {
   }
 }
 
+const getMessageDetailByID = async (idMessage) => { 
+    try {
+      const data = await MessageDetailModel.findOne({ idMessage: idMessage });
+      return data;
+    } catch (err) {
+      console.error(err);
+      return "Lỗi khi lấy thông tin tin nhắn";
+    }
+  }
+
 module.exports = {
   createTextMessageDetail,
   createNewImageMessage,
   createNewFileMessage,
   createNewVideoMessage,
-  createNewMessage
+  createNewMessage,
+  getMessageDetailByID,
 };

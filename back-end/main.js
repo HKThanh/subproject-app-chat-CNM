@@ -12,6 +12,7 @@ const authRoutes = require("./routes/authRoute");
 const userRoutes = require("./routes/userRoute");
 const friendRequestRoutes = require("./routes/friendRequestRoute");
 const uploadRoutes = require("./routes/upload");
+const conversationRoutes = require("./routes/conversationRoute");
 
 const corsOptions = {
     origin: ['http://localhost:3001', 'http://localhost:8082'], // Add your frontend URLs
@@ -41,6 +42,7 @@ app.use("/auth", authRoutes(io));
 app.use("/user", userRoutes(io));
 app.use("/friend-request", friendRequestRoutes);
 app.use("/upload", uploadRoutes);
+app.use("/conversation", conversationRoutes);
 
 server.listen(port, '0.0.0.0', () => {
     console.log(`Server is running on port ${port} and accessible from all network interfaces`);

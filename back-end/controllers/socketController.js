@@ -1,6 +1,7 @@
 // const MessageController = require("./MessageController");
 const MessageDetailController = require("./MessageDetailController");
 const Conversation = require("../models/ConversationModel");
+const conversationController = require("./conversationController");
 const { v4: uuidv4 } = require("uuid");
 const s3 = require("../config/connectS3");
 const MessageDetail = require("../models/MessageDetailModel");
@@ -69,7 +70,7 @@ const handleUserOnline = (socket) => {
         try {
             const { id } = payload;
             addNewUser(id, socket.id);
-            
+
             // Join user vào room với ID
             socket.join(id);
 
@@ -78,8 +79,8 @@ const handleUserOnline = (socket) => {
                 idReceiver: id,
                 isRead: false
             })
-            .sort({ dateTime: 1 })
-            .populate('idSender', 'fullname avatar'); 
+                .sort({ dateTime: 1 })
+                .populate('idSender', 'fullname avatar');
 
             if (unreadMessages.length > 0) {
                 socket.emit("unread_messages", {
@@ -116,16 +117,16 @@ const handleLoadConversation = (io, socket) => {
                     { idReceiver: IDUser }
                 ]
             })
-            .sort({ lastChange: -1 })
-            .skip(skip)
-            .limit(limit);
+                .sort({ lastChange: -1 })
+                .skip(skip)
+                .limit(limit);
 
             // Lấy thông tin người dùng và tin nhắn mới nhất cho mỗi cuộc trò chuyện
             const conversationsWithDetails = await Promise.all(
                 conversations.map(async (conv) => {
                     // Xác định ID người nhận
                     const otherUserId = conv.idSender === IDUser ? conv.idReceiver : conv.idSender;
-                    
+
                     // Lấy thông tin người nhận
                     const otherUser = await User.findOne({ id: otherUserId })
                         .select('id fullname urlavatar phone status');
@@ -134,8 +135,8 @@ const handleLoadConversation = (io, socket) => {
                     const latestMessage = await MessageDetail.findOne({
                         idConversation: conv.idConversation
                     })
-                    .sort({ dateTime: -1 })
-                    .limit(1);
+                        .sort({ dateTime: -1 })
+                        .limit(1);
 
                     // Đếm số tin nhắn chưa đọc
                     const unreadCount = await MessageDetail.countDocuments({
@@ -171,8 +172,8 @@ const handleLoadConversation = (io, socket) => {
 
         } catch (error) {
             console.error("Error loading conversations:", error);
-            socket.emit("error", { 
-                message: "Lỗi khi tải cuộc trò chuyện" 
+            socket.emit("error", {
+                message: "Lỗi khi tải cuộc trò chuyện"
             });
         }
     });
@@ -255,8 +256,8 @@ const handleSendFile = async (io, socket) => {
 
             // Get conversation to find receiver
             const conversation = await Conversation.findOne({ idConversation });
-            const idReceiver = conversation.idSender === idSender ? 
-                             conversation.idReceiver : conversation.idSender;
+            const idReceiver = conversation.idSender === idSender ?
+                conversation.idReceiver : conversation.idSender;
 
             // Emit to conversation room
             io.to(idConversation).emit("receive_message", newMessage);
@@ -277,9 +278,9 @@ const handleSendFile = async (io, socket) => {
 
         } catch (error) {
             console.error("Error sending file:", error);
-            socket.emit("error", { 
+            socket.emit("error", {
                 message: "Lỗi khi gửi file",
-                error: error.message 
+                error: error.message
             });
         }
     });
@@ -289,7 +290,7 @@ const handleSendMessage = async (io, socket) => {
     socket.on("send_message", async (payload) => {
         try {
             const { IDSender, IDReceiver, textMessage, type = 'text', fileUrl } = payload;
-            
+
             let conversation = await Conversation.findOne({
                 $or: [
                     { idSender: IDSender, idReceiver: IDReceiver },
@@ -358,9 +359,9 @@ const handleSendMessage = async (io, socket) => {
 
         } catch (error) {
             console.error("Error sending message:", error);
-            socket.emit("send_message_error", { 
+            socket.emit("send_message_error", {
                 message: "Lỗi khi gửi tin nhắn",
-                error: error.message 
+                error: error.message
             });
         }
     });
@@ -370,7 +371,7 @@ const handleDeleteMessage = async (io, socket) => {
     socket.on("delete_message", async (payload) => {
         try {
             const { idMessage, idSender } = payload;
-            
+
             // Tìm và kiểm tra tin nhắn
             const message = await MessageDetail.findOne({ idMessage });
             if (!message) {
@@ -409,7 +410,7 @@ const handleRecallMessage = async (io, socket) => {
     socket.on("recall_message", async (payload) => {
         try {
             const { idMessage, idConversation } = payload;
-            
+
             // Tìm tin nhắn và thông tin người nhận
             const message = await MessageDetail.findOne({ idMessage });
             if (!message) {
@@ -419,7 +420,7 @@ const handleRecallMessage = async (io, socket) => {
             // Cập nhật tin nhắn
             const updatedMessage = await MessageDetail.findOneAndUpdate(
                 { idMessage },
-                { 
+                {
                     isRecall: true,
                     content: "Tin nhắn đã được thu hồi"
                 },
@@ -434,8 +435,8 @@ const handleRecallMessage = async (io, socket) => {
             console.log("Conversation của tin nhắn bị thu hồi: ", conversation);
 
             // Xác định người nhận
-            const idReceiver = conversation.idSender === message.idSender ? 
-                             conversation.idReceiver : conversation.idSender;
+            const idReceiver = conversation.idSender === message.idSender ?
+                conversation.idReceiver : conversation.idSender;
 
             console.log('Sending recall notification to receiver:', idReceiver);
 
@@ -455,9 +456,9 @@ const handleRecallMessage = async (io, socket) => {
 
         } catch (error) {
             console.error("Error recalling message:", error);
-            socket.emit("error", { 
+            socket.emit("error", {
                 message: "Lỗi khi thu hồi tin nhắn",
-                error: error.message 
+                error: error.message
             });
         }
     });
@@ -467,7 +468,7 @@ const handleForwardMessage = async (io, socket) => {
     socket.on("forward_message", async (payload) => {
         try {
             const { IDMessageDetail, targetConversations, IDSender } = payload;
-            
+
             // Tìm tin nhắn gốc
             const originalMessage = await MessageDetail.findOne({ idMessage: IDMessageDetail });
             if (!originalMessage) {
@@ -484,7 +485,7 @@ const handleForwardMessage = async (io, socket) => {
                 const conversation = await Conversation.findOne({ idConversation: IDConversation });
                 if (!conversation) continue;
 
-                const IDReceiver = conversation.idSender === IDSender ? 
+                const IDReceiver = conversation.idSender === IDSender ?
                     conversation.idReceiver : conversation.idSender;
 
                 // Tạo tin nhắn mới
@@ -582,9 +583,9 @@ const handleMarkMessagesRead = (socket) => {
 
         } catch (error) {
             console.error("Error marking messages as read:", error);
-            socket.emit("error", { 
+            socket.emit("error", {
                 message: "Lỗi khi đánh dấu tin nhắn đã đọc",
-                error: error.message 
+                error: error.message
             });
         }
     });
@@ -594,7 +595,7 @@ const handleLoadMessages = (io, socket) => {
     socket.on("load_messages", async (payload) => {
         try {
             const { IDConversation, lastMessageId, firstMessageId, limit = 20 } = payload;
-            
+
             let query = {
                 idConversation: IDConversation
             };
@@ -623,7 +624,7 @@ const handleLoadMessages = (io, socket) => {
 
             // Sắp xếp lại nếu load tin nhắn mới
             if (firstMessageId) {
-                processedMessages = processedMessages.sort((a, b) => 
+                processedMessages = processedMessages.sort((a, b) =>
                     new Date(a.dateTime) - new Date(b.dateTime)
                 );
             }
@@ -655,8 +656,8 @@ const getNewestMessages = async (conversations) => {
                     // Không lấy tin nhắn đã xóa bởi người gửi
                     isDeletedBySender: { $ne: true }
                 })
-                .sort({ dateTime: -1 })
-                .limit(1);
+                    .sort({ dateTime: -1 })
+                    .limit(1);
 
                 if (!newestMessage) {
                     return {
@@ -704,7 +705,7 @@ const handleGetNewestMessages = async (io, socket) => {
 
             // Lấy thông tin các conversation
             const conversations = await Promise.all(
-                conversationIds.map(id => 
+                conversationIds.map(id =>
                     Conversation.findOne({ idConversation: id })
                 )
             );
@@ -740,7 +741,7 @@ const handleCheckUsersStatus = (socket) => {
                 console.log(`User ${userId} status:`, !!user);
                 statuses[userId] = !!user;
             });
-            
+
             console.log('Sending statuses:', statuses);
             socket.emit('users_status', { statuses });
         } catch (error) {
@@ -753,6 +754,286 @@ const handleCheckUsersStatus = (socket) => {
         }
     });
 };
+
+const handleCreatGroupConversation = (io, socket) => {
+    socket.on("create_group_conversation", async (payload) => {
+        // groupMembers phải có cả IDOwner
+        console.log(payload);
+        const { IDOwner, groupName, groupMembers } = payload;
+        const groupAvatar = payload.groupAvatar;
+
+        const dataConversation =
+            await conversationController.createNewGroupConversation(
+                IDOwner,
+                groupName,
+                groupAvatar,
+                groupMembers
+            );
+        groupMembers.forEach(async (member) => {
+            const user = getUser(member);
+            if (user?.socketId) {
+                io.to(user.socketId).emit(
+                    "new_group_conversation",
+                    "Load conversation again!"
+                );
+            }
+        });
+    });
+};
+
+const handleAddMemberToGroup = async (io, socket) => {
+    socket.on("add_member_to_group", async (payload) => {
+        const { IDConversation, IDUser, groupMembers } = payload;
+        const listConversation =
+            await conversationController.getAllConversationByID(IDConversation);
+        const list = listConversation.Items || [];
+
+        var data;
+        // list.forEach(async (conversation) => {
+        for (const conversation of list) {
+            var memberSet = new Set(conversation.groupMembers);
+            groupMembers.forEach((member) => {
+                memberSet.add(member);
+            });
+            conversation.groupMembers = Array.from(memberSet);
+            data = await conversationController.updateConversation(conversation);
+        }
+
+        for (const member of groupMembers) {
+            data.IDSender = member;
+            const ls = await conversationController.updateConversation(data);
+        }
+
+        // Update lastChange time conversation
+        // updateLastChangeConversation(IDConversation, data.IDNewestMessage); -> Code cũ
+        await updateLastChangeConversation(IDConversation, data.IDNewestMessage);
+
+        if (IDUser) {
+            const user = getUser(IDUser);
+            if (user?.socketId) {
+                io.to(user.socketId).emit(
+                    "new_group_conversation",
+                    "Load conversation again!"
+                );
+            }
+        }
+        groupMembers.forEach(async (member) => {
+            const user = getUser(member);
+            if (user?.socketId) {
+                io.to(user.socketId).emit(
+                    "new_group_conversation",
+                    "Load conversation again!"
+                );
+            }
+        });
+    });
+};
+
+const handleRemoveMemberFromGroup = async (io, socket) => {
+    socket.on("remove_member_from_group", async (payload) => {
+        const { IDConversation, IDUser, groupMembers } = payload;
+        const listConversation =
+            await conversationController.getAllConversationByID(IDConversation);
+        const list = listConversation.Items || [];
+
+        // Check permission
+        if (
+            !(
+                list[0].rules.IDOwner === IDUser ||
+                list[0].rules.listIDCoOwner.includes(IDUser)
+            )
+        ) {
+            socket.emit(
+                "message_from_server",
+                "Chỉ có trường nhóm hoặc phó nhóm mới quyền xoá thành viên!"
+            );
+            return;
+        }
+
+        let data = "";
+        for (let conversation of list) {
+            let memberSet = new Set(conversation.groupMembers);
+            groupMembers.forEach((member) => {
+                memberSet.delete(member);
+            });
+            conversation.groupMembers = Array.from(memberSet);
+
+            let CoOwner = new Set(conversation.rules.listIDCoOwner);
+            groupMembers.forEach((member) => {
+                CoOwner.delete(member);
+            });
+            conversation.rules.listIDCoOwner = Array.from(CoOwner);
+
+            for (let member of groupMembers) {
+                await conversationController.removeConversationByID(
+                    IDConversation,
+                    member
+                );
+            }
+
+            data = await conversationController.updateConversation(conversation);
+        }
+
+        await updateLastChangeConversation(IDConversation, data.IDNewestMessage);
+
+        socket.emit("new_group_conversation", "Load conversation again!");
+
+        groupMembers.forEach(async (member) => {
+            const user = getUser(member);
+            if (user?.socketId) {
+                io.to(user.socketId).emit(
+                    "new_group_conversation",
+                    "Load conversation again!"
+                );
+            }
+        });
+    });
+};
+
+const handleDeleteGroup = async (io, socket) => {
+    socket.on("delete_group", async (payload) => {
+        const { IDConversation, IDUser } = payload;
+        const listConversation =
+            await conversationController.getAllConversationByID(IDConversation);
+        const list = listConversation.Items || [];
+
+        // Check permission
+        if (list[0].rules.IDOwner !== IDUser) {
+            socket.emit("message_from_server", "Bạn không phải trưởng nhóm");
+            return;
+        }
+        const groupMembers = list[0].groupMembers;
+        console.log(groupMembers);
+        list.forEach(async (conversation) => {
+            await conversationController.removeConversationByID(
+                IDConversation,
+                conversation.IDSender
+            );
+        });
+
+        groupMembers.forEach(async (member) => {
+            const user = getUser(member);
+            if (user?.socketId) {
+                io.to(user.socketId).emit(
+                    "new_group_conversation",
+                    "Load conversation again!"
+                );
+            }
+        });
+    });
+};
+
+// Trigger load lại member của group
+const handleLoadMemberOfGroup = async (io, socket) => {
+    socket.on("load_member_of_group", (payload) => {
+        const { IDConversation } = payload;
+        io.to(IDConversation).emit(
+            "load_member_of_group_server",
+            "Load member group again"
+        );
+    });
+};
+
+const handleChangeOwnerGroup = async (io, socket) => {
+    socket.on("change_owner_group", async (payload) => {
+        const { IDConversation, IDUser, IDNewOwner } = payload;
+        const listConversation =
+            await conversationController.getAllConversationByID(IDConversation);
+        const list = listConversation.Items || [];
+
+        // Check permission
+        if (list[0].rules.IDOwner !== IDUser) {
+            socket.emit("message_from_server", "Bạn không phải trưởng nhóm!");
+            return;
+        }
+
+        for (let conversation of list) {
+            conversation.rules.IDOwner = IDNewOwner;
+            let CoOwner = new Set(conversation.rules.listIDCoOwner);
+            if (CoOwner.has(IDNewOwner)) {
+                CoOwner.delete(IDNewOwner);
+                conversation.rules.listIDCoOwner = Array.from(CoOwner);
+            }
+            const data = await conversationController.updateConversation(conversation);
+        }
+
+        io.to(IDConversation).emit("new_group_conversation", "Load conversation again!");
+    });
+};
+
+const handleSendGroupMessage = (io, socket) => {
+    socket.on("send_group_message", async (payload) => {
+        try {
+            const { IDSender, IDConversation, textMessage, type = 'text', fileUrl } = payload;
+
+            let conversation = await Conversation.findOne({
+                idConversation: payload.IDConversation,
+                idSender: IDSender,
+                isGroup: true
+            });
+
+            // Tạo message detail dựa vào type
+            let messageContent = textMessage;
+            if (type !== 'text') {
+                messageContent = fileUrl; // URL từ S3 sau khi upload
+            }
+
+            const messageDetail = await MessageDetail.create({
+                idMessage: uuidv4(),
+                idSender: IDSender,
+                idConversation: conversation.idConversation,
+                type: type, // 'text', 'image', 'video', 'document'
+                content: messageContent,
+                dateTime: new Date().toISOString(),
+                isRead: false
+            });
+
+            // Update last change của conversation
+            await updateLastChangeConversation(
+                conversation.idConversation,
+                messageDetail.idMessage
+            );
+
+            // Lấy thông tin sender và receiver
+            const senderUser = await User.findOne({ id: IDSender }).select('id fullname avatar phone status');
+
+            const messageWithUsers = {
+                ...messageDetail.toObject(),
+                senderInfo: senderUser,
+            };
+
+            // Emit message cho receiver nếu online
+            const groupMembers = conversation.groupMembers.filter(member => member !== IDSender);
+
+            groupMembers.forEach(member => {
+                const receiverOnline = getUser(member);
+                    if (receiverOnline) {
+                        io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers);
+                    }
+                    console.log("Emitting message to group members:", groupMembers);
+                }
+            );
+
+            // Emit message cho tất cả thành viên trong group
+            io.to(conversation.idConversation).emit("receive_message", messageWithUsers);
+            console.log("Emitting message to group:", conversation.idConversation);
+
+
+            // Emit success cho sender
+            socket.emit("send_message_success", {
+                conversationId: conversation.idConversation,
+                message: messageWithUsers
+            });
+
+        } catch (error) {
+            console.error("Error sending message:", error);
+            socket.emit("send_message_error", {
+                message: "Lỗi khi gửi tin nhắn",
+                error: error.message
+            });
+        }
+    });
+}
 
 module.exports = {
     handleUserOnline,
@@ -768,5 +1049,11 @@ module.exports = {
     handleMarkMessagesRead,
     handleLoadMessages,
     handleGetNewestMessages,
-    handleCheckUsersStatus
+    handleCheckUsersStatus,
+    handleCreatGroupConversation,
+    handleAddMemberToGroup,
+    handleRemoveMemberFromGroup,
+    handleDeleteGroup,
+    handleLoadMemberOfGroup,
+    handleChangeOwnerGroup,
 };

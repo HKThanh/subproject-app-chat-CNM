@@ -1,7 +1,8 @@
 const MessageBucketModel = require('../models/MessageBucketModel');
 const { v4: uuidv4 } = require('uuid');
+
 const getMessageBucketByID = async (IDMessageBucket) => {
-    const data = await MessageBucketModel.get(IDMessageBucket);
+    const data = await MessageBucketModel.findOne(IDMessageBucket);
     return data;
 }
 
