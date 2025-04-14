@@ -1,5 +1,18 @@
-import { ThumbsUp, FileText, Download, Image as ImageIcon, Video } from "lucide-react";
+import { ThumbsUp, FileText, Download, Image as ImageIcon, Video, Reply, Forward, Trash2, MoreHorizontal, MessageSquareQuote, MessageSquareX } from "lucide-react";
 import Image from "next/image";
+import { useState } from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ChatMessageProps {
   message: string;
@@ -7,6 +20,10 @@ interface ChatMessageProps {
   isOwn?: boolean;
   type?: "text" | "image" | "video" | "document" | "file";
   fileUrl?: string;
+  messageId?: string;
+  onReply?: (messageId: string, content: string, type: string) => void;
+  onForward?: (messageId: string) => void;
+  onDelete?: (messageId: string) => void;
 }
 
 export default function ChatMessage({ 
@@ -14,8 +31,13 @@ export default function ChatMessage({
   timestamp, 
   isOwn = false, 
   type = "text",
-  fileUrl
+  fileUrl,
+  messageId = "",
+  onReply,
+  onForward,
+  onDelete
 }: ChatMessageProps) {
+  const [isHovered, setIsHovered] = useState(false);
   
   // Render content based on message type
   const renderContent = () => {
@@ -83,13 +105,13 @@ export default function ChatMessage({
         
         return (
           <div className="flex flex-col w-full">
-            <div className={`flex items-center rounded-md p-2 ${isOwn ? 'bg-blue-400' : 'bg-gray-200'}`}>
-              <FileText className={`w-8 h-8 mr-2 text-gray-700`} />
+            <div className={`flex items-center rounded-md p-2 ${isOwn ? 'bg-blue-100' : 'bg-gray-200'}`}>
+              <FileText className={`w-8 h-8 mr-2 ${isOwn ? 'text-blue-500' : 'text-gray-700'}`} />
               <div className="flex-1 overflow-hidden">
-                <p className={`text-sm font-medium truncate text-gray-800`}>
+                <p className={`text-sm font-medium truncate ${isOwn ? 'text-blue-800' : 'text-gray-800'}`}>
                   {fileName}
                 </p>
-                <p className={"text-xs text-gray-600"}>
+                <p className={`text-xs ${isOwn ? 'text-blue-600' : 'text-gray-600'}`}>
                   Đã gửi một tệp đính kèm
                 </p>
               </div>
@@ -100,7 +122,7 @@ export default function ChatMessage({
                 className={`ml-2 p-1 rounded-full ${isOwn ? 'bg-blue-200 hover:bg-blue-300' : 'bg-gray-300 hover:bg-gray-400'}`}
                 download
               >
-                <Download className={`w-5 h-5 text-gray-700`} />
+                <Download className={`w-5 h-5 ${isOwn ? 'text-blue-700' : 'text-gray-700'}`} />
               </a>
             </div>
           </div>
@@ -115,10 +137,73 @@ export default function ChatMessage({
     }
   };
 
+  // Message action buttons that appear on hover
+  const renderActionButtons = () => {
+    if (!isHovered) return null;
+    
+    return (
+      <div className={`absolute ${isOwn ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'} top-1/2 -translate-y-1/2 flex ${isOwn ? 'flex-row-reverse' : 'flex-row'} gap-1`}>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button 
+                onClick={() => onReply && onReply(messageId, message, type)}
+                className="p-1.5 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors"
+              >
+                <MessageSquareQuote className="w-4 h-4 text-gray-600" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Phản hồi</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button 
+                onClick={() => onForward && onForward(messageId)}
+                className="p-1.5 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors"
+              >
+                <Forward className="w-4 h-4 text-gray-600" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Chuyển tiếp</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        {isOwn && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button 
+                  onClick={() => onDelete && onDelete(messageId)}
+                  className="p-1.5 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors"
+                >
+                  <MessageSquareX className="w-4 h-4 text-red-500" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Xóa</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className={`mb-4 ${isOwn ? 'flex justify-end' : ''}`}>
+    <div 
+      className={`mb-4 ${isOwn ? 'flex justify-end' : ''}`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <div
-        className={`rounded-lg p-3 ${
+        className={`relative rounded-lg p-3 ${
           type !== 'text' 
             ? 'bg-transparent'
             : isOwn
@@ -139,7 +224,11 @@ export default function ChatMessage({
             {timestamp !== "Invalid Date" ? timestamp : "Bây giờ"}
           </div>
         )}
+        
+        {/* Action buttons */}
+        {renderActionButtons()}
       </div>
+      
       {!isOwn && (
         <div className="flex items-center mt-1 ml-2">
           <button className="p-1 rounded-full hover:bg-gray-200">

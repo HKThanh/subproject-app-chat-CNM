@@ -792,15 +792,12 @@ const handleGetNewestMessages = async (io, socket) => {
 const handleCheckUsersStatus = (socket) => {
     socket.on('check_users_status', ({ userIds }) => {
         try {
-            console.log('Checking status for users:', userIds);
             const statuses = {};
             userIds.forEach(userId => {
                 const user = getUser(userId);
-                console.log(`User ${userId} status:`, !!user);
                 statuses[userId] = !!user;
             });
 
-            console.log('Sending statuses:', statuses);
             socket.emit('users_status', { statuses });
         } catch (error) {
             console.error('Error checking users status:', error);
