@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Search } from "lucide-react";
+import { getAuthToken } from "@/utils/auth-utils";
 
 interface SearchBarProps {
   onSelectConversation: (id: string) => void;
@@ -23,10 +24,12 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
     setLoading(true);
 
     try {
+      const token = await getAuthToken();
       const response = await fetch("http://localhost:3000/user/search", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ text: value }),
       });
