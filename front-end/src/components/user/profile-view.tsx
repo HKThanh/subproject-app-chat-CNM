@@ -24,9 +24,6 @@ export default function ProfileView({ profile, onEdit, onViewImage }: ProfileVie
       {/* Header with close button */}
       <div className="flex items-center justify-between p-4 border-b">
         <h2 className="text-lg font-semibold">Thông tin tài khoản</h2>
-        <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
-          <X className="h-4 w-4" />
-        </Button>
       </div>
 
       {/* Cover photo */}
