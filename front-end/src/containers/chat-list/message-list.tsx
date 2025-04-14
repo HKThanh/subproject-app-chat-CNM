@@ -1,9 +1,12 @@
+"use client";
 import { MessageSquare, Phone, ImageIcon, Loader2, Clock } from "lucide-react";
 import Image from "next/image";
 import { Conversation } from "@/socket/useChat";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
 import { useEffect } from "react";
+import useUserStore from "@/stores/useUserStoree";
+import { Avatar } from "@/components/ui/avatar";
 
 interface MessageListProps {
   conversations: Conversation[];
@@ -18,6 +21,44 @@ export default function MessageList({
   onSelectConversation,
   loading
 }: MessageListProps) {
+  useEffect(() => {
+    // Log thông tin về trạng thái online của tất cả các cuộc trò chuyện
+    console.log("Danh sách trạng thái online của các cuộc trò chuyện:");
+    conversations.forEach((conv, index) => {
+      console.log(`Conversation ${index}:`, {
+        id: conv.otherUser?.id || null,
+        fullname: conv.otherUser?.fullname || null,
+        isOnline: conv.otherUser?.isOnline || false,
+        latestMessage: conv.latestMessage || null,
+      });
+    });
+    
+    // Kiểm tra xem có bất kỳ người dùng nào online không
+    const anyUserOnline = conversations.some(conv => conv.otherUser?.isOnline === true);
+    console.log("Có người dùng online:", anyUserOnline);
+  }, [conversations]);
+  const user = useUserStore((state) => state.user)
+  // Format message preview based on message type and sender
+  const formatMessagePreview = (message: any) => {
+    if (!message) return "Không có tin nhắn";
+    console.log("check message>>>> ", message);
+    
+    // Add prefix for messages sent by the current user
+    const prefix = message.idSender===user?.id? "Bạn: " : "";
+    
+    // Format based on message type
+    if (message.type === "image") {
+      return `${prefix}Đã gửi một hình ảnh`;
+    } else if (message.type === "video") {
+      return `${prefix}Đã gửi một video`;
+    } else if (message.type === "document" || message.type === "file") {
+      return `${prefix}Đã gửi một tệp đính kèm`;
+    } else {
+      // For text messages, show the content with prefix
+      return `${prefix}${message.content || ""}`;
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -50,21 +91,6 @@ export default function MessageList({
       return "Không rõ";
     }
   };
-  useEffect(() => {
-    // Log thông tin về trạng thái online của tất cả các cuộc trò chuyện
-    console.log("Danh sách trạng thái online của các cuộc trò chuyện:");
-    conversations.forEach((conv, index) => {
-      console.log(`Conversation ${index}:`, {
-        id: conv.otherUser?.id || null,
-        fullname: conv.otherUser?.fullname || null,
-        isOnline: conv.otherUser?.isOnline || false
-      });
-    });
-
-    // Kiểm tra xem có bất kỳ người dùng nào online không
-    const anyUserOnline = conversations.some(conv => conv.otherUser?.isOnline === true);
-    console.log("Có người dùng online:", anyUserOnline);
-  }, [conversations]);
 
   // Hàm xử lý khi chọn cuộc trò chuyện
 
@@ -85,21 +111,17 @@ export default function MessageList({
             }`}
             onClick={() => onSelectConversation(conversation.idConversation)}
           >
-            <div className="relative mr-2">
-              <Image
+            <div className="relative">
+                <Avatar className="h-10 w-10 border-2 border-white cursor-pointer hover:opacity-90 transition-opacity">
+                  <img 
                 src={conversation.otherUser?.urlavatar || `https://ui-avatars.com/api/?name=${conversation.otherUser?.fullname || "User"}`}
-                alt={conversation.otherUser?.fullname || "User"}
-                width={40}
-                height={40}
-                className="rounded-full"
-              />
-              <span
-                className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${
-                  conversation.otherUser?.isOnline ? 'bg-green-500' : 'bg-gray-400'
-                }`}
-                title={conversation.otherUser?.isOnline ? 'Online' : 'Offline'}
-              ></span>
-            </div>
+                alt="Avatar người dùng" />
+                </Avatar>
+                <span
+                  className={`${ conversation.otherUser?.isOnline ?'absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-blue-600 bg-green-500' : 'bg-gray-400' }`}
+                  title="Online"
+                ></span>
+              </div>
             <div className="flex-1 min-w-0">
               <div className="flex justify-between">
                 <h3 className={`${hasUnread ? 'font-bold' : 'font-medium'} ${isActive ? 'text-blue-800' : 'text-gray-900'} truncate text-sm`}>
@@ -109,8 +131,8 @@ export default function MessageList({
                   {formatTime(conversation.lastChange)}
                 </span>
               </div>
-              <p className={`text-xs ${hasUnread ? 'font-semibold text-gray-700' : 'font-normal text-gray-500'} ${isActive ? 'text-blue-600' : ''} truncate`}>
-                {conversation.latestMessage?.content || "Không có tin nhắn"}
+              <p className={`text-xs ${hasUnread ? 'font-semibold text-gray-900' : 'font-normal text-gray-500'} ${isActive ? 'text-blue-600' : ''} truncate`}>
+                {formatMessagePreview(conversation.latestMessage)}
               </p>
             </div>
             {hasUnread && (
