@@ -10,7 +10,8 @@ const userRoutes = (io) => {
 
   router.get("/get-all", userController.getAllUsers);
   router.get("/", authMiddleware, userController.getUser);
-  router.get("/friend-requests", authMiddleware, userController.getAllFriendRequests);
+  router.get("/get-received-friend-requests", authMiddleware, userController.getAllReceivedFriendRequests);
+  router.get("/get-sended-friend-requests", authMiddleware, userController.getAllSendedFriendRequest);
 
   router.put(
     "/avatar/upload",
@@ -26,10 +27,10 @@ const userRoutes = (io) => {
 
   router.post("/handle", authMiddleware, (req, res) => userController.handleFriendRequest(req, res, io));
 
-  router.post("/cancel/:receiverId", authMiddleware, (req, res) => userController.cancelFriendRequest(req, res, io));
+  router.post("/cancel/:requestId", authMiddleware, (req, res) => userController.cancelFriendRequest(req, res, io));
 
   router.put("/bio", authMiddleware, userController.updateBio);
-  
+
   router.put(
     "/cover/upload",
     authMiddleware,
@@ -43,6 +44,13 @@ const userRoutes = (io) => {
   router.post("/search", authMiddleware, userController.findUserByText);
 
   router.get("/:id", authMiddleware, userController.getUserById);
+
+  // Block user
+  router.post('/blocked/block', authMiddleware, (req, res) => userController.blockUser(req, res, io));
+
+  router.post('/blocked/unblock', authMiddleware, (req, res) => userController.unblockUser(req, res, io));
+
+  router.get('/blocked/get-blocked', authMiddleware, (req, res) => userController.getBlockedUsers(req, res));
 
   return router;
 }

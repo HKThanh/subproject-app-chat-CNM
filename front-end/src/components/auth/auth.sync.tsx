@@ -14,11 +14,9 @@ export default function AuthSync() {
     if (status === "loading") return;
 
     if (!session?.user) {
-      console.log("No valid session found, clearing user store");
       clearUser();
       return;
     }
-    console.log("check status >>> ", status);
     
     if (status === "authenticated" && session?.user) {
       const user: IUser = {
@@ -34,7 +32,6 @@ export default function AuthSync() {
         ismale: session.user.ismale,
       };
 
-      console.log("Syncing user to store:", user);
       setUser(user, session.accessToken);
       setTokens(session.accessToken, session.refreshToken)
     }

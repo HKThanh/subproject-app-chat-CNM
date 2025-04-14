@@ -25,7 +25,7 @@ export async function loginUser(email: string, password: string) {
       error: false,
       success: true,
       message: "Đăng nhập thành công!",
-      redirectTo: "/chat",
+      redirectTo: "/",
       status: 200,
     };
   } catch (error: any) {
