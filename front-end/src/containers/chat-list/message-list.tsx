@@ -19,7 +19,7 @@ export default function MessageList({
   conversations,
   activeConversationId,
   onSelectConversation,
-  loading
+  loading,
 }: MessageListProps) {
   useEffect(() => {
     // Log thông tin về trạng thái online của tất cả các cuộc trò chuyện
@@ -32,12 +32,14 @@ export default function MessageList({
         latestMessage: conv.latestMessage || null,
       });
     });
-    
+
     // Kiểm tra xem có bất kỳ người dùng nào online không
-    const anyUserOnline = conversations.some(conv => conv.otherUser?.isOnline === true);
+    const anyUserOnline = conversations.some(
+      (conv) => conv.otherUser?.isOnline === true
+    );
     console.log("Có người dùng online:", anyUserOnline);
   }, [conversations]);
-  const user = useUserStore((state) => state.user)
+  const user = useUserStore((state) => state.user);
   // Format message preview based on message type and sender
   const formatMessagePreview = (message: any) => {
     if (!message) return "Không có tin nhắn";
@@ -69,7 +71,9 @@ export default function MessageList({
       <div className="flex-1 flex items-center justify-center">
         <div className="flex flex-col items-center">
           <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
-          <p className="mt-2 text-sm text-gray-500">Đang tải cuộc trò chuyện...</p>
+          <p className="mt-2 text-sm text-gray-500">
+            Đang tải cuộc trò chuyện...
+          </p>
         </div>
       </div>
     );
@@ -104,10 +108,10 @@ export default function MessageList({
       {conversations.map((conversation) => {
         // Check if there are unread messages
         const hasUnread = (conversation.unreadCount ?? 0) > 0;
-        
+
         // Xác định xem cuộc trò chuyện có đang được chọn không
         const isActive = activeConversationId === conversation.idConversation;
-        
+
         return (
           <div
             key={conversation.idConversation}
@@ -117,32 +121,54 @@ export default function MessageList({
             onClick={() => onSelectConversation(conversation.idConversation)}
           >
             <div className="relative">
-                <Avatar className="h-10 w-10 border-2 border-white cursor-pointer hover:opacity-90 transition-opacity">
-                  <img 
-                src={conversation.otherUser?.urlavatar || `https://ui-avatars.com/api/?name=${conversation.otherUser?.fullname || "User"}`}
-                alt="Avatar người dùng" />
-                </Avatar>
-                <span
-                  className={`${ conversation.otherUser?.isOnline ?'absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-blue-600 bg-green-500' : 'bg-gray-400' }`}
-                  title="Online"
-                ></span>
-              </div>
+              <Avatar className="h-10 w-10 border-2 border-white cursor-pointer hover:opacity-90 transition-opacity">
+                <img
+                  src={
+                    conversation.otherUser?.urlavatar ||
+                    `https://ui-avatars.com/api/?name=${
+                      conversation.otherUser?.fullname || "User"
+                    }`
+                  }
+                  alt="Avatar người dùng"
+                />
+              </Avatar>
+              <span
+                className={`${
+                  conversation.otherUser?.isOnline
+                    ? "absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-blue-600 bg-green-500"
+                    : "bg-gray-400"
+                }`}
+                title="Online"
+              ></span>
+            </div>
             <div className="flex-1 min-w-0">
               <div className="flex justify-between">
-                <h3 className={`${hasUnread ? 'font-bold' : 'font-medium'} ${isActive ? 'text-blue-800' : 'text-gray-900'} truncate text-sm`}>
+                <h3
+                  className={`${hasUnread ? "font-bold" : "font-medium"} ${
+                    isActive ? "text-blue-800" : "text-gray-900"
+                  } truncate text-sm`}
+                >
                   {conversation.otherUser?.fullname || "Người dùng"}
                 </h3>
                 <span className="text-xs text-gray-500 whitespace-nowrap">
                   {formatTime(conversation.lastChange)}
                 </span>
               </div>
-              <p className={`text-xs ${hasUnread ? 'font-semibold text-gray-900' : 'font-normal text-gray-500'} ${isActive ? 'text-blue-600' : ''} truncate`}>
+              <p
+                className={`text-xs ${
+                  hasUnread
+                    ? "font-semibold text-gray-900"
+                    : "font-normal text-gray-500"
+                } ${isActive ? "text-blue-600" : ""} truncate`}
+              >
                 {formatMessagePreview(conversation.latestMessage)}
               </p>
             </div>
             {hasUnread && (
               <div className="ml-1 bg-red-500 text-white text-xs rounded-full h-4 min-w-4 flex items-center justify-center px-1 text-[12px]">
-                {(conversation.unreadCount ?? 0) > 9 ? "9+" : conversation.unreadCount ?? 0}
+                {(conversation.unreadCount ?? 0) > 9
+                  ? "9+"
+                  : conversation.unreadCount ?? 0}
               </div>
             )}
           </div>
