@@ -12,7 +12,7 @@ const { data: session } = useSession();
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
         <div className="flex items-center gap-2">
           <span className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 text-transparent bg-clip-text">
-            WeChat
+            WeLo
           </span>
           <RotatingText
             texts={[
