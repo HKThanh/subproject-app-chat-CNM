@@ -27,7 +27,8 @@ export default function Home() {
     loadMessages,
     sendMessage,
     markMessagesAsRead,
-    deleteMessage
+    deleteMessage,
+    recallMessage
   } = useChatContext();
 
   // Tải danh sách cuộc trò chuyện khi component được mount
@@ -130,6 +131,14 @@ export default function Home() {
     }
   };
 
+  // Xử lý thu hồi tin nhắn
+  const handleRecallMessage = (messageId: string) => {
+    if (activeConversation) {
+      // Gọi hàm thu hồi tin nhắn từ context
+      recallMessage(messageId, activeConversation);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900">
       <div
@@ -170,6 +179,7 @@ export default function Home() {
           }
           onSendMessage={handleSendMessage}
           onDeleteMessage={handleDeleteMessage}
+          onRecallMessage={handleRecallMessage}
           loading={loading}
         />
       </div>

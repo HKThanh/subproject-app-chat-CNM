@@ -10,6 +10,7 @@ import {
   MoreHorizontal,
   MessageSquareQuote,
   MessageSquareX,
+  RotateCcw
 } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
@@ -34,9 +35,11 @@ interface ChatMessageProps {
   fileUrl?: string;
   messageId?: string;
   isRemove: boolean;
+  isRecall?: boolean;
   onReply?: (messageId: string, content: string, type: string) => void;
   onForward?: (messageId: string) => void;
   onDelete?: (messageId: string) => void;
+  onRecallMessage?: (messageId: string) => void; // Add this prop
 }
 
 export default function ChatMessage({
@@ -46,10 +49,12 @@ export default function ChatMessage({
   type = "text",
   fileUrl,
   isRemove,
+  isRecall,
   messageId = "",
   onReply,
   onForward,
   onDelete,
+  onRecallMessage
 }: ChatMessageProps) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -57,6 +62,8 @@ export default function ChatMessage({
   const renderContent = () => {
     if (isRemove && isOwn) {
       return <div className="italic text-gray-500">Tin nhắn đã bị xóa</div>;
+    } else if (isRecall) {
+      return <div className="italic text-gray-500">Tin nhắn đã được thu hồi</div>;
     } else {
       switch (type) {
         case "image":
@@ -163,7 +170,8 @@ export default function ChatMessage({
 
   // Message action buttons that appear on hover
   const renderActionButtons = () => {
-    if (!isHovered) return null;
+    // Don't show any buttons if not hovered or message is recalled/removed
+    if (!isHovered || isRecall || (isRemove && isOwn)) return null;
 
     return (
       <div
@@ -204,21 +212,39 @@ export default function ChatMessage({
         </TooltipProvider>
 
         {isOwn && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => onDelete && onDelete(messageId)}
-                  className="p-1.5 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors"
-                >
-                  <MessageSquareX className="w-4 h-4 text-red-500" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Xóa</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => onRecallMessage && onRecallMessage(messageId)}
+                    className="p-1.5 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors"
+                  >
+                    <RotateCcw className="w-4 h-4 text-blue-500" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Thu hồi</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => onDelete && onDelete(messageId)}
+                    className="p-1.5 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors"
+                  >
+                    <MessageSquareX className="w-4 h-4 text-red-500" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Xóa</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </>
         )}
       </div>
     );

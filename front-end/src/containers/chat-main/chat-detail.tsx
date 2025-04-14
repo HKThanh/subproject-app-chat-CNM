@@ -24,8 +24,9 @@ interface ChatDetailProps {
   activeConversation: Conversation | null;
   messages: Message[];
   onSendMessage: (text: string, type?: string, fileUrl?: string) => void;
-  loading: boolean;
   onDeleteMessage?: (messageId: string) => void;
+  onRecallMessage?: (messageId: string) => void; // Add this prop
+  loading: boolean;
 }
 
 export default function ChatDetail({
@@ -34,8 +35,9 @@ export default function ChatDetail({
   activeConversation,
   messages: chatMessages,
   onSendMessage,
-  loading,
-  onDeleteMessage
+  onDeleteMessage,
+  onRecallMessage,
+  loading
 }: ChatDetailProps) {
   // Tham chiếu đến container tin nhắn để tự động cuộn xuống
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -228,6 +230,7 @@ export default function ChatDetail({
                     fileUrl={fileUrl}
                     onReply={handleReply}
                     onForward={handleForward}
+                    onRecallMessage={onRecallMessage}
                     onDelete={handleDelete}
                   />
                 );
@@ -302,18 +305,15 @@ export default function ChatDetail({
       
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Xóa tin nhắn</DialogTitle>
-            <DialogDescription>
-              Bạn có chắc chắn muốn xóa tin nhắn này không?
-            </DialogDescription>
+        <DialogContent className="sm:max-w-[325px]">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-base">Xóa tin nhắn?</DialogTitle>
           </DialogHeader>
-          <DialogFooter className="sm:justify-end">
-            <Button
-              type="button"
-              variant="secondary"
+          <DialogFooter className="sm:justify-end gap-2 mt-2">
+            <Button              type="button"
+              variant="ghost"
               onClick={() => setShowDeleteDialog(false)}
+              className="h-8"
             >
               Hủy
             </Button>
@@ -321,6 +321,7 @@ export default function ChatDetail({
               type="button" 
               variant="destructive"
               onClick={confirmDelete}
+              className="h-8"
             >
               Xóa
             </Button>

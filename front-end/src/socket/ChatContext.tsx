@@ -16,6 +16,7 @@ interface ChatContextType {
   markMessagesAsRead: (messageIds: string[], conversationId: string) => void;
   deleteMessage: (messageId: string, conversationId: string) => void;
   forwardMessage: (messageId: string, targetConversationIds: string[]) => void;
+  recallMessage: (messageId: string, conversationId: string) => void;
 }
 
 // Tạo context với giá trị mặc định
@@ -31,6 +32,7 @@ const ChatContext = createContext<ChatContextType>({
   markMessagesAsRead: () => {},
   deleteMessage: () => {},
   forwardMessage: () => {},
+  recallMessage: () => {},
 });
 
 // Hook để sử dụng chat context
@@ -55,6 +57,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children, userId }) 
     markMessagesAsRead,
     deleteMessage,
     forwardMessage,
+    recallMessage,
   } = useChat(userId);
 
   return (
@@ -71,6 +74,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children, userId }) 
         markMessagesAsRead,
         deleteMessage,
         forwardMessage,
+        recallMessage,
       }}
     >
       {children}
