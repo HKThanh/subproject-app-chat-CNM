@@ -15,7 +15,8 @@ interface ChatContextType {
   sendMessage: (conversationId: string, text: string, type?: "text" | "image" | "video" | "document" | "file", fileUrl?: string) => void;
   markMessagesAsRead: (messageIds: string[], conversationId: string) => void;
   deleteMessage: (messageId: string, conversationId: string) => void;
-  forwardMessage: (messageId: string, targetConversationIds: string[]) => void;
+  // Add to ChatContextType
+  forwardMessage: (messageId: string, targetConversations: string[]) => void;
   recallMessage: (messageId: string, conversationId: string) => void;
 }
 

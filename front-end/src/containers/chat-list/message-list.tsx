@@ -41,21 +41,26 @@ export default function MessageList({
   // Format message preview based on message type and sender
   const formatMessagePreview = (message: any) => {
     if (!message) return "Không có tin nhắn";
-    console.log("check message>>>> ", message);
     
     // Add prefix for messages sent by the current user
-    const prefix = message.idSender===user?.id? "Bạn: " : "";
+    const prefix = message.idSender === user?.id ? "Bạn: " : "";
     
-    // Format based on message type
-    if (message.type === "image") {
-      return `${prefix}Đã gửi một hình ảnh`;
-    } else if (message.type === "video") {
-      return `${prefix}Đã gửi một video`;
-    } else if (message.type === "document" || message.type === "file") {
-      return `${prefix}Đã gửi một tệp đính kèm`;
-    } else {
-      // For text messages, show the content with prefix
-      return `${prefix}${message.content || ""}`;
+    // If message has a preview property (for non-text messages), use it
+    if (message.preview) {
+      return `${prefix}${message.preview}`;
+    }
+    
+    // Otherwise format based on message type
+    switch (message.type) {
+      case "image":
+        return `${prefix}Đã gửi một hình ảnh`;
+      case "video":
+        return `${prefix}Đã gửi một video`;
+      case "document":
+      case "file":
+        return `${prefix}Đã gửi một tệp đính kèm`;
+      default:
+        return `${prefix}${message.content || ""}`;
     }
   };
 

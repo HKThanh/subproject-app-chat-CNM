@@ -128,14 +128,14 @@ export default function ChatMessage({
           }
 
           return (
-            <div className="flex flex-col w-full">
+            <div className="flex flex-col w-full ">
               <div className={`flex items-center rounded-md p-2  bg-gray-200`}>
-                <FileText className={`w-8 h-8 mr-2 'text-gray-700 m`} />
+                <FileText className={`w-8 h-8 mr-2 text-gray-700`} />
                 <div className="flex-1 overflow-hidden">
                   <p className={`text-sm font-medium truncate text-gray-800`}>
                     {fileName}
                   </p>
-                  <p className={`text-xs text-gray-600`}>
+                  <p className="text-xs text-gray-600">
                     Đã gửi một tệp đính kèm
                   </p>
                 </div>
@@ -143,17 +143,12 @@ export default function ChatMessage({
                   href={fileUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`ml-2 p-1 rounded-full ${
-                    isOwn
-                      ? "bg-blue-200 hover:bg-blue-300"
-                      : "bg-gray-300 hover:bg-gray-400 mr-200"
+                  className={`ml-2 p-1 rounded-ful bg-blue-200 hover:bg-blue-300
                   }`}
                   download
                 >
                   <Download
-                    className={`w-5 h-5 ${
-                      isOwn ? "text-blue-700" : "text-gray-700"
-                    }`}
+                    className={`w-5 h-5 text-gray-700`}
                   />
                 </a>
               </div>

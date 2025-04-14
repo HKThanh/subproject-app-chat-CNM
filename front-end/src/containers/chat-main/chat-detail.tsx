@@ -25,7 +25,9 @@ interface ChatDetailProps {
   messages: Message[];
   onSendMessage: (text: string, type?: string, fileUrl?: string) => void;
   onDeleteMessage?: (messageId: string) => void;
-  onRecallMessage?: (messageId: string) => void; // Add this prop
+  onRecallMessage?: (messageId: string) => void; 
+  onForwardMessage?: (messageId: string, targetConversations: string[]) => void;
+  conversations: Conversation[];
   loading: boolean;
 }
 
@@ -37,6 +39,8 @@ export default function ChatDetail({
   onSendMessage,
   onDeleteMessage,
   onRecallMessage,
+  onForwardMessage,
+  conversations,
   loading
 }: ChatDetailProps) {
   // Tham chiếu đến container tin nhắn để tự động cuộn xuống
@@ -67,28 +71,16 @@ export default function ChatDetail({
     }
   }, [chatMessages]);
   
-  // Load available conversations for forwarding
+  // handle 
   useEffect(() => {
-    if (showForwardDialog && socket) {
-      // This would typically come from your context or a separate API call
-      // For now, we'll use a placeholder
-      // In a real implementation, you'd fetch this from your API or context
-      socket.emit("load_conversations", { IDUser: "current_user_id" });
-      
-      // Handle the response
-      const handleConversationsResponse = (data: any) => {
-        if (data && data.Items) {
-          setAvailableConversations(data.Items);
-        }
-      };
-      
-      socket.on("load_conversations_response", handleConversationsResponse);
-      
-      return () => {
-        socket.off("load_conversations_response", handleConversationsResponse);
-      };
+    if (showForwardDialog) {
+      // Filter out current conversation from available conversations
+      const filteredConversations = conversations.filter(
+        conv => conv.idConversation !== activeConversation?.idConversation
+      );
+      setAvailableConversations(filteredConversations);
     }
-  }, [showForwardDialog, socket]);
+  }, [showForwardDialog, conversations, activeConversation]);
 
   // Handle reply to message
   const handleReply = (messageId: string, content: string, type: string) => {
@@ -115,13 +107,8 @@ export default function ChatDetail({
   
   // Confirm forward message
   const confirmForward = () => {
-    if (forwardingMessage && selectedConversations.length > 0 && socket) {
-      socket.emit("forward_message", {
-        IDMessageDetail: forwardingMessage,
-        targetConversations: selectedConversations,
-        IDSender: "current_user_id" // This should come from your auth context
-      });
-      
+    if (forwardingMessage && selectedConversations.length > 0 && onForwardMessage) {
+      onForwardMessage(forwardingMessage, selectedConversations);
       setShowForwardDialog(false);
       setForwardingMessage(null);
       setSelectedConversations([]);
