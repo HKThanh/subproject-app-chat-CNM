@@ -64,6 +64,8 @@ const initSocket = (server) => {
         socketController.handleCheckUsersStatus(socket);
 
         webRTCController.handleCall(io, socket);
+        socketController.handleUserDisconnect(socket);
+        socketController.handleCreateConversation(io, socket);
         socket.on("disconnect", () => {
             console.log("Client disconnected: " + socket.id);
             const user = socketController.getUserBySocketId(socket.id);
