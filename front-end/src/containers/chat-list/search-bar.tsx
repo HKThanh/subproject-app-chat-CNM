@@ -19,13 +19,15 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   const [showResults, setShowResults] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const END_POINT_URL = process.env.NEXT_PUBLIC_API_URL;
+
   const handleSearch = async (value: string) => {
     setSearchText(value);
     setLoading(true);
 
     try {
       const token = await getAuthToken();
-      const response = await fetch("http://localhost:3000/user/search", {
+      const response = await fetch(`${END_POINT_URL}/user/search`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -51,7 +53,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   return (
     <div className="relative flex-1 mr-4">
       <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-        <Search className="w-4 h-4 text-gray-500" />
+        <Search className="absolute w-4 h-4 text-gray-500" />
       </div>
       <input
         type="text"
