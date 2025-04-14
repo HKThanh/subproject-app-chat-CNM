@@ -53,7 +53,7 @@ fileService.uploadAvatar = multer({
 fileService.uploadChatFile = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
+    fileSize: 1024 * 1024 * 1024, // 10MB
   },
   fileFilter: chatFileFilter,
 });
