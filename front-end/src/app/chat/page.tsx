@@ -28,14 +28,14 @@ export default function Home() {
     sendMessage,
     markMessagesAsRead,
     deleteMessage,
-    recallMessage
+    recallMessage,
   } = useChatContext();
 
   // Tải danh sách cuộc trò chuyện khi component được mount
   useEffect(() => {
     // Thêm biến để theo dõi đã gọi loadConversations chưa
     let hasLoadedConversations = false;
-    
+
     if (isConnected && !hasLoadedConversations) {
       console.log("Tải danh sách cuộc trò chuyện lần đầu");
       loadConversations();
@@ -100,13 +100,18 @@ export default function Home() {
     fileUrl?: string
   ) => {
     if (activeConversation) {
-      console.log("check send message:", type, fileUrl,text);
-      
+      console.log("check send message:", type, fileUrl, text);
+
       if (type === "text") {
         sendMessage(activeConversation, text);
       } else {
         // Gọi hàm gửi file từ useChat
-        sendMessage(activeConversation, text, type as "image" | "video" | "document" | "file", fileUrl);
+        sendMessage(
+          activeConversation,
+          text,
+          type as "image" | "video" | "document" | "file",
+          fileUrl
+        );
       }
     }
   };
@@ -118,13 +123,14 @@ export default function Home() {
       const conversation = conversations.find(
         (conv) => conv.idConversation === activeConversation
       );
-      
+
       if (conversation) {
         // Lấy thông tin người nhận từ cuộc trò chuyện
-        const receiverId = conversation.idSender === conversation.otherUser?.id 
-          ? conversation.idReceiver 
-          : conversation.idSender;
-          
+        const receiverId =
+          conversation.idSender === conversation.otherUser?.id
+            ? conversation.idReceiver
+            : conversation.idSender;
+
         // Gọi hàm xóa tin nhắn từ context
         deleteMessage(messageId, activeConversation);
       }
@@ -147,7 +153,7 @@ export default function Home() {
         } flex flex-col border-r border-gray-200 transition-all duration-300`}
       >
         <div className="p-4">
-          <SearchBar />
+          <SearchBar onSelectConversation={handleSelectConversation} />
         </div>
         <div className="flex-1 overflow-hidden flex flex-col">
           <TabNavigation />
