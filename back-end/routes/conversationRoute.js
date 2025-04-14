@@ -198,7 +198,7 @@ router.post("/change-owner", authMiddleware, async (req, res) => {
 
     const newOwner = await UserModel.findOne({id: IDNewOwner});
     if (!newOwner) {
-        return res.json({ message: "Người dùng không tồn tại trong nhóm", status: -1 });
+        return res.json({ message: "Người dùng không tồn tại", status: -1 });
     }
 
     if (IDOwner === IDNewOwner) {
@@ -210,11 +210,60 @@ router.post("/change-owner", authMiddleware, async (req, res) => {
         return res.json({ message: "Trưởng nhóm mới được quyền đổi trưởng nhóm mới", status: -1 });
     }
 
+    const isMember = await Conversation.findOne({ idConversation: IDConversation, groupMembers: IDNewOwner });
+    if (!isMember) {
+        return res.json({ message: "Người dùng không phải là thành viên nhóm", status: -1 });
+    }
+
     try {
         const data = await conversationController.changeOwnerGroup(
             IDOwner,
             IDConversation,
             IDNewOwner
+        );
+        return res.json(data); // Success
+    } catch (error) {
+        res.json(error);
+    }
+});
+
+router.post("/remove-member", authMiddleware, async (req, res) => {
+    const IDOwner = req.user.id; // ID của người tạo nhóm
+    const { IDConversation, IDMember } = req.body;
+
+    if (!IDConversation || !IDMember) {
+        return res.json({ message: "Thiếu IDConversation hoặc IDMember", status: -1 });
+    }
+
+    const member = await UserModel.findOne({id: IDMember});
+    if (!member) {
+        return res.json({ message: "Người dùng không tồn tại", status: -1 });
+    }
+
+    if (IDOwner === IDMember) {
+        return res.json({ message: "Người dùng không thể tự đuổi chính mình", status: -1 });
+    }
+
+    const owner = await Conversation.findOne({ idConversation: IDConversation, "rules.IDOwner": IDOwner });
+    if (!owner) {
+        return res.json({ message: "Trưởng nhóm mới được quyền đuổi thành viên", status: -1 });
+    }
+
+    const isMember = await Conversation.findOne({ idConversation: IDConversation, groupMembers: IDMember });
+    if (!isMember) {
+        return res.json({ message: "Người dùng không phải là thành viên nhóm", status: -1 });
+    }
+
+    const checkNumberMember = await Conversation.findOne({ idConversation: IDConversation });
+    if (checkNumberMember.groupMembers.length <= 2) {
+        return res.json({ message: "Không thể đuổi thành viên cuối cùng trong nhóm", status: -1 });
+    }
+
+    try {
+        const data = await conversationController.removeMemberFromGroup(
+            IDOwner,
+            IDConversation,
+            IDMember
         );
         return res.json(data); // Success
     } catch (error) {

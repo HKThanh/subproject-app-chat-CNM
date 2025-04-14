@@ -769,6 +769,64 @@ const changeOwnerGroup = async (IDOwner, IDConversation, IDNewOwner) => {
   }
 }
 
+const removeMemberFromGroup = async (IDOwner, IDConversation, IDMember) => {
+  try {
+    // Validate input
+    if (!IDConversation || !IDMember) {
+      throw new Error('IDConversation và IDMember không được để trống');
+    }
+
+    // Kiểm tra conversation có tồn tại và là group không
+    const conversation = await Conversation.findOne({
+      'rules.IDOwner': IDOwner,
+      idConversation: IDConversation,
+      isGroup: true
+    });
+
+    if (!conversation) {
+      throw new Error('Conversation không tồn tại hoặc không phải là nhóm');
+    }
+
+    // Kiểm tra thành viên có trong nhóm không
+    if (!conversation.groupMembers.includes(IDMember)) {
+      throw new Error('Người dùng không có trong nhóm');
+    }
+
+    // Update tất cả conversations của group một lần
+    const result = await Conversation.updateMany(
+      { idConversation: IDConversation },
+      { 
+        $pull: { 
+          groupMembers: IDMember,
+          'rules.listIDCoOwner': IDMember 
+        },
+        lastChange: moment.tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DDTHH:mm:ss.SSS')
+      }
+    );
+
+    if (result.modifiedCount === 0) {
+      throw new Error('Không thể xóa thành viên khỏi nhóm');
+    }
+
+    const data = await Conversation.findOne({ idConversation: IDConversation });
+
+    return {
+      success: true,
+      message: 'Xóa thành viên khỏi nhóm thành công',
+      modifiedCount: result.modifiedCount,
+      updatedData: {
+        groupName: data.groupName,
+        groupAvatar: data.groupAvatar,
+        groupMembers: data.groupMembers,
+        rules: data.rules
+      }
+    };
+
+  } catch (error) {
+    console.error('Lỗi xóa thành viên khỏi nhóm:', error);
+    throw error;
+  }
+};
 
 module.exports = {
   getConversation,
@@ -793,4 +851,5 @@ module.exports = {
   getConversationByUserFriend,
   searchConversationByName,
   changeOwnerGroup,
+  removeMemberFromGroup,
 };

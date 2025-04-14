@@ -501,3 +501,124 @@ output
         }
     }
 }
+
+*localhost:3000/conversation/change-owner
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDNewOwner": "user002"
+}
+output
+{
+    "message": "Trưởng nhóm mới được quyền đổi trưởng nhóm mới",
+    "status": -1
+}
+
+*localhost:3000/conversation/change-owner
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDNewOwner": "user004"
+}
+output
+{
+    "message": "Người dùng không phải là thành viên nhóm",
+    "status": -1
+}
+
+*localhost:3000/conversation/change-owner
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDNewOwner": "user006"
+}
+output
+{
+    "message": "Người dùng không tồn tại",
+    "status": -1
+}
+
+*localhost:3000/conversation/remove-member
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDMember": "user001"
+}
+output
+{
+    "message": "Người dùng không thể tự đuổi chính mình",
+    "status": -1
+}
+
+*localhost:3000/conversation/remove-member
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDMember": "user002"
+}
+output
+{
+    "message": "Không thể đuổi thành viên cuối cùng trong nhóm",
+    "status": -1
+}
+
+*localhost:3000/conversation/remove-member
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDMember": "user003"
+}
+output
+{
+    "message": "Người dùng không phải là thành viên nhóm",
+    "status": -1
+}
+
+*localhost:3000/conversation/remove-member
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDMember": "user008"
+}
+output
+{
+    "message": "Người dùng không tồn tại",
+    "status": -1
+}
+
+*localhost:3000/conversation/remove-member (đổi sang user thành viên)
+input
+{
+    "IDConversation": "14cf18df-96c1-4146-bd24-3b8f6e43ea13",
+    "IDMember": "user001"
+}
+output
+{
+    "message": "Trưởng nhóm mới được quyền đuổi thành viên",
+    "status": -1
+}
+
+*localhost:3000/conversation/remove-member
+input
+{
+    "IDConversation": "e9ab95d5-3132-41b9-9fc0-a2789fdb644f", //Nhóm trên 3 thành viên
+    "IDMember": "user003"
+}
+output
+{
+    "success": true,
+    "message": "Xóa thành viên khỏi nhóm thành công",
+    "modifiedCount": 3,
+    "updatedData": {
+        "groupName": "ABC",
+        "groupAvatar": "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp",
+        "groupMembers": [
+            "user002",
+            "user001"
+        ],
+        "rules": {
+            "IDOwner": "user001",
+            "listIDCoOwner": []
+        }
+    }
+}
