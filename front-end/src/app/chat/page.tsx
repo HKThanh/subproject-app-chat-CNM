@@ -31,8 +31,13 @@ export default function Home() {
 
   // Tải danh sách cuộc trò chuyện khi component được mount
   useEffect(() => {
-    if (isConnected) {
+    // Thêm biến để theo dõi đã gọi loadConversations chưa
+    let hasLoadedConversations = false;
+    
+    if (isConnected && !hasLoadedConversations) {
+      console.log("Tải danh sách cuộc trò chuyện lần đầu");
       loadConversations();
+      hasLoadedConversations = true;
     }
   }, [isConnected, loadConversations]);
 
@@ -48,15 +53,17 @@ export default function Home() {
     if (activeConversation && messages[activeConversation]) {
       // Lấy danh sách tin nhắn chưa đọc trong cuộc trò chuyện hiện tại
       const unreadMessages = messages[activeConversation].filter(
-        msg => !msg.isRead && !msg.isOwn
+        (msg) => !msg.isRead && !msg.isOwn
       );
-      
+
       // Nếu có tin nhắn chưa đọc, đánh dấu đã đọc
       if (unreadMessages.length > 0) {
-        const unreadMessageIds = unreadMessages.map(msg => msg.idMessage);
+        const unreadMessageIds = unreadMessages.map((msg) => msg.idMessage);
         markMessagesAsRead(unreadMessageIds, activeConversation);
-        
-        console.log(`Đánh dấu ${unreadMessageIds.length} tin nhắn đã đọc trong cuộc trò chuyện đang mở`);
+
+        console.log(
+          `Đánh dấu ${unreadMessageIds.length} tin nhắn đã đọc trong cuộc trò chuyện đang mở`
+        );
       }
     }
   }, [activeConversation, messages, markMessagesAsRead]);
@@ -65,27 +72,40 @@ export default function Home() {
   const handleSelectConversation = (conversationId: string) => {
     setActiveConversation(conversationId);
     loadMessages(conversationId);
-    
+
     // Mark messages as read when selecting a conversation
-    const conversation = conversations.find(conv => conv.idConversation === conversationId);
+    const conversation = conversations.find(
+      (conv) => conv.idConversation === conversationId
+    );
     if (conversation && (conversation.unreadCount ?? 0) > 0) {
       // Get unread messages for this conversation
       const conversationMessages = messages[conversationId] || [];
       const unreadMessageIds = conversationMessages
-        .filter(msg => !msg.isRead && !msg.isOwn)
-        .map(msg => msg.idMessage);
-      
+        .filter((msg) => !msg.isRead && !msg.isOwn)
+        .map((msg) => msg.idMessage);
+
       // Mark messages as read if there are any unread messages
       if (unreadMessageIds.length > 0) {
         markMessagesAsRead(unreadMessageIds, conversationId);
       }
-    };
-  }
+    }
+  };
 
   // Xử lý gửi tin nhắn
-  const handleSendMessage = (text: string) => {
+  const handleSendMessage = (
+    text: string,
+    type: string = "text",
+    fileUrl?: string
+  ) => {
     if (activeConversation) {
-      sendMessage(activeConversation, text);
+      console.log("check send message:", type, fileUrl,text);
+      
+      if (type === "text") {
+        sendMessage(activeConversation, text);
+      } else {
+        // Gọi hàm gửi file từ useChat
+        sendMessage(activeConversation, text, type as "image" | "video" | "document" | "file", fileUrl);
+      }
     }
   };
 

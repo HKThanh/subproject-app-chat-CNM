@@ -10,7 +10,7 @@ interface ChatDetailProps {
   showChatInfo: boolean;
   activeConversation: Conversation | null;
   messages: Message[];
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, type?: string, fileUrl?: string) => void;
   loading: boolean;
 }
 
@@ -72,12 +72,41 @@ export default function ChatDetail({
                   return null;
                 }
 
+                // Xác định URL file nếu có
+                let fileUrl;
+                let displayMessage = msg.content;
+                
+                if (msg.type !== "text" && msg.content.includes("http")) {
+                  // Tìm URL trong nội dung tin nhắn
+                  const urlMatch = msg.content.match(/(https?:\/\/[^\s]+)/g);
+                  fileUrl = urlMatch ? urlMatch[0] : undefined;
+                  
+                  // Nếu là hình ảnh hoặc file, loại bỏ URL khỏi nội dung hiển thị
+                  if (fileUrl) {
+                    // Thay thế URL bằng chuỗi rỗng và cắt khoảng trắng thừa
+                    displayMessage = msg.content.replace(fileUrl, '').trim();
+                    
+                    // Nếu chỉ còn lại URL (không có nội dung khác)
+                    if (!displayMessage) {
+                      if (msg.type === "image") {
+                        displayMessage = "Đã gửi một hình ảnh";
+                      } else if (msg.type === "video") {
+                        displayMessage = "Đã gửi một video";
+                      } else {
+                        displayMessage = "Đã gửi một tệp đính kèm";
+                      }
+                    }
+                  }
+                }
+
                 return (
                   <ChatMessage
                     key={msg.idMessage || index}
-                    message={msg.content}
+                    message={displayMessage}
                     timestamp={msg.dateTime ? new Date(msg.dateTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                     isOwn={Boolean(msg.isOwn)}
+                    type={msg.type}
+                    fileUrl={fileUrl}
                   />
                 );
               }).filter(Boolean)}

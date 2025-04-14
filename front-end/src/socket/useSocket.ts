@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import { useNetworkStatus } from "./useNetwork";
 import { useSession } from "next-auth/react";
@@ -15,12 +15,17 @@ export const useSocket = () => {
   const isOnline = useNetworkStatus();
   const { data: session, status } = useSession();
   const accessToken = useUserStore((state) => state.accessToken);
+  
+  // Sử dụng useRef để theo dõi số lần thử kết nối
+  const reconnectAttempts = useRef(0);
+  const socketRef = useRef<Socket | null>(null);
 
-  // Log thông tin để debug
-  console.log("SOCKET_URL:", SOCKET_URL);
-  console.log("Session status:", status);
-  console.log("Access token from store:", accessToken);
-  console.log("Session token:", session?.accessToken);
+  // Chỉ log khi cần thiết
+  useEffect(() => {
+    console.log("SOCKET_URL:", SOCKET_URL);
+    console.log("Session status:", status);
+    console.log("Access token available:", !!accessToken || !!session?.accessToken);
+  }, [status, accessToken, session?.accessToken]);
 
   useEffect(() => {
     // Không kết nối nếu offline
@@ -35,15 +40,16 @@ export const useSocket = () => {
       return;
     }
 
+    // Nếu đã có socket và đang kết nối, không tạo mới
+    if (socketRef.current && socketRef.current.connected) {
+      console.log("Socket đã kết nối, không tạo mới");
+      return;
+    }
+
     // Lấy token từ nhiều nguồn để đảm bảo có giá trị
     const token = session?.accessToken || accessToken || "";
 
-    if (!token && status === "authenticated") {
-      console.warn("Đã xác thực nhưng không có token");
-    }
-
-    console.log("Kết nối socket với URL:", SOCKET_URL);
-    console.log("Sử dụng token:", token ? "Có" : "Không");
+    console.log("Tạo kết nối socket mới với URL:", SOCKET_URL);
 
     // Tạo instance socket với các cấu hình
     const socketInstance = io(SOCKET_URL, {
@@ -52,79 +58,68 @@ export const useSocket = () => {
       },
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 500,  // Giảm thời gian delay giữa các lần thử kết nối lại
-      reconnectionDelayMax: 2000,
-      timeout: 30000,  // Tăng thời gian timeout
-      transports: ['websocket', 'polling'], // Thử cả hai phương thức
+      reconnectionAttempts: 5,  // Giới hạn số lần thử kết nối lại
+      reconnectionDelay: 1000,  
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+      transports: ['websocket', 'polling'],
     });
 
     // Đăng ký sự kiện để debug
     socketInstance.on('connect', () => {
       console.log('Socket connected with ID:', socketInstance.id);
       setIsConnected(true);
+      reconnectAttempts.current = 0; // Reset số lần thử kết nối
     });
 
-    socketInstance.on('disconnect', () => {
-      console.log('Socket disconnected');
+    socketInstance.on('disconnect', (reason) => {
+      console.log('Socket disconnected, reason:', reason);
       setIsConnected(false);
-
-      // Tự động thử kết nối lại ngay lập tức
-      console.log('Attempting to reconnect socket immediately...');
-      socketInstance.connect();
+      
+      // Chỉ thử kết nối lại nếu lý do không phải là "io client disconnect"
+      if (reason !== "io client disconnect" && reconnectAttempts.current < 5) {
+        reconnectAttempts.current++;
+        console.log(`Reconnect attempt ${reconnectAttempts.current}/5`);
+      }
     });
 
     socketInstance.on('connect_error', (error) => {
       console.error('Socket connection error:', error.message);
       setIsConnected(false);
-
-      // Tự động thử kết nối lại sau 1 giây
-      setTimeout(() => {
-        console.log('Attempting to reconnect socket after error...');
-        socketInstance.connect();
-      }, 1000);
+      
+      // Giới hạn số lần thử kết nối lại
+      if (reconnectAttempts.current < 5) {
+        reconnectAttempts.current++;
+        console.log(`Reconnect attempt ${reconnectAttempts.current}/5 after error`);
+      }
     });
 
-    // Đảm bảo socket được kết nối
-    if (!socketInstance.connected) {
-      console.log('Socket not connected, connecting now...');
-      socketInstance.connect();
-    }
-
-    // Thêm log cho các sự kiện khác
-    socketInstance.onAny((event, ...args) => {
-      console.log(`Socket event received: ${event}`, args);
-    });
-
-    // Log khi gửi sự kiện
-    const originalEmit = socketInstance.emit;
-    socketInstance.emit = function(event, ...args) {
-      console.log(`Socket emitting event: ${event}`, args);
-      return originalEmit.apply(this, [event, ...args]);
-    };
-
-    console.log("Socket instance created");
+    // Lưu socket vào ref để tránh tạo mới không cần thiết
+    socketRef.current = socketInstance;
     setSocket(socketInstance);
 
     return () => {
+      // Chỉ ngắt kết nối khi component unmount hoặc dependencies thay đổi
       console.log("Cleanup socket connection");
       socketInstance.disconnect();
-      setSocket(null);
+      socketRef.current = null;
       setIsConnected(false);
     };
-  }, [isOnline, session, accessToken, status]);
+  }, [isOnline, status === "authenticated"]); // Chỉ phụ thuộc vào trạng thái online và xác thực
 
+  // Xử lý khi mạng thay đổi
   useEffect(() => {
-    if (!socket) return;
-    if (isOnline) {
+    if (!socketRef.current) return;
+    
+    if (isOnline && !socketRef.current.connected && reconnectAttempts.current < 5) {
       console.log("Mạng online - kết nối lại socket");
-      socket.connect();
-    } else {
+      socketRef.current.connect();
+    } else if (!isOnline && socketRef.current.connected) {
       console.log("Mạng offline - ngắt kết nối socket");
-      socket.disconnect();
+      socketRef.current.disconnect();
       setIsConnected(false);
     }
-  }, [isOnline, socket]);
+  }, [isOnline]);
 
   return { socket, isConnected };
 };

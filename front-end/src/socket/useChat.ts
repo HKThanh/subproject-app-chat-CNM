@@ -42,6 +42,9 @@ export interface Conversation {
     content: string;
     dateTime: string;
     isRead: boolean;
+    idReceiver?: string;
+    idSender?: string;
+    type: "text" | "file" | "image" | "video" | "document";
     isRemove?: boolean;
     isRecall?: boolean;
     isReply?: boolean;
@@ -240,23 +243,30 @@ type ChatAction =
   // Tải danh sách cuộc trò chuyện - tối ưu dependencies
   const loadConversations = useCallback(() => {
     console.log("=== loadConversations được gọi ===>");
+    
+    // Nếu đang loading, không gọi lại
+    if (loading) {
+      console.log("Đang loading, bỏ qua yêu cầu tải cuộc trò chuyện mới");
+      return;
+    }
+    
     // Kiểm tra điều kiện kết nối
     if (!socket) {
       console.log("Không thể tải cuộc trò chuyện: Socket chưa được khởi tạo");
       return;
     }
-
+  
     if (!isConnected) {
       console.log("Không thể tải cuộc trò chuyện: Socket chưa kết nối");
       return;
     }
-
+  
     if (!isValidUserId) {
       console.log("Không thể tải cuộc trò chuyện: userId không hợp lệ");
       dispatch({ type: 'SET_ERROR', payload: "Không thể tải cuộc trò chuyện: Thiếu thông tin người dùng" });
       return;
     }
-
+  
     // Kiểm tra người dùng đã kết nối chưa
     if (!isUserConnected) {
       console.log("Người dùng chưa kết nối, tự động kết nối trước khi tải cuộc trò chuyện");
@@ -266,27 +276,27 @@ type ChatAction =
       dispatch({ type: 'SET_USER_CONNECTED', payload: true });
       // Không return để tiếp tục tải cuộc trò chuyện
     }
-
+  
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
-
+  
     console.log("Tải danh sách cuộc trò chuyện cho người dùng:", userId);
     socket.emit("load_conversations", {
       IDUser: userId,
       lastEvaluatedKey: 0,
     });
-
+  
     // Timeout để tránh trạng thái loading vô hạn
     const timeoutId = setTimeout(() => {
       console.log("Timeout khi tải cuộc trò chuyện");
       dispatch({ type: 'SET_LOADING', payload: false });
       dispatch({ type: 'SET_ERROR', payload: "Không thể tải cuộc trò chuyện: Hết thời gian chờ. Vui lòng thử lại sau." });
     }, 10000); // 10 giây timeout
-
+  
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [socket, isConnected, userId, isValidUserId, isUserConnected]); // Giữ nguyên dependencies cần thiết
+  }, [socket, isConnected, userId, isValidUserId, isUserConnected]);
 
   // Gộp các useEffect đăng ký sự kiện socket
   useEffect(() => {
@@ -400,7 +410,10 @@ type ChatAction =
                 latestMessage: {
                   content: message.content,
                   dateTime: message.dateTime,
-                  isRead: false
+                  isRead: false,
+                  idReceiver: message.idReceiver,
+                  idSender: message.idSender,
+                  type: message.type
                 },
                 lastChange: message.dateTime,
                 unreadCount: ((conversations.find(c => c.idConversation === conversationId)?.unreadCount) || 0) + 1
