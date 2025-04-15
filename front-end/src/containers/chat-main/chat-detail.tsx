@@ -141,13 +141,13 @@ export default function ChatDetail({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-gray-200">
       <ChatHeader
         onToggleInfo={onToggleInfo}
         showChatInfo={showChatInfo}
         conversation={activeConversation}
       />
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-4 bg-gray-50 pb-8">
         {chatMessages.length > 0 ? (
           <>
             {[...chatMessages]
@@ -212,6 +212,8 @@ export default function ChatDetail({
               })
               .filter(Boolean)}
             <div ref={messagesEndRef} />
+          </div>
+            
           </>
         ) : (
           <div className="flex items-center justify-center h-full">

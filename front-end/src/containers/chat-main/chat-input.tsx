@@ -33,8 +33,9 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
     };
     fetchToken();
   }, []);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [filePreview, setFilePreview] = useState<string | null>(null);
+  
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [filePreviews, setFilePreviews] = useState<string[]>([]);
   const [fileType, setFileType] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -49,11 +50,11 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
   }, [replyingTo]);
 
   const handleSendMessage = () => {
-    if (selectedFile) {
-      // Nếu có file được chọn, xử lý upload file
+    if (selectedFiles.length > 0) {
+      // If files are selected, handle file upload
       handleFileUpload();
     } else if (message.trim()) {
-      // Nếu chỉ có text, gửi tin nhắn text
+      // If only text, send text message
       onSendMessage(message.trim(), "text");
       setMessage("");
       
@@ -65,46 +66,53 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
   };
 
   const handleFileUpload = async () => {
-    if (!selectedFile) return;
+    if (selectedFiles.length === 0) return;
 
     try {
-      // Tạo FormData để upload file
-      const formData = new FormData();
-      formData.append("file", selectedFile);
+      // Upload each file and collect URLs
+      const uploadPromises = selectedFiles.map(async (file) => {
+        const formData = new FormData();
+        formData.append("file", file);
 
-      // Gọi API upload file
-      const response = await fetch(`http://localhost:3000/upload/chat-file`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: formData,
+        const response = await fetch(`http://localhost:3000/upload/chat-file`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          throw new Error("Upload file thất bại");
+        }
+
+        const data = await response.json();
+        return data;
       });
+
+      const results = await Promise.all(uploadPromises);
       
-      if (!response.ok) {
-        throw new Error("Upload file thất bại");
+      // Send each file as a separate message
+      for (const result of results) {
+        const fileUrl = result.fileUrl;
+        const success = result.success;
+        
+        if (!success) {
+          throw new Error("Upload file thất bại");
+        }
+        
+        // Send message with uploaded file
+        onSendMessage(
+          message.trim() || "Đã gửi một tệp đính kèm",
+          fileType || "file",
+          fileUrl
+        );
       }
-
-      const data = await response.json();
-      const fileUrl = data.fileUrl;
-      const success = data.success;
-      const fileName = data.fileName;
-      console.log("check response upload>>>> ", data);
-
-      if (!success) {
-        throw new Error("Upload file thất bại");
-      }
-      // Gửi tin nhắn với file đã upload
-      onSendMessage(
-        message.trim() || "Đã gửi một tệp đính kèm",
-        fileType || "file",
-        fileUrl
-      );
 
       // Reset state
       setMessage("");
-      setSelectedFile(null);
-      setFilePreview(null);
+      setSelectedFiles([]);
+      setFilePreviews([]);
       setFileType(null);
     } catch (error) {
       console.error("Lỗi khi upload file:", error);
@@ -123,31 +131,44 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
     e: React.ChangeEvent<HTMLInputElement>,
     type: string
   ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    setSelectedFile(file);
+    // Convert FileList to array
+    const fileArray = Array.from(files);
+    setSelectedFiles(prev => [...prev, ...fileArray]);
     setFileType(type);
 
-    // Tạo preview cho file
-    if (type === "image" || type === "video") {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setFilePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      // Hiển thị tên file cho các loại file khác
-      setFilePreview(file.name);
+    // Create previews for files
+    fileArray.forEach(file => {
+      if (type === "image" || type === "video") {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setFilePreviews(prev => [...prev, e.target?.result as string]);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // Display filename for other file types
+        setFilePreviews(prev => [...prev, file.name]);
+      }
+    });
+  };
+
+  const clearSelectedFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setFilePreviews(prev => prev.filter((_, i) => i !== index));
+    
+    if (selectedFiles.length === 1) {
+      setFileType(null);
     }
   };
 
-  const clearSelectedFile = () => {
-    setSelectedFile(null);
-    setFilePreview(null);
+  const clearAllFiles = () => {
+    setSelectedFiles([]);
+    setFilePreviews([]);
     setFileType(null);
 
-    // Reset input file
+    // Reset input files
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (imageInputRef.current) imageInputRef.current.value = "";
     if (videoInputRef.current) videoInputRef.current.value = "";
@@ -171,34 +192,65 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
         </div>
       )}
 
-      {/* File preview */}
-      {filePreview && (
+      {/* File previews */}
+      {filePreviews.length > 0 && (
         <div className="mb-3 relative bg-gray-100 p-2 rounded-lg">
+          {/* Clear all button */}
           <button
-            className="absolute top-1 right-1 bg-gray-200 rounded-full p-1 hover:bg-gray-300"
-            onClick={clearSelectedFile}
+            className="absolute top-1 right-1 bg-gray-200 rounded-full p-1 hover:bg-gray-300 z-10"
+            onClick={clearAllFiles}
           >
             <X className="w-4 h-4" />
           </button>
 
-          {fileType === "image" ? (
-            <img
-              src={filePreview}
-              alt="Preview"
-              className="max-h-40 rounded mx-auto"
-            />
-          ) : fileType === "video" ? (
-            <video
-              src={filePreview}
-              controls
-              className="max-h-40 rounded mx-auto"
-            />
-          ) : (
-            <div className="flex items-center justify-center p-2">
-              <Paperclip className="mr-2 w-5 h-5 text-gray-500" />
-              <span className="text-sm text-gray-700">{filePreview}</span>
-            </div>
-          )}
+          {/* Grid layout for multiple images */}
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            {filePreviews.map((preview, index) => (
+              <div key={index} className="relative">
+                {fileType === "image" ? (
+                  <div className="relative group">
+                    <img
+                      src={preview}
+                      alt={`Preview ${index}`}
+                      className="h-24 w-full object-cover rounded"
+                    />
+                    <button
+                      className="absolute top-1 right-1 bg-gray-200 rounded-full p-1 hover:bg-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => clearSelectedFile(index)}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : fileType === "video" ? (
+                  <div className="relative group">
+                    <video
+                      src={preview}
+                      className="h-24 w-full object-cover rounded"
+                    />
+                    <button
+                      className="absolute top-1 right-1 bg-gray-200 rounded-full p-1 hover:bg-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => clearSelectedFile(index)}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between p-2 bg-white rounded">
+                    <div className="flex items-center">
+                      <Paperclip className="mr-2 w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700 truncate max-w-[150px]">{preview}</span>
+                    </div>
+                    <button
+                      className="p-1 rounded-full hover:bg-gray-200"
+                      onClick={() => clearSelectedFile(index)}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -216,6 +268,7 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
         onChange={(e) => handleFileSelect(e, "image")}
         className="hidden"
         accept="image/*"
+        multiple
       />
       <input
         type="file"
@@ -261,7 +314,7 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
         />
-        {message.trim() || selectedFile ? (
+        {message.trim() || selectedFiles.length > 0 ? (
           <button
             className="p-2 ml-2 rounded-full bg-blue-500 hover:bg-blue-600 text-white"
             onClick={handleSendMessage}

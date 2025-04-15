@@ -43,21 +43,26 @@ export default function MessageList({
   // Format message preview based on message type and sender
   const formatMessagePreview = (message: any) => {
     if (!message) return "Không có tin nhắn";
-    console.log("check message>>>> ", message);
-
+    
     // Add prefix for messages sent by the current user
     const prefix = message.idSender === user?.id ? "Bạn: " : "";
-
-    // Format based on message type
-    if (message.type === "image") {
-      return `${prefix}Đã gửi một hình ảnh`;
-    } else if (message.type === "video") {
-      return `${prefix}Đã gửi một video`;
-    } else if (message.type === "document" || message.type === "file") {
-      return `${prefix}Đã gửi một tệp đính kèm`;
-    } else {
-      // For text messages, show the content with prefix
-      return `${prefix}${message.content || ""}`;
+    
+    // If message has a preview property (for non-text messages), use it
+    if (message.preview) {
+      return `${prefix}${message.preview}`;
+    }
+    
+    // Otherwise format based on message type
+    switch (message.type) {
+      case "image":
+        return `${prefix}Đã gửi một hình ảnh`;
+      case "video":
+        return `${prefix}Đã gửi một video`;
+      case "document":
+      case "file":
+        return `${prefix}Đã gửi một tệp đính kèm`;
+      default:
+        return `${prefix}${message.content || ""}`;
     }
   };
 
@@ -110,8 +115,8 @@ export default function MessageList({
         return (
           <div
             key={conversation.idConversation}
-            className={`flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200 ${
-              isActive ? "bg-blue-100 text-blue-800" : ""
+            className={`flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer  ${
+              isActive ? "bg-blue-500 text-white" : "hover:bg-gray-100 text-gray-900"
             }`}
             onClick={() => onSelectConversation(conversation.idConversation)}
           >
@@ -139,13 +144,11 @@ export default function MessageList({
             <div className="flex-1 min-w-0">
               <div className="flex justify-between">
                 <h3
-                  className={`${hasUnread ? "font-bold" : "font-medium"} ${
-                    isActive ? "text-blue-800" : "text-gray-900"
-                  } truncate text-sm`}
+                  className={`${hasUnread ? "font-bold" : "font-medium"}truncate text-sm`}
                 >
                   {conversation.otherUser?.fullname || "Người dùng"}
                 </h3>
-                <span className="text-xs text-gray-500 whitespace-nowrap">
+                <span className={`text-xs ${isActive? "text-white-500":"text-gray-500"}  whitespace-nowrap`}>
                   {formatTime(conversation.lastChange)}
                 </span>
               </div>
@@ -154,17 +157,17 @@ export default function MessageList({
                   hasUnread
                     ? "font-semibold text-gray-900"
                     : "font-normal text-gray-500"
-                } ${isActive ? "text-blue-600" : ""} truncate`}
+                } ${isActive ? "text-blue-1000" : ""} truncate`}
               >
                 {formatMessagePreview(conversation.latestMessage)}
               </p>
             </div>
             {hasUnread && (
-              <div className="ml-1 bg-red-500 text-white text-xs rounded-full h-4 min-w-4 flex items-center justify-center px-1 text-[12px]">
-                {(conversation.unreadCount ?? 0) > 9
-                  ? "9+"
-                  : conversation.unreadCount ?? 0}
-              </div>
+              <div className={`ml-1 ${isActive ? "bg-white text-blue-500" : "bg-red-500 text-white"} text-xs rounded-full h-4 min-w-4 flex items-center justify-center px-1 text-[12px]`}>
+              {(conversation.unreadCount ?? 0) > 9
+                ? "9+"
+                : conversation.unreadCount ?? 0}
+            </div>
             )}
           </div>
         );

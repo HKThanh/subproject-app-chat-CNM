@@ -178,7 +178,18 @@ const handleLoadConversation = (io, socket) => {
                         idConversation: conv.idConversation
                     })
                     .sort({ dateTime: -1 })
-                    .limit(1);
+                    .limit(1)
+                    .populate('idSender', 'id fullname');  // Populate sender info
+
+                    let messagePreview = latestMessage ? {
+                        ...latestMessage.toObject(),
+                        preview: latestMessage.type !== 'text' ? 
+                            `Đã gửi một ${
+                                latestMessage.type === 'image' ? 'hình ảnh' :
+                                latestMessage.type === 'video' ? 'video' :
+                                'tệp đính kèm'
+                            }` : latestMessage.content
+                    } : null;
 
                     // Đếm số tin nhắn chưa đọc
                     const unreadCount = await MessageDetail.countDocuments({
@@ -190,7 +201,7 @@ const handleLoadConversation = (io, socket) => {
                     return {
                         ...conv.toObject(),
                         otherUser,
-                        latestMessage,
+                        latestMessage: messagePreview,
                         unreadCount
                     };
                 })
@@ -514,7 +525,7 @@ const handleForwardMessage = async (io, socket) => {
     socket.on("forward_message", async (payload) => {
         try {
             const { IDMessageDetail, targetConversations, IDSender } = payload;
-
+            console.log("Received forward_message event with payload:", payload);
             // Tìm tin nhắn gốc
             const originalMessage = await MessageDetail.findOne({ idMessage: IDMessageDetail });
             if (!originalMessage) {
