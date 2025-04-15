@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require("uuid");
 const moment = require("moment-timezone");
 const MessageDetailModel = require("../models/MessageDetailModel");
 const Conversation = require("../models/ConversationModel");
+const User = require("../models/UserModel");
 
 const getConversation = async (IDUser, lastEvaluatedKey) => {
   try {
@@ -49,6 +50,16 @@ const createNewSignleConversation = async (
   IDReceiver,
   IDConversation
 ) => {
+  const user = await User.findOne({ idUser: IDSender });
+
+  if (!user) {
+    throw new Error("Không tìm thấy người gửi");
+  }
+
+  if (user.blockList && user.blockList.includes(IDReceiver)) {
+    throw new Error("Không thể tạo cuộc trò chuyện với người đã chặn");
+  }
+
   const conversation = new Conversation({
     idConversation: IDConversation || uuidv4(),
     idSender: IDSender,

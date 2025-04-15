@@ -833,6 +833,31 @@ const handleCreateConversation = async (io, socket) => {
                 return;
             }
 
+            const user = await User.findOne({ id: IDSender });
+            if (!user) {
+                socket.emit("create_conversation_response", {
+                    success: false,
+                    message: "Người gửi không tồn tại"
+                });
+                return;
+            }
+
+            if (user.blockList && user.blockList.includes(IDReceiver)) {
+                socket.emit("create_conversation_response", {
+                    success: false,
+                    message: "Không thể tạo cuộc trò chuyện với người đã chặn"
+                });
+                return;
+            }
+
+            if (user.friendList && !user.friendList.includes(IDReceiver)) {
+                socket.emit("create_conversation_response", {
+                    success: false,
+                    message: "Không thể tạo cuộc trò chuyện với người chưa kết bạn"
+                });
+                return;
+            }
+
             // Tạo conversation mới
             conversation = await Conversation.create({
                 idConversation: uuidv4(),
