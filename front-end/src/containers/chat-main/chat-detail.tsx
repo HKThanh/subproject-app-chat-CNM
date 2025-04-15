@@ -156,15 +156,16 @@ export default function ChatDetail({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-gray-200">
       <ChatHeader
         onToggleInfo={onToggleInfo}
         showChatInfo={showChatInfo}
         conversation={activeConversation}
       />
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-4 bg-gray-50 pb-8">
         {chatMessages.length > 0 ? (
           <>
+          <div className="space-y-6 ">
             {/* Sắp xếp tin nhắn từ cũ đến mới (theo thời gian tăng dần) */}
             {[...chatMessages]
               .sort((a, b) => {
@@ -211,6 +212,7 @@ export default function ChatDetail({
                     messageId={msg.idMessage}
                     message={displayMessage}
                     isRemove={msg.isRemove || false}
+                    isRecall= {msg.isRecall || false} 
                     timestamp={msg.dateTime ? new Date(msg.dateTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                     isOwn={Boolean(msg.isOwn)}
                     type={msg.type}
@@ -224,6 +226,8 @@ export default function ChatDetail({
               }).filter(Boolean)}
             {/* Thêm phần tử trống để cuộn xuống */}
             <div ref={messagesEndRef} />
+          </div>
+            
           </>
         ) : (
           <div className="flex items-center justify-center h-full">

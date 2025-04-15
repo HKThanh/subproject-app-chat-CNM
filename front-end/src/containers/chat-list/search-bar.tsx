@@ -19,7 +19,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   const [showResults, setShowResults] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const END_POINT_URL = process.env.NEXT_PUBLIC_API_URL;
+  const END_POINT_URL = process.env.NODE_PUBLIC_API_URL || "http://localhost:3000";
 
   const handleSearch = async (value: string) => {
     setSearchText(value);

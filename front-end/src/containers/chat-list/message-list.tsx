@@ -116,7 +116,7 @@ export default function MessageList({
           <div
             key={conversation.idConversation}
             className={`flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200 ${
-              isActive ? "bg-blue-100 text-blue-800" : ""
+              isActive ? "bg-blue-500 text-white" : "hover:bg-gray-100 text-gray-900"
             }`}
             onClick={() => onSelectConversation(conversation.idConversation)}
           >
@@ -144,9 +144,7 @@ export default function MessageList({
             <div className="flex-1 min-w-0">
               <div className="flex justify-between">
                 <h3
-                  className={`${hasUnread ? "font-bold" : "font-medium"} ${
-                    isActive ? "text-blue-800" : "text-gray-900"
-                  } truncate text-sm`}
+                  className={`${hasUnread ? "font-bold" : "font-medium"}truncate text-sm`}
                 >
                   {conversation.otherUser?.fullname || "Người dùng"}
                 </h3>
@@ -159,17 +157,17 @@ export default function MessageList({
                   hasUnread
                     ? "font-semibold text-gray-900"
                     : "font-normal text-gray-500"
-                } ${isActive ? "text-blue-600" : ""} truncate`}
+                } ${isActive ? "text-blue-100" : ""} truncate`}
               >
                 {formatMessagePreview(conversation.latestMessage)}
               </p>
             </div>
             {hasUnread && (
-              <div className="ml-1 bg-red-500 text-white text-xs rounded-full h-4 min-w-4 flex items-center justify-center px-1 text-[12px]">
-                {(conversation.unreadCount ?? 0) > 9
-                  ? "9+"
-                  : conversation.unreadCount ?? 0}
-              </div>
+              <div className={`ml-1 ${isActive ? "bg-white text-blue-500" : "bg-red-500 text-white"} text-xs rounded-full h-4 min-w-4 flex items-center justify-center px-1 text-[12px]`}>
+              {(conversation.unreadCount ?? 0) > 9
+                ? "9+"
+                : conversation.unreadCount ?? 0}
+            </div>
             )}
           </div>
         );
