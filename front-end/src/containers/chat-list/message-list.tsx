@@ -115,7 +115,7 @@ export default function MessageList({
         return (
           <div
             key={conversation.idConversation}
-            className={`flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200 ${
+            className={`flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer  ${
               isActive ? "bg-blue-500 text-white" : "hover:bg-gray-100 text-gray-900"
             }`}
             onClick={() => onSelectConversation(conversation.idConversation)}
@@ -148,7 +148,7 @@ export default function MessageList({
                 >
                   {conversation.otherUser?.fullname || "Người dùng"}
                 </h3>
-                <span className="text-xs text-gray-500 whitespace-nowrap">
+                <span className={`text-xs ${isActive? "text-white-500":"text-gray-500"}  whitespace-nowrap`}>
                   {formatTime(conversation.lastChange)}
                 </span>
               </div>
@@ -157,7 +157,7 @@ export default function MessageList({
                   hasUnread
                     ? "font-semibold text-gray-900"
                     : "font-normal text-gray-500"
-                } ${isActive ? "text-blue-100" : ""} truncate`}
+                } ${isActive ? "text-blue-1000" : ""} truncate`}
               >
                 {formatMessagePreview(conversation.latestMessage)}
               </p>
