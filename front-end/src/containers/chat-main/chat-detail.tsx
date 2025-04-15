@@ -160,7 +160,8 @@ export default function ChatDetail({
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50 pb-8">
         {chatMessages.length > 0 ? (
           <>
-            {[...chatMessages]
+          <div className="space-y-4">
+          {[...chatMessages]
               .sort((a, b) => {
                 const dateA = a.dateTime ? new Date(a.dateTime).getTime() : 0;
                 const dateB = b.dateTime ? new Date(b.dateTime).getTime() : 0;
@@ -213,6 +214,7 @@ export default function ChatDetail({
                     isOwn={Boolean(msg.isOwn)}
                     type={msg.type}
                     fileUrl={fileUrl}
+                    isRecall={msg.isRecall || false}
                     onReply={handleReply}
                     onForward={handleForward}
                     onRecallMessage={onRecallMessage}
@@ -222,6 +224,8 @@ export default function ChatDetail({
               })
               .filter(Boolean)}
             <div ref={messagesEndRef} />
+          </div>
+            
           </>
         ) : (
           <div className="flex items-center justify-center h-full">
