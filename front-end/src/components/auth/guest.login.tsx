@@ -59,11 +59,8 @@ export default function LoginForm() {
       if (result.error) {
         toast.error(result.message);
         setError(result.message);
-        if (result.redirectTo) {
-          console.log("Login error>>> ", result.message);
-          router.push(result.redirectTo);
-          toast.error(result.message);
-        }
+        // Remove the automatic redirect when there's an error
+        // Only redirect if explicitly needed for specific cases
       } else if (result.success) {
         if (result.redirectTo) {
           router.push(result.redirectTo);
@@ -77,6 +74,18 @@ export default function LoginForm() {
       setIsLoading(false);
     }
   }
+
+  // Add a new function to handle forgot password navigation
+  const handleForgotPassword = () => {
+    // Store the current email in localStorage if available
+    const currentEmail = form.getValues().email;
+    if (currentEmail) {
+      localStorage.setItem('forgotPasswordEmail', currentEmail);
+    }
+    
+    // Navigate to forgot password page
+    router.push('/auth/forgot-password');
+  };
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
@@ -145,14 +154,17 @@ export default function LoginForm() {
                           </span>
                         </Button>
                       </div>
-                    </FormControl>
+                    </FormControl>                    
                     <FormMessage>
-                      <a
-                        href="#"
-                        className="ml-auto text-sm font-semibold underline-offset-2 hover:underline text-gray-800"
-                      >
-                        Quên mật khẩu?
-                      </a>
+                      <div className="flex justify-end">
+                        <Button
+                          variant="link"
+                          className="p-0 h-auto text-sm font-semibold text-gray-800 hover:text-orange-600"
+                          onClick={handleForgotPassword}
+                        >
+                          Quên mật khẩu?
+                        </Button>
+                      </div>
                     </FormMessage>
                   </FormItem>
                 )}
