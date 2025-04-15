@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require("multer");
 const upload = multer();
 const userController = require("../controllers/userController");
+const friendRequestController = require("../controllers/friendRequestController");
 const authMiddleware = require("../middlewares/authMiddleware");
 const fileService = require("../services/fileService");
 
@@ -51,6 +52,8 @@ const userRoutes = (io) => {
   router.post('/blocked/unblock', authMiddleware, (req, res) => userController.unblockUser(req, res, io));
 
   router.get('/blocked/get-blocked', authMiddleware, (req, res) => userController.getBlockedUsers(req, res));
+
+  router.get('/friend/get-friends', authMiddleware, (req, res) => friendRequestController.getAllFriendsById(req, res));
 
   return router;
 }
