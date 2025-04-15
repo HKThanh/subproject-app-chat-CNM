@@ -14,11 +14,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import FooterComponent from '../components/FooterComponent';
+import SocketService from '../services/SocketService';
+import AuthService from '../services/AuthService';
 
-<<<<<<< HEAD
-=======
 const avatarDefaulturi = 'https://static.vecteezy.com/system/resources/previews/009/292/244/non_2x/default-avatar-icon-of-social-media-user-vector.jpg';
->>>>>>> main
 type InfoScreenProps = {
   navigation?: any;
   route?: {
@@ -29,12 +28,6 @@ type InfoScreenProps = {
   };
 };
 
-<<<<<<< HEAD
-const InfoScreen = ({ navigation, route }: InfoScreenProps) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  
-=======
 interface UserData {
   id: string;
   email: string;
@@ -51,25 +44,18 @@ const InfoScreen = ({ navigation, route }: InfoScreenProps) => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isLoadingUserData, setIsLoadingUserData] = useState(false);
 
->>>>>>> main
   // Get the access token from navigation params or global variable
   useEffect(() => {
     // First check if we have the token in route params
     if (route?.params?.accessToken) {
       setAccessToken(route.params.accessToken);
-<<<<<<< HEAD
-    } 
-=======
     }
->>>>>>> main
     // Then try from global variable
     else if (global.accessToken) {
       setAccessToken(global.accessToken);
     }
   }, [route?.params]);
 
-<<<<<<< HEAD
-=======
   // Fetch user data when we have an access token
   useEffect(() => {
     if (accessToken) {
@@ -82,7 +68,7 @@ const InfoScreen = ({ navigation, route }: InfoScreenProps) => {
 
     setIsLoadingUserData(true);
     try {
-      const response = await fetch('http://192.168.0.107:3000/user', {
+      const response = await fetch('http://192.168.1.9:3000/user', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -107,70 +93,57 @@ const InfoScreen = ({ navigation, route }: InfoScreenProps) => {
     }
   };
 
->>>>>>> main
   const handleTabPress = (tabName: 'messages' | 'contacts' | 'explore' | 'diary' | 'profile') => {
     if (tabName === 'messages') {
       navigation?.navigate('HomeScreen');
     }
-  };
-
-  const handleLogout = async () => {
-    setIsLoading(true);
+  };  const handleLogout = async () => {
     try {
-<<<<<<< HEAD
-      const response = await fetch('http://192.168.0.107:3000/auth/logout', {
+      setIsLoading(true);
+      
+      // Lấy token từ AuthService
+      const authService = AuthService.getInstance();
+      const headers = await authService.getAuthHeader();
+      
+      // Lấy socketService trước để phát sự kiện user_offline trước khi đăng xuất
+      const socketService = SocketService.getInstance();
+      
+      // Phát sự kiện user_offline để thông báo cho server rằng người dùng đang offline
+      // Đây là bước bạn yêu cầu để thay đổi trạng thái trước khi logout
+      console.log('Emitting user_offline event before logging out');
+      await socketService.emitUserOffline();
+      
+      // Gọi API đăng xuất
+      const response = await fetch('http://192.168.1.9:3000/auth/logout/mobile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': accessToken ? `Bearer ${accessToken}` : '', 
-=======
-      const response = await fetch('http://192.168.0.107:3000/auth/logout/mobile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': accessToken ? `Bearer ${accessToken}` : '',
->>>>>>> main
-        },
-        body: JSON.stringify({}),
+          ...headers
+        }
       });
-
+      
       const data = await response.json();
-<<<<<<< HEAD
+      console.log('Logout response:', data);
       
-      // Clear the stored token
+      // Xóa tokens trong AuthService
+      await authService.clearTokens();
+      
+      // Xóa dữ liệu và ngắt kết nối socket
+      await socketService.logout();
+      
+      // Xóa biến global cho tương thích ngược (backward compatibility)
       global.accessToken = null;
+      global.socketInstance = null;
+      global.conversations = [];
       
-      // In production with AsyncStorage:
-      // await AsyncStorage.removeItem('accessToken');
-      // await AsyncStorage.removeItem('refreshToken');
-      
-=======
-
-      // Clear the stored token
-      global.accessToken = null;
-
-      // In production with AsyncStorage:
-      // await AsyncStorage.removeItem('accessToken');
-      // await AsyncStorage.removeItem('refreshToken');
-
->>>>>>> main
-      if (response.ok) {
-        Alert.alert('Thành công', data.message || 'Bạn đã đăng xuất thành công', [
-          { text: 'OK', onPress: () => navigation?.navigate('WelcomeScreen') }
-        ]);
-      } else {
-        // Even if the server response isn't OK, we still log out locally
-        Alert.alert('Thông báo', 'Đã xảy ra lỗi khi đăng xuất, nhưng bạn vẫn được đăng xuất khỏi ứng dụng', [
-          { text: 'OK', onPress: () => navigation?.navigate('WelcomeScreen') }
-        ]);
-      }
+      // Điều hướng về màn hình đăng nhập
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'WelcomeScreen' }],
+      });
     } catch (error) {
-      console.error('Logout error:', error);
-      // Even if the server call fails, we still log out locally
-      global.accessToken = null;
-      Alert.alert('Thông báo', 'Không thể kết nối đến máy chủ, nhưng bạn vẫn được đăng xuất khỏi ứng dụng', [
-        { text: 'OK', onPress: () => navigation?.navigate('WelcomeScreen') }
-      ]);
+      console.error('Error during logout:', error);
+      Alert.alert('Lỗi đăng xuất', 'Có lỗi xảy ra khi đăng xuất. Vui lòng thử lại sau.');
     } finally {
       setIsLoading(false);
     }
@@ -193,89 +166,6 @@ const InfoScreen = ({ navigation, route }: InfoScreenProps) => {
       </View>
 
       <ScrollView style={styles.contentContainer}>
-<<<<<<< HEAD
-        {/* Profile Section */}
-        <View style={styles.profileSection}>
-          <Image 
-            source={require('../assets/Welo_image.png')} 
-            style={styles.profileImage} 
-          />
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>Hiểu Đôngg</Text>
-            <Text style={styles.profileAction}>Xem trang cá nhân</Text>
-          </View>
-          <TouchableOpacity style={styles.profileArrow}>
-            <Ionicons name="chevron-forward" size={20} color="rgba(12, 113, 232, 0.64)" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Account and Security Section */}
-        <View style={styles.sectionContainer}>
-          <TouchableOpacity style={styles.menuItem}>
-            <Ionicons name="shield-outline" size={22} color="#0C71E8" style={styles.menuIcon} />
-            <Text style={styles.menuTitle}>Tài khoản và bảo mật</Text>
-            <Ionicons name="chevron-forward" size={20} color="rgba(12, 113, 232, 0.64)" style={styles.menuArrow} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <Ionicons name="lock-closed-outline" size={22} color="#0C71E8" style={styles.menuIcon} />
-            <Text style={styles.menuTitle}>Quyền riêng tư</Text>
-            <Ionicons name="chevron-forward" size={20} color="rgba(12, 113, 232, 0.64)" style={styles.menuArrow} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Features Section */}
-        <View style={[styles.sectionContainer, styles.marginTop]}>
-          <TouchableOpacity style={styles.menuItem}>
-            <Ionicons name="qr-code-outline" size={22} color="#0C71E8" style={styles.menuIcon} />
-            <View style={styles.menuTextContainer}>
-              <Text style={styles.menuTitle}>Ví QR</Text>
-              <Text style={styles.menuDescription}>Lưu trữ và xuất trình các mã QR quan trọng</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="rgba(12, 113, 232, 0.64)" style={styles.menuArrow} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <Ionicons name="cloud-outline" size={22} color="#0C71E8" style={styles.menuIcon} />
-            <View style={styles.menuTextContainer}>
-              <Text style={styles.menuTitle}>Clound của tôi</Text>
-              <Text style={styles.menuDescription}>Lưu trữ các tin nhắn quan trọng</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="rgba(12, 113, 232, 0.64)" style={styles.menuArrow} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <Ionicons name="save-outline" size={22} color="#0C71E8" style={styles.menuIcon} />
-            <View style={styles.menuTextContainer}>
-              <Text style={styles.menuTitle}>Quản lí dung lượng và bộ nhớ</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="rgba(12, 113, 232, 0.64)" style={styles.menuArrow} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Logout Section */}
-        <View style={[styles.sectionContainer, styles.marginTop]}>
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={handleLogout}
-            disabled={isLoading}
-          >
-            <Ionicons name="log-out-outline" size={22} color="#E53935" style={styles.menuIcon} />
-            <View style={styles.menuTextContainer}>
-              <Text style={[styles.menuTitle, styles.logoutText]}>
-                {isLoading ? 'Đang đăng xuất...' : 'Đăng xuất'}
-              </Text>
-            </View>
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#E53935" />
-            ) : (
-              <Ionicons name="chevron-forward" size={20} color="rgba(229, 57, 53, 0.64)" style={styles.menuArrow} />
-            )}
-          </TouchableOpacity>
-        </View>
-      </ScrollView>   
-         {/* Footer */}
-=======
         {isLoadingUserData ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#1FAEEB" />
@@ -386,7 +276,6 @@ const InfoScreen = ({ navigation, route }: InfoScreenProps) => {
         )}
       </ScrollView>
       {/* Footer */}
->>>>>>> main
       <FooterComponent activeTab="profile" onTabPress={handleTabPress} />
     </SafeAreaView>
   );
@@ -445,8 +334,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     color: '#000000',
   },
-<<<<<<< HEAD
-=======
   profileEmail: {
     fontSize: 12,
     fontFamily: 'Inter',
@@ -454,7 +341,6 @@ const styles = StyleSheet.create({
     color: '#645C5C',
     marginTop: 4,
   },
->>>>>>> main
   profileAction: {
     fontSize: 10,
     fontFamily: 'Inter',
@@ -505,8 +391,6 @@ const styles = StyleSheet.create({
   menuArrow: {
     marginLeft: 4,
   },
-<<<<<<< HEAD
-=======
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -518,7 +402,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1FAEEB',
   },
->>>>>>> main
 });
 
 export default InfoScreen;
