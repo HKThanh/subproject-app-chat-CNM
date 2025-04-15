@@ -10,11 +10,8 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Alert,
-<<<<<<< HEAD
-=======
   ActivityIndicator,
   Modal,
->>>>>>> main
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -22,9 +19,6 @@ type OTPScreenProps = {
   navigation?: any;
   route?: {
     params: {
-<<<<<<< HEAD
-      phoneNumber: string;
-=======
       phoneNumber?: string;
       email: string;
       fullname?: string;
@@ -32,23 +26,12 @@ type OTPScreenProps = {
       phone?: string;
       resetId?: string;
       isPasswordReset?: boolean;
->>>>>>> main
     };
   };
 };
 
 const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-<<<<<<< HEAD
-  const [timer, setTimer] = useState(300);
-  const [canResend, setCanResend] = useState(false);
-  const inputRefs = useRef<Array<TextInput | null>>([]);
-
-  // Format phone number to international format (+84)
-  const phoneNumber = route?.params?.phoneNumber || '';
-  const formattedPhoneNumber = phoneNumber.startsWith('0') 
-    ? '+84' + phoneNumber.substring(1) 
-=======
   const [timer, setTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -67,17 +50,12 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
   // Format phone number to international format (+84) if needed
   const formattedPhoneNumber = phoneNumber.startsWith('0')
     ? '+84' + phoneNumber.substring(1)
->>>>>>> main
     : phoneNumber;
 
   // Timer countdown
   useEffect(() => {
     let interval: NodeJS.Timeout;
-<<<<<<< HEAD
-    
-=======
 
->>>>>>> main
     if (timer > 0) {
       interval = setInterval(() => {
         setTimer(prevTimer => prevTimer - 1);
@@ -94,11 +72,7 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
       const newOtpDigits = [...otpDigits];
       newOtpDigits[index] = text;
       setOtpDigits(newOtpDigits);
-<<<<<<< HEAD
-      
-=======
 
->>>>>>> main
       // Auto focus to next input
       if (text.length === 1 && index < 5) {
         inputRefs.current[index + 1]?.focus();
@@ -113,28 +87,6 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
     }
   };
 
-<<<<<<< HEAD
-  const handleResendOtp = () => {
-    if (canResend) {
-      setTimer(300);
-      setCanResend(false);
-      // Reset OTP digits
-      setOtpDigits(['', '', '', '', '', '']);
-      inputRefs.current[0]?.focus();
-      
-      // Show a message that OTP has been sent
-      Alert.alert('Thông báo', 'Mã xác thực mới đã được gửi.');
-    }
-  };
-
-  const handleVerifyOtp = () => {
-    const otp = otpDigits.join('');
-    
-    if (otp.length === 6) {
-      // For demonstration, we assume the OTP is correct
-      // In a real app, you would verify this with your backend
-      navigation?.navigate('WelcomeScreen');
-=======
   const handleResendOtp = async () => {
     if (canResend) {
       setIsLoading(true);
@@ -143,7 +95,7 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
         let response;
         
         if (isPasswordReset) {
-          response = await fetch('http://192.168.0.107:3000/auth/reset-password-request', {
+          response = await fetch('http://192.168.1.9:3000/auth/reset-password-request', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -153,7 +105,7 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
             }),
           });
         } else {
-          response = await fetch('http://192.168.0.107:3000/auth/register-phone', {
+          response = await fetch('http://192.168.1.9:3000/auth/register-phone', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -207,7 +159,7 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
         let response;
         
         if (isPasswordReset) {
-          response = await fetch(`http://192.168.0.107:3000/auth/reset-password/${resetId}`, {
+          response = await fetch(`http://192.168.1.9:3000/auth/reset-password/${resetId}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -218,7 +170,7 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
             }),
           });
         } else {
-          response = await fetch('http://192.168.0.107:3000/auth/verify-otp', {
+          response = await fetch('http://192.168.1.9:3000/auth/verify-otp', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -253,7 +205,6 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
       } finally {
         setIsLoading(false);
       }
->>>>>>> main
     } else {
       Alert.alert('Lỗi', 'Vui lòng nhập đủ 6 chữ số mã xác thực.');
     }
@@ -261,10 +212,6 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-<<<<<<< HEAD
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#1FAEEB" />
-=======
       <SafeAreaView style={styles.container}>    
             <StatusBar barStyle="light-content" backgroundColor="#1FAEEB" />
 
@@ -292,7 +239,6 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
             </View>
           </View>
         )}
->>>>>>> main
 
         {/* Header */}
         <View style={styles.header}>
@@ -302,13 +248,9 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
           >
             <Ionicons name="arrow-back" size={24} color="#FDF8F8" />
           </TouchableOpacity>
-<<<<<<< HEAD
-          <Text style={styles.headerTitle}>Xác thực số điện thoại</Text>
-=======
           <Text style={styles.headerTitle}>
             {isPasswordReset ? 'Xác thực đổi mật khẩu' : 'Xác thực tài khoản'}
           </Text>
->>>>>>> main
         </View>
 
         {/* Main Content */}
@@ -316,13 +258,8 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
           <Text style={styles.instructionTitle}>
             Nhập mã xác thực gồm 6 số được gửi đến
           </Text>
-<<<<<<< HEAD
-          
-          <Text style={styles.phoneNumberText}>{formattedPhoneNumber}</Text>
-=======
 
           <Text style={styles.phoneNumberText}>{email}</Text>
->>>>>>> main
 
           {/* OTP Input */}
           <View style={styles.otpContainer}>
@@ -343,24 +280,14 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
 
           {/* Timer and Resend */}
           <View style={styles.timerContainer}>
-<<<<<<< HEAD
-            <TouchableOpacity 
-              onPress={handleResendOtp}
-              disabled={!canResend}
-=======
             <TouchableOpacity
               onPress={handleResendOtp}
               disabled={!canResend || isLoading}
->>>>>>> main
             >
               <Text
                 style={[
                   styles.resendText,
-<<<<<<< HEAD
-                  canResend ? styles.activeResend : styles.disabledResend
-=======
                   canResend && !isLoading ? styles.activeResend : styles.disabledResend
->>>>>>> main
                 ]}
               >
                 Gửi lại {!canResend && `(${timer}s)`}
@@ -374,11 +301,7 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
               <Ionicons name="information-circle" size={24} color="#1FAEEB" />
             </View>
             <Text style={styles.infoText}>
-<<<<<<< HEAD
-              Mã xác thực (OTP) đã được gửi bằng tin nhắn đến số điện thoại của bạn.
-=======
               Mã xác thực (OTP) đã được gửi bằng tin nhắn đến email của bạn.
->>>>>>> main
               Vui lòng kiểm tra và nhập mã để tiếp tục.
             </Text>
           </View>
@@ -387,10 +310,7 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
           <TouchableOpacity
             style={styles.verifyButton}
             onPress={handleVerifyOtp}
-<<<<<<< HEAD
-=======
             disabled={isLoading}
->>>>>>> main
           >
             <Text style={styles.verifyText}>Xác nhận</Text>
           </TouchableOpacity>
@@ -508,8 +428,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#FFFFFF',
   },
-<<<<<<< HEAD
-=======
   modalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -556,7 +474,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
->>>>>>> main
 });
 
 export default OTPScreen;

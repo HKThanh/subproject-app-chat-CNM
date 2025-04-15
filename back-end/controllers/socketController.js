@@ -29,18 +29,9 @@ const addNewUser = (id, socketId) => {
 };
 
 const removeUser = (id) => {
-    const beforeCount = onlineUsers.length;
+
     onlineUsers = onlineUsers.filter((item) => item.id !== id);
-    const afterCount = onlineUsers.length;
 
-    if (beforeCount !== afterCount) {
-        console.log(`Removed user ${id} from online users. Before: ${beforeCount}, After: ${afterCount}`);
-    } else {
-        console.log(`User ${id} not found in online users list`);
-    }
-
-    // Log danh sách người dùng online sau khi cập nhật
-    console.log("Current online users after removal:", onlineUsers);
 };
 
 const getUser = (id) => {
@@ -79,7 +70,6 @@ const handleUserDisconnect = (socket) => {
 const handleUserOffline = (socket) => {
     const user = getUserBySocketId(socket.id);
     console.log(user)
-    console.log(user.id)
     if (user) {
         removeUser(user.id);
         // Thông báo cho các user khác về việc user này offline
@@ -412,14 +402,10 @@ const handleSendMessage = async (io, socket) => {
             console.log("Receiver online status:", receiverOnline, "IDReceiver:", IDReceiver, "Online users:", onlineUsers);
 
             if (receiverOnline) {
-                // Gửi tin nhắn với cùng cấu trúc như send_message_success
-                io.to(receiverOnline.socketId).emit("receive_message", {
-                    conversationId: conversation.idConversation,
-                    message: messageWithUsers
-                });
-                console.log("Emitting message to receiver:", IDReceiver, "with socket ID:", receiverOnline.socketId);
-            } else {
-                console.log("Receiver is not online, message will be delivered when they connect");
+
+                io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers);
+                console.log("Emitting message to receiver:", IDReceiver);
+
             }
 
             // Emit success cho sender
@@ -801,7 +787,9 @@ const handleGetNewestMessages = async (io, socket) => {
         }
     });
 };
-
+//{
+ //   "userIds":["user002"]
+// }
 const handleCheckUsersStatus = (socket) => {
     socket.on('check_users_status', ({ userIds }) => {
         try {
@@ -822,7 +810,6 @@ const handleCheckUsersStatus = (socket) => {
         }
     });
 };
-
 const handleCreateConversation = async (io, socket) => {
     socket.on("create_conversation", async (payload) => {
         try {
@@ -911,3 +898,4 @@ module.exports = {
     handleUserDisconnect,
     handleCreateConversation
 };
+
