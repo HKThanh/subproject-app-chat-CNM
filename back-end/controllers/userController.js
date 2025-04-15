@@ -716,6 +716,7 @@ userController.updatePhone = async (req, res) => {
 userController.findUserByText = async (req, res) => {
   try {
     const { text } = req.body;
+    const currentUserId = req.user.id; // Lấy ID của người đang đăng nhập
 
     if (!text || text.trim().length === 0) {
       return res.status(400).json({
@@ -724,16 +725,24 @@ userController.findUserByText = async (req, res) => {
       });
     }
 
-    // Tạo regex pattern cho tìm kiếm tương đối
-    const searchPattern = new RegExp(text, "i");
+    // Chuẩn hóa từ khóa tìm kiếm, giữ nguyên dấu tiếng Việt
+    const normalizedText = text.trim();
+    
+    // Tạo regex pattern cho tìm kiếm tương đối, hỗ trợ Unicode/tiếng Việt
+    const searchPattern = new RegExp(normalizedText, "i");
 
-    // Tìm kiếm song song theo cả fullname và phone
+    console.log(`Đang tìm kiếm với từ khóa: "${normalizedText}"`);
+    console.log(currentUserId);
+    
+
+    // Tìm kiếm song song theo cả fullname, phone và email
     const users = await UserModel.find({
       $or: [
         { fullname: searchPattern },
         { phone: searchPattern },
         { email: searchPattern }
-      ]
+      ],
+      id: { $ne: currentUserId } // Loại bỏ người dùng hiện tại
     }, { _id: 0, id: 1, fullname: 1, urlavatar: 1, phone: 1, email: 1 });
 
     if (!users || users.length === 0) {
@@ -747,6 +756,8 @@ userController.findUserByText = async (req, res) => {
     const uniqueUsers = users.filter((user, index, self) =>
       index === self.findIndex((u) => u.id === user.id)
     );
+
+    console.log(`Tìm thấy ${uniqueUsers.length} người dùng phù hợp`);
 
     return res.status(200).json({
       code: 1,
