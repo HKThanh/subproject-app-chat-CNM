@@ -1,6 +1,10 @@
+"use client";
+
 import { useState } from "react";
 import { Search } from "lucide-react";
 import { getAuthToken } from "@/utils/auth-utils";
+import UserAddIcon from "@/assets/common/icon-user-add";
+import { useSocketContext } from "@/socket/SocketContext";
 
 interface SearchBarProps {
   onSelectConversation: (id: string) => void;
@@ -18,8 +22,10 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { socket } = useSocketContext();
 
-  const END_POINT_URL = process.env.NEXT_PUBLIC_API_URL;
+  const END_POINT_URL =
+    process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:3000";
 
   const handleSearch = async (value: string) => {
     setSearchText(value);
@@ -50,11 +56,49 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
     }
   };
 
+  const handleAddFriend = (id: string) => {
+    // Logic for adding friend (you can call an API or update state here)
+    console.log(`Add friend with id: ${id}`);
+  };
+
+  const handleSelectUser = (userId: string) => {
+    if (!socket) {
+      console.error("Socket is not initialized");
+      return;
+    }
+
+    // Lấy thông tin người dùng từ sessionStorage
+    const userSession = sessionStorage.getItem("user-session");
+    const currentUserId = userSession
+      ? JSON.parse(userSession).state.user.id
+      : null;
+
+    if (!currentUserId) {
+      console.error("User ID not found in session storage");
+      return;
+    }
+
+    // Emit sự kiện tạo conversation
+    socket.emit("create_conversation", {
+      IDSender: currentUserId,
+      IDReceiver: userId,
+    });
+
+    // Lắng nghe phản hồi từ server
+    socket.once("create_conversation_response", (response) => {
+      if (response.success) {
+        // Gọi hàm onSelectConversation với idConversation từ backend
+        onSelectConversation(response.conversation.idConversation);
+        setShowResults(false);
+        setSearchText("");
+      } else {
+        console.error("Failed to create conversation:", response.message);
+      }
+    });
+  };
+
   return (
     <div className="relative flex-1 mr-4">
-      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-        <Search className="absolute w-4 h-4 text-gray-500" />
-      </div>
       <input
         type="text"
         value={searchText}
@@ -78,11 +122,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
                   <li
                     key={result.id}
                     className="flex items-center p-3 hover:bg-gray-100 cursor-pointer"
-                    onClick={() => {
-                      onSelectConversation(result.id);
-                      setShowResults(false);
-                      setSearchText("");
-                    }}
+                    onClick={() => handleSelectUser(result.id)}
                   >
                     <img
                       src={result.urlavatar || "https://via.placeholder.com/40"}
@@ -95,6 +135,15 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
                         {result.email}
                       </div>
                     </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent the li click event
+                        handleAddFriend(result.id);
+                      }}
+                      className="ml-auto text-blue-500 text-sm hover:text-blue-700"
+                    >
+                      <UserAddIcon width={20} />
+                    </button>
                   </li>
                 ))}
               </ul>

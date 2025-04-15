@@ -25,7 +25,9 @@ interface ChatDetailProps {
   messages: Message[];
   onSendMessage: (text: string, type?: string, fileUrl?: string) => void;
   onDeleteMessage?: (messageId: string) => void;
-  onRecallMessage?: (messageId: string) => void; // Add this prop
+  onRecallMessage?: (messageId: string) => void;
+  onForwardMessage?: (messageId: string, targetConversations: string[]) => void;
+  conversations: Conversation[];
   loading: boolean;
 }
 
@@ -37,98 +39,70 @@ export default function ChatDetail({
   onSendMessage,
   onDeleteMessage,
   onRecallMessage,
-  loading
+  onForwardMessage,
+  conversations,
+  loading,
 }: ChatDetailProps) {
-  // Tham chiếu đến container tin nhắn để tự động cuộn xuống
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { socket } = useSocketContext();
   
-  // State for reply functionality
   const [replyingTo, setReplyingTo] = useState<{
     messageId: string;
     content: string;
     type: string;
   } | null>(null);
   
-  // State for forward functionality
   const [forwardingMessage, setForwardingMessage] = useState<string | null>(null);
   const [showForwardDialog, setShowForwardDialog] = useState(false);
   const [selectedConversations, setSelectedConversations] = useState<string[]>([]);
   const [availableConversations, setAvailableConversations] = useState<Conversation[]>([]);
   
-  // State for delete confirmation
   const [deletingMessage, setDeletingMessage] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  // Tự động cuộn xuống khi có tin nhắn mới
   useEffect(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [chatMessages]);
   
-  // Load available conversations for forwarding
   useEffect(() => {
-    if (showForwardDialog && socket) {
-      // This would typically come from your context or a separate API call
-      // For now, we'll use a placeholder
-      // In a real implementation, you'd fetch this from your API or context
-      socket.emit("load_conversations", { IDUser: "current_user_id" });
-      
-      // Handle the response
-      const handleConversationsResponse = (data: any) => {
-        if (data && data.Items) {
-          setAvailableConversations(data.Items);
-        }
-      };
-      
-      socket.on("load_conversations_response", handleConversationsResponse);
-      
-      return () => {
-        socket.off("load_conversations_response", handleConversationsResponse);
-      };
+    if (showForwardDialog) {
+      const filteredConversations = conversations.filter(
+        (conv) => conv.idConversation !== activeConversation?.idConversation
+      );
+      setAvailableConversations(filteredConversations);
     }
-  }, [showForwardDialog, socket]);
+  }, [showForwardDialog, conversations, activeConversation]);
 
-  // Handle reply to message
   const handleReply = (messageId: string, content: string, type: string) => {
     setReplyingTo({
       messageId,
       content,
-      type
+      type,
     });
-    // Focus on input field would be handled in ChatInput component
   };
   
-  // Handle forward message
   const handleForward = (messageId: string) => {
     setForwardingMessage(messageId);
     setShowForwardDialog(true);
     setSelectedConversations([]);
   };
   
-  // Handle delete message
   const handleDelete = (messageId: string) => {
     setDeletingMessage(messageId);
     setShowDeleteDialog(true);
   };
   
-  // Confirm forward message
   const confirmForward = () => {
-    if (forwardingMessage && selectedConversations.length > 0 && socket) {
-      socket.emit("forward_message", {
-        IDMessageDetail: forwardingMessage,
-        targetConversations: selectedConversations,
-        IDSender: "current_user_id" // This should come from your auth context
-      });
-      
+    if (forwardingMessage && selectedConversations.length > 0 && onForwardMessage) {
+      onForwardMessage(forwardingMessage, selectedConversations);
       setShowForwardDialog(false);
       setForwardingMessage(null);
       setSelectedConversations([]);
     }
   };
   
-  // Confirm delete message
   const confirmDelete = () => {
     if (deletingMessage && onDeleteMessage) {
       onDeleteMessage(deletingMessage);
@@ -137,16 +111,14 @@ export default function ChatDetail({
     }
   };
   
-  // Toggle conversation selection for forwarding
   const toggleConversationSelection = (conversationId: string) => {
-    setSelectedConversations(prev => 
+    setSelectedConversations((prev) =>
       prev.includes(conversationId)
-        ? prev.filter(id => id !== conversationId)
+        ? prev.filter((id) => id !== conversationId)
         : [...prev, conversationId]
     );
   };
   
-  // Cancel reply
   const cancelReply = () => {
     setReplyingTo(null);
   };
@@ -178,7 +150,6 @@ export default function ChatDetail({
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
         {chatMessages.length > 0 ? (
           <>
-            {/* Sắp xếp tin nhắn từ cũ đến mới (theo thời gian tăng dần) */}
             {[...chatMessages]
               .sort((a, b) => {
                 const dateA = a.dateTime ? new Date(a.dateTime).getTime() : 0;
@@ -186,26 +157,20 @@ export default function ChatDetail({
                 return dateA - dateB;
               })
               .map((msg, index) => {
-                // Chỉ hiển thị tin nhắn có nội dung
                 if (!msg.content || msg.content.trim() === "") {
                   return null;
                 }
 
-                // Xác định URL file nếu có
                 let fileUrl;
                 let displayMessage = msg.content;
-                
+
                 if (msg.type !== "text" && msg.content.includes("http")) {
-                  // Tìm URL trong nội dung tin nhắn
                   const urlMatch = msg.content.match(/(https?:\/\/[^\s]+)/g);
                   fileUrl = urlMatch ? urlMatch[0] : undefined;
-                  
-                  // Nếu là hình ảnh hoặc file, loại bỏ URL khỏi nội dung hiển thị
+
                   if (fileUrl) {
-                    // Thay thế URL bằng chuỗi rỗng và cắt khoảng trắng thừa
-                    displayMessage = msg.content.replace(fileUrl, '').trim();
-                    
-                    // Nếu chỉ còn lại URL (không có nội dung khác)
+                    displayMessage = msg.content.replace(fileUrl, "").trim();
+
                     if (!displayMessage) {
                       if (msg.type === "image") {
                         displayMessage = "Đã gửi một hình ảnh";
@@ -224,7 +189,17 @@ export default function ChatDetail({
                     messageId={msg.idMessage}
                     message={displayMessage}
                     isRemove={msg.isRemove || false}
-                    timestamp={msg.dateTime ? new Date(msg.dateTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                    timestamp={
+                      msg.dateTime
+                        ? new Date(msg.dateTime).toLocaleTimeString("vi-VN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : new Date().toLocaleTimeString("vi-VN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                    }
                     isOwn={Boolean(msg.isOwn)}
                     type={msg.type}
                     fileUrl={fileUrl}
@@ -234,8 +209,8 @@ export default function ChatDetail({
                     onDelete={handleDelete}
                   />
                 );
-              }).filter(Boolean)}
-            {/* Thêm phần tử trống để cuộn xuống */}
+              })
+              .filter(Boolean)}
             <div ref={messagesEndRef} />
           </>
         ) : (
@@ -244,13 +219,12 @@ export default function ChatDetail({
           </div>
         )}
       </div>
-      <ChatInput 
-        onSendMessage={onSendMessage} 
+      <ChatInput
+        onSendMessage={onSendMessage}
         replyingTo={replyingTo}
         onCancelReply={cancelReply}
       />
-      
-      {/* Forward Dialog */}
+
       <Dialog open={showForwardDialog} onOpenChange={setShowForwardDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -261,19 +235,19 @@ export default function ChatDetail({
           </DialogHeader>
           <ScrollArea className="h-72 mt-4">
             <div className="space-y-4">
-              {availableConversations.map(conv => (
+              {availableConversations.map((conv) => (
                 <div key={conv.idConversation} className="flex items-center space-x-2">
-                  <Checkbox 
-                    id={conv.idConversation} 
+                  <Checkbox
+                    id={conv.idConversation}
                     checked={selectedConversations.includes(conv.idConversation)}
                     onCheckedChange={() => toggleConversationSelection(conv.idConversation)}
                   />
                   <Label htmlFor={conv.idConversation} className="flex items-center">
                     {conv.otherUser?.urlavatar && (
                       <div className="w-8 h-8 rounded-full overflow-hidden mr-2">
-                        <img 
-                          src={conv.otherUser.urlavatar} 
-                          alt={conv.otherUser.fullname || "User"} 
+                        <img
+                          src={conv.otherUser.urlavatar}
+                          alt={conv.otherUser.fullname || "User"}
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -292,8 +266,8 @@ export default function ChatDetail({
             >
               Hủy
             </Button>
-            <Button 
-              type="button" 
+            <Button
+              type="button"
               onClick={confirmForward}
               disabled={selectedConversations.length === 0}
             >
@@ -302,23 +276,23 @@ export default function ChatDetail({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      {/* Delete Confirmation Dialog */}
+
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent className="sm:max-w-[325px]">
           <DialogHeader className="space-y-2">
             <DialogTitle className="text-base">Xóa tin nhắn?</DialogTitle>
           </DialogHeader>
           <DialogFooter className="sm:justify-end gap-2 mt-2">
-            <Button              type="button"
+            <Button
+              type="button"
               variant="ghost"
               onClick={() => setShowDeleteDialog(false)}
               className="h-8"
             >
               Hủy
             </Button>
-            <Button 
-              type="button" 
+            <Button
+              type="button"
               variant="destructive"
               onClick={confirmDelete}
               className="h-8"

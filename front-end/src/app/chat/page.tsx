@@ -7,7 +7,6 @@ import TabNavigation from "@/containers/chat-list/tab-navigation";
 import ChatDetail from "@/containers/chat-main/chat-detail";
 import { useChatContext } from "@/socket/ChatContext";
 import { useSocketContext } from "@/socket/SocketContext";
-import { useChat } from "@/socket/useChat";
 import { useEffect, useState } from "react";
 
 export default function Home() {
@@ -29,11 +28,11 @@ export default function Home() {
     markMessagesAsRead,
     deleteMessage,
     recallMessage,
+    forwardMessage,
   } = useChatContext();
 
   // Tải danh sách cuộc trò chuyện khi component được mount
   useEffect(() => {
-    // Thêm biến để theo dõi đã gọi loadConversations chưa
     let hasLoadedConversations = false;
 
     if (isConnected && !hasLoadedConversations) {
@@ -50,15 +49,30 @@ export default function Home() {
     }
   }, [activeConversation, isConnected, loadMessages]);
 
+  // Lắng nghe sự kiện new_conversation từ backend
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on("new_conversation", (data) => {
+      console.log("Nhận được cuộc trò chuyện mới:", data.conversation);
+      loadConversations(); // Cập nhật danh sách cuộc trò chuyện
+
+      // Tự động chuyển đến cuộc trò chuyện mới
+      setActiveConversation(data.conversation.idConversation);
+    });
+
+    return () => {
+      socket.off("new_conversation");
+    };
+  }, [socket, loadConversations]);
+
   // Thêm useEffect để đánh dấu tin nhắn đã đọc khi có tin nhắn mới trong cuộc trò chuyện đang mở
   useEffect(() => {
     if (activeConversation && messages[activeConversation]) {
-      // Lấy danh sách tin nhắn chưa đọc trong cuộc trò chuyện hiện tại
       const unreadMessages = messages[activeConversation].filter(
         (msg) => !msg.isRead && !msg.isOwn
       );
 
-      // Nếu có tin nhắn chưa đọc, đánh dấu đã đọc
       if (unreadMessages.length > 0) {
         const unreadMessageIds = unreadMessages.map((msg) => msg.idMessage);
         markMessagesAsRead(unreadMessageIds, activeConversation);
@@ -75,18 +89,15 @@ export default function Home() {
     setActiveConversation(conversationId);
     loadMessages(conversationId);
 
-    // Mark messages as read when selecting a conversation
     const conversation = conversations.find(
       (conv) => conv.idConversation === conversationId
     );
     if (conversation && (conversation.unreadCount ?? 0) > 0) {
-      // Get unread messages for this conversation
       const conversationMessages = messages[conversationId] || [];
       const unreadMessageIds = conversationMessages
         .filter((msg) => !msg.isRead && !msg.isOwn)
         .map((msg) => msg.idMessage);
 
-      // Mark messages as read if there are any unread messages
       if (unreadMessageIds.length > 0) {
         markMessagesAsRead(unreadMessageIds, conversationId);
       }
@@ -105,7 +116,6 @@ export default function Home() {
       if (type === "text") {
         sendMessage(activeConversation, text);
       } else {
-        // Gọi hàm gửi file từ useChat
         sendMessage(
           activeConversation,
           text,
@@ -119,19 +129,16 @@ export default function Home() {
   // Xử lý xóa tin nhắn
   const handleDeleteMessage = (messageId: string) => {
     if (activeConversation) {
-      // Gọi hàm xóa tin nhắn từ context
       const conversation = conversations.find(
         (conv) => conv.idConversation === activeConversation
       );
 
       if (conversation) {
-        // Lấy thông tin người nhận từ cuộc trò chuyện
         const receiverId =
           conversation.idSender === conversation.otherUser?.id
             ? conversation.idReceiver
             : conversation.idSender;
 
-        // Gọi hàm xóa tin nhắn từ context
         deleteMessage(messageId, activeConversation);
       }
     }
@@ -140,8 +147,17 @@ export default function Home() {
   // Xử lý thu hồi tin nhắn
   const handleRecallMessage = (messageId: string) => {
     if (activeConversation) {
-      // Gọi hàm thu hồi tin nhắn từ context
       recallMessage(messageId, activeConversation);
+    }
+  };
+
+  // Xử lý chuyển tin nhắn
+  const handleForwardMessage = (
+    messageId: string,
+    targetConversations: string[]
+  ) => {
+    if (activeConversation) {
+      forwardMessage(messageId, targetConversations);
     }
   };
 
@@ -186,6 +202,8 @@ export default function Home() {
           onSendMessage={handleSendMessage}
           onDeleteMessage={handleDeleteMessage}
           onRecallMessage={handleRecallMessage}
+          onForwardMessage={handleForwardMessage}
+          conversations={conversations}
           loading={loading}
         />
       </div>
