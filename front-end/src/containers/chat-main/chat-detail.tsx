@@ -45,18 +45,24 @@ export default function ChatDetail({
 }: ChatDetailProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { socket } = useSocketContext();
-  
+
   const [replyingTo, setReplyingTo] = useState<{
     messageId: string;
     content: string;
     type: string;
   } | null>(null);
-  
-  const [forwardingMessage, setForwardingMessage] = useState<string | null>(null);
+
+  const [forwardingMessage, setForwardingMessage] = useState<string | null>(
+    null
+  );
   const [showForwardDialog, setShowForwardDialog] = useState(false);
-  const [selectedConversations, setSelectedConversations] = useState<string[]>([]);
-  const [availableConversations, setAvailableConversations] = useState<Conversation[]>([]);
-  
+  const [selectedConversations, setSelectedConversations] = useState<string[]>(
+    []
+  );
+  const [availableConversations, setAvailableConversations] = useState<
+    Conversation[]
+  >([]);
+
   const [deletingMessage, setDeletingMessage] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -65,7 +71,7 @@ export default function ChatDetail({
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [chatMessages]);
-  
+
   useEffect(() => {
     if (showForwardDialog) {
       const filteredConversations = conversations.filter(
@@ -82,27 +88,31 @@ export default function ChatDetail({
       type,
     });
   };
-  
+
   const handleForward = (messageId: string) => {
     setForwardingMessage(messageId);
     setShowForwardDialog(true);
     setSelectedConversations([]);
   };
-  
+
   const handleDelete = (messageId: string) => {
     setDeletingMessage(messageId);
     setShowDeleteDialog(true);
   };
-  
+
   const confirmForward = () => {
-    if (forwardingMessage && selectedConversations.length > 0 && onForwardMessage) {
+    if (
+      forwardingMessage &&
+      selectedConversations.length > 0 &&
+      onForwardMessage
+    ) {
       onForwardMessage(forwardingMessage, selectedConversations);
       setShowForwardDialog(false);
       setForwardingMessage(null);
       setSelectedConversations([]);
     }
   };
-  
+
   const confirmDelete = () => {
     if (deletingMessage && onDeleteMessage) {
       onDeleteMessage(deletingMessage);
@@ -110,7 +120,7 @@ export default function ChatDetail({
       setDeletingMessage(null);
     }
   };
-  
+
   const toggleConversationSelection = (conversationId: string) => {
     setSelectedConversations((prev) =>
       prev.includes(conversationId)
@@ -118,7 +128,7 @@ export default function ChatDetail({
         : [...prev, conversationId]
     );
   };
-  
+
   const cancelReply = () => {
     setReplyingTo(null);
   };
@@ -212,8 +222,6 @@ export default function ChatDetail({
               })
               .filter(Boolean)}
             <div ref={messagesEndRef} />
-          </div>
-            
           </>
         ) : (
           <div className="flex items-center justify-center h-full">
@@ -238,13 +246,23 @@ export default function ChatDetail({
           <ScrollArea className="h-72 mt-4">
             <div className="space-y-4">
               {availableConversations.map((conv) => (
-                <div key={conv.idConversation} className="flex items-center space-x-2">
+                <div
+                  key={conv.idConversation}
+                  className="flex items-center space-x-2"
+                >
                   <Checkbox
                     id={conv.idConversation}
-                    checked={selectedConversations.includes(conv.idConversation)}
-                    onCheckedChange={() => toggleConversationSelection(conv.idConversation)}
+                    checked={selectedConversations.includes(
+                      conv.idConversation
+                    )}
+                    onCheckedChange={() =>
+                      toggleConversationSelection(conv.idConversation)
+                    }
                   />
-                  <Label htmlFor={conv.idConversation} className="flex items-center">
+                  <Label
+                    htmlFor={conv.idConversation}
+                    className="flex items-center"
+                  >
                     {conv.otherUser?.urlavatar && (
                       <div className="w-8 h-8 rounded-full overflow-hidden mr-2">
                         <img
