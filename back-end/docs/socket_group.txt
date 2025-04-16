@@ -78,3 +78,75 @@ output
         "user009"
     ]
 }
+
+ADD member
+Emit: add_member_to_group
+input
+{
+    "IDUser": "user010",
+    "IDConversation": "546091eb-9de4-4757-8a59-b2eec68189b7",
+    "newGroupMembers": ["user008"]
+}
+output
+{
+    "success": true,
+    "conversation": {
+        "rules": {
+            "IDOwner": "user010",
+            "listIDCoOwner": []
+        },
+        "_id": "67ff6a9df527ec2f343e7386",
+        "idConversation": "0d7ad58e-0461-48c5-93e0-9b4c6db2433e",
+        "idSender": "user010",
+        "isGroup": true,
+        "groupName": "ABC",
+        "groupAvatar": "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp",
+        "idNewestMessage": null,
+        "isBlock": false,
+        "groupMembers": [
+            "user003",
+            "user004",
+            "user008"
+        ],
+        "mutedMembers": [],
+        "listImage": [],
+        "listFile": [],
+        "lastChange": "2025-04-16T15:30:21.593",
+        "createdAt": "2025-04-16T08:30:21.609Z",
+        "updatedAt": "2025-04-16T08:31:15.443Z",
+        "__v": 0
+    },
+    "message": "Thêm thành viên thành công",
+    "members": [
+        {
+            "id": "user008",
+            "fullname": "Phạm Thị Mai Anh",
+            "urlavatar": "https://example.com/avatars/maianh.jpg",
+            "phone": "0977889911"
+        }
+    ]
+}
+
+input (Lần 2)
+{
+    "IDUser": "user010",
+    "IDConversation": "546091eb-9de4-4757-8a59-b2eec68189b7",
+    "newGroupMembers": ["user008"]
+}
+output
+{
+    "success": false,
+    "message": "Người dùng đã có trong nhóm!"
+}
+
+input
+{
+    "IDUser": "user008",
+    "IDConversation": "0d7ad58e-0461-48c5-93e0-9b4c6db2433e",
+    "newGroupMembers": ["user005"]
+}
+output (Người không có quyền thêm thành viên)
+{
+    "success": false,
+    "message": "Chỉ có trưởng nhóm hoặc phó nhóm mới quyền thêm thành viên!"
+}

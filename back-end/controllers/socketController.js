@@ -906,6 +906,8 @@ const handleCreateConversation = async (io, socket) => {
     });
 };
 
+
+
 // Khi người dùng join vào một cuộc trò chuyện
 const handleJoinConversation = (io, socket) => {
     socket.on("join_conversation", async (payload) => {
@@ -1008,13 +1010,6 @@ const handleCreatGroupConversation = (io, socket) => {
             return;
         }
 
-        const data = await conversationController.createNewGroupConversation(
-            IDOwner,
-            groupName,
-            groupAvatar,
-            groupMembers
-        );
-
         // kiểm tra groupMembers có nằm trong danh sách bạn của người tạo không
         // Check if all group members are in the owner's friend list
         const owner = await User.findOne({ id: IDOwner });
@@ -1048,6 +1043,13 @@ const handleCreatGroupConversation = (io, socket) => {
             });
             return;
         }
+
+        const data = await conversationController.createNewGroupConversation(
+            IDOwner,
+            groupName,
+            groupAvatar,
+            groupMembers
+        );
 
         const groupMembersInfos = await Promise.all(
             groupMembers.map(async (member) => {
@@ -1089,7 +1091,7 @@ const handleCreatGroupConversation = (io, socket) => {
 
 const handleAddMemberToGroup = async (io, socket) => {
     socket.on("add_member_to_group", async (payload) => {
-        const { IDConversation, IDUser, groupMembers } = payload;
+        const { IDConversation, IDUser, newGroupMembers } = payload;
         const conversation = await Conversation.findOne({ idConversation: IDConversation });
         if (!conversation) {
             socket.emit("message_from_server", "Cuộc trò chuyện không tồn tại!");
@@ -1103,16 +1105,24 @@ const handleAddMemberToGroup = async (io, socket) => {
         ) {
             socket.emit(
                 "message_from_server",
-                "Chỉ có trưởng nhóm hoặc phó nhóm mới quyền thêm thành viên!"
+                {
+                    success: false,
+                    message: "Chỉ có trưởng nhóm hoặc phó nhóm mới quyền thêm thành viên!",
+                }
             );
             return;
         }
-        // Kiểm tra xem người dùng đã có trong nhóm chưa
 
+        // Kiểm tra xem người dùng đã có trong nhóm chưa
         const existingMembers = conversation.groupMembers || [];
-        const newMembers = groupMembers.filter(member => !existingMembers.includes(member));
+        const newMembers = newGroupMembers.filter(member => !existingMembers.includes(member));
         if (newMembers.length === 0) {
-            socket.emit("message_from_server", "Người dùng đã có trong nhóm!");
+            socket.emit("message_from_server",
+                {
+                    success: false,
+                    message: "Người dùng đã có trong nhóm!",
+                }
+            );
             return;
         }
 
@@ -1122,7 +1132,44 @@ const handleAddMemberToGroup = async (io, socket) => {
         const updatedConversation = await conversationController.updateConversation(conversation);
         await updateLastChangeConversation(IDConversation, updatedConversation.idNewestMessage);
 
-        socket.emit("new_group_conversation", "Load conversation again!");
+        const dataNewMembers = await Promise.all(
+            newMembers.map(async (member) => {
+                const userInfo = await User.findOne({ id: member })
+                    .select('id fullname urlavatar phone status');
+                return {
+                    id: member,
+                    fullname: userInfo ? userInfo.fullname : 'Unknown User',
+                    urlavatar: userInfo ? userInfo.urlavatar : null,
+                    phone: userInfo ? userInfo.phone : null,
+                    status: userInfo ? userInfo.status : 'offline'
+                };
+            })
+        );
+
+        // Gửi thông báo cho các thành viên mới
+        newMembers.forEach(async (member) => {
+            const user = getUser(member);
+            if (user?.socketId) {
+                io.to(user.socketId).emit(
+                    "new_group_conversation",
+                    {
+                        success: true,
+                        conversation: updatedConversation,
+                        message: "Bạn đã được thêm vào nhóm",
+                        members: dataNewMembers
+                    }
+                );
+            }
+        });
+
+        socket.emit("new_group_conversation",
+            {
+                success: true,
+                conversation: updatedConversation,
+                message: "Thêm thành viên thành công",
+                members: dataNewMembers
+            }
+        );
     });
 };
 
@@ -1168,22 +1215,24 @@ const handleRemoveMemberFromGroup = async (io, socket) => {
 const handleDeleteGroup = async (io, socket) => {
     socket.on("delete_group", async (payload) => {
         const { IDConversation, IDUser } = payload;
-        const listConversation = await conversationController.getAllConversationByID(IDConversation);
-        const list = listConversation.Items || [];
-
-        // Check permission
-        if (list[0].rules.IDOwner !== IDUser) {
-            socket.emit("message_from_server", "Bạn không phải trưởng nhóm");
+        const conversation = await Conversation.findOne({ idConversation: IDConversation });
+        if (!conversation) {
+            socket.emit("message_from_server", "Cuộc trò chuyện không tồn tại!");
             return;
         }
-        const groupMembers = list[0].groupMembers;
-        console.log(groupMembers);
-        list.forEach(async (conversation) => {
-            await conversationController.removeConversationByID(
-                IDConversation,
-                conversation.rules.IDOwner
+
+        // Check permission
+        if (conversation.rules.IDOwner !== IDUser) {
+            socket.emit(
+                "message_from_server",
+                "Chỉ có trưởng nhóm mới quyền xóa nhóm!"
             );
-        });
+            return;
+        }
+
+        // Xóa nhóm
+        await Conversation.deleteOne({ idConversation: IDConversation });
+        socket.emit("message_from_server", "Xóa nhóm thành công!");
 
         groupMembers.forEach(async (member) => {
             const user = getUser(member);
