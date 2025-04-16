@@ -1098,6 +1098,8 @@ const handleAddMemberToGroup = async (io, socket) => {
             return;
         }
 
+        const user = User.findOne({ id: IDUser });
+
         // Check permission
         if (
             !(conversation.rules.IDOwner === IDUser ||
@@ -1162,53 +1164,175 @@ const handleAddMemberToGroup = async (io, socket) => {
             }
         });
 
-        socket.emit("new_group_conversation",
-            {
-                success: true,
-                conversation: updatedConversation,
-                message: "Thêm thành viên thành công",
-                members: dataNewMembers
+        dataNewMembers.forEach(async (member) => {
+            const user = getUser(member.id);
+            if (user?.socketId) {
+                io.to(user.socketId).emit(
+                    "new_group_conversation",
+                    {
+                        success: true,
+                        conversation: updatedConversation,
+                        message: `${user?.fullname || IDUser} đã được thêm vào nhóm`,
+                    }
+                );
             }
-        );
+        });
     });
 };
 
 const handleRemoveMemberFromGroup = async (io, socket) => {
     socket.on("remove_member_from_group", async (payload) => {
-        const { IDConversation, IDUser, groupMembers } = payload;
-        const conversation = await Conversation.findOne({ idConversation: IDConversation });
+        try {
+            const { IDConversation, IDUser, groupMembers } = payload;
+            const conversation = await Conversation.findOne({ idConversation: IDConversation });
+            
+            if (!conversation) {
+                socket.emit("remove_member_response", {
+                    success: false,
+                    message: "Cuộc trò chuyện không tồn tại!"
+                });
+                return;
+            }
 
-        if (!conversation) {
-            socket.emit("message_from_server", "Cuộc trò chuyện không tồn tại!");
-            return;
-        }
+            // Check permission
+            if (
+                !(conversation.rules.IDOwner === IDUser ||
+                  conversation.rules.listIDCoOwner.includes(IDUser))
+            ) {
+                socket.emit(
+                    "remove_member_response",
+                    {
+                        success: false,
+                        message: "Chỉ có trưởng nhóm hoặc phó nhóm mới quyền xóa thành viên!",
+                    }
+                );
+                return;
+            }
 
-        // Check permission
-        if (
-            !(conversation.rules.IDOwner === IDUser ||
-                conversation.rules.listIDCoOwner.includes(IDUser))
-        ) {
-            socket.emit(
-                "message_from_server",
-                "Chỉ có trưởng nhóm hoặc phó nhóm mới quyền xóa thành viên!"
+            // Kiểm tra không thể xóa chủ nhóm
+            if (groupMembers.includes(conversation.rules.IDOwner)) {
+                socket.emit(
+                    "remove_member_response",
+                    {
+                        success: false,
+                        message: "Không thể xóa trưởng nhóm khỏi nhóm!",
+                    }
+                );
+                return;
+            }
+
+            // Kiểm tra xem người dùng có trong nhóm không
+            const existingMembers = conversation.groupMembers || [];
+            const membersToRemove = groupMembers.filter(member => existingMembers.includes(member));
+            
+            if (membersToRemove.length === 0) {
+                socket.emit("remove_member_response", {
+                    success: false,
+                    message: "Những người dùng này không có trong nhóm!"
+                });
+                return;
+            }
+
+            // Cập nhật danh sách thành viên và co-owner
+            conversation.groupMembers = existingMembers.filter(member => !membersToRemove.includes(member));
+            
+            // Xóa quyền co-owner nếu bị xóa khỏi nhóm
+            if (conversation.rules && conversation.rules.listIDCoOwner) {
+                conversation.rules.listIDCoOwner = conversation.rules.listIDCoOwner.filter(
+                    coOwner => !membersToRemove.includes(coOwner)
+                );
+            }
+            
+            // Lưu cập nhật vào database
+            const updatedConversation = await conversationController.updateConversation(conversation);
+
+            // Tạo thông báo hệ thống
+            const user = await User.findOne({ id: IDUser }).select('fullname');
+            
+            // Lấy thông tin người bị xóa
+            const removedUsers = await Promise.all(
+                membersToRemove.map(async (member) => {
+                    const userInfo = await User.findOne({ id: member })
+                        .select('id fullname urlavatar');
+                    return {
+                        id: member,
+                        fullname: userInfo ? userInfo.fullname : 'Unknown User',
+                        urlavatar: userInfo ? userInfo.urlavatar : null
+                    };
+                })
             );
-            return;
+            
+            // Tạo nội dung thông báo
+            const removedNames = removedUsers.map(user => user.fullname || user.id).join(", ");
+            
+            const systemMessage = await MessageDetail.create({
+                idMessage: uuidv4(),
+                idSender: "system",
+                idConversation: IDConversation,
+                type: "system",
+                content: `${user?.fullname || IDUser} đã xóa ${removedNames} khỏi nhóm`,
+                dateTime: new Date().toISOString(),
+                isRead: false
+            });
+            
+            // Cập nhật lastChange và idNewestMessage
+            await updateLastChangeConversation(
+                IDConversation,
+                systemMessage.idMessage
+            );
+
+            // Thông báo cho người thực hiện xóa
+            socket.emit("remove_member_response", {
+                success: true,
+                message: "Xóa thành viên thành công",
+                removedMembers: removedUsers,
+                conversation: updatedConversation
+            });
+
+            // Thông báo cho các thành viên bị xóa
+            membersToRemove.forEach(member => {
+                const userSocket = getUser(member);
+                if (userSocket) {
+                    io.to(userSocket.socketId).emit("removed_from_group", {
+                        success: true,
+                        conversationId: IDConversation,
+                        removedBy: {
+                            id: IDUser,
+                            fullname: user?.fullname || IDUser
+                        },
+                        message: `Bạn đã bị xóa khỏi nhóm ${conversation.groupName}`
+                    });
+                }
+            });
+
+            // Thông báo cho các thành viên còn lại
+            conversation.groupMembers.forEach(member => {
+                if (member !== IDUser) {
+                    const memberSocket = getUser(member);
+                    if (memberSocket) {
+                        io.to(memberSocket.socketId).emit("member_removed_notification", {
+                            success: true,
+                            conversationId: IDConversation,
+                            removedMembers: removedUsers,
+                            removedBy: {
+                                id: IDUser,
+                                fullname: user?.fullname || IDUser
+                            },
+                            systemMessage,
+                            message: `${removedNames} đã bị xóa khỏi nhóm`
+                        });
+                    }
+                }
+            });
+
+        } catch (error) {
+            console.error("Error removing members from group:", error);
+            socket.emit("remove_member_response", {
+                success: false,
+                message: "Lỗi khi xóa thành viên khỏi nhóm",
+                error: error.message
+            });
         }
-
-        // Kiểm tra xem người dùng có trong nhóm không
-        const existingMembers = conversation.groupMembers || [];
-        const membersToRemove = groupMembers.filter(member => existingMembers.includes(member));
-        if (membersToRemove.length === 0) {
-            socket.emit("message_from_server", "Người dùng không có trong nhóm!");
-            return;
-        }
-
-        // Cập nhật danh sách thành viên
-        conversation.groupMembers = existingMembers.filter(member => !membersToRemove.includes(member));
-        const updatedConversation = await conversationController.updateConversation(conversation);
-        await updateLastChangeConversation(IDConversation, updatedConversation.idNewestMessage);
-
-        socket.emit("new_group_conversation", "Load conversation again!");
     });
 };
 

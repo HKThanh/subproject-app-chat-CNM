@@ -150,3 +150,137 @@ output (Người không có quyền thêm thành viên)
     "success": false,
     "message": "Chỉ có trưởng nhóm hoặc phó nhóm mới quyền thêm thành viên!"
 }
+
+Remove member
+Events: remove_member_response, removed_from_group, member_removed_notification
+Emit: remove_member_from_group
+input
+{
+    "IDUser": "user010",
+    "IDConversation": "0d7ad58e-0461-48c5-93e0-9b4c6db24",
+    "groupMembers": ["user004"]
+}
+output
+{
+    "success": false,
+    "message": "Cuộc trò chuyện không tồn tại!"
+}
+
+input
+{
+    "IDUser": "user010",
+    "IDConversation": "0d7ad58e-0461-48c5-93e0-9b4c6db2433e",
+    "groupMembers": ["user010"]
+}
+output
+{
+    "success": false,
+    "message": "Không thể xóa trưởng nhóm khỏi nhóm!"
+}
+
+input
+{
+    "IDUser": "user004",
+    "IDConversation": "0d7ad58e-0461-48c5-93e0-9b4c6db2433e",
+    "groupMembers": ["user003"]
+}
+output
+{
+    "success": false,
+    "message": "Chỉ có trưởng nhóm hoặc phó nhóm mới quyền xóa thành viên!"
+}
+
+input
+{
+    "IDUser": "user010",
+    "IDConversation": "0d7ad58e-0461-48c5-93e0-9b4c6db2433e",
+    "groupMembers": ["user003"]
+}
+output
+{
+    "success": true,
+    "message": "Xóa thành viên thành công",
+    "removedMembers": [
+        {
+            "id": "user003",
+            "fullname": "Alice Johnson",
+            "urlavatar": "https://example.com/avatars/alice.jpg"
+        }
+    ],
+    "conversation": {
+        "rules": {
+            "IDOwner": "user010",
+            "listIDCoOwner": []
+        },
+        "_id": "67ff6a9df527ec2f343e7386",
+        "idConversation": "0d7ad58e-0461-48c5-93e0-9b4c6db2433e",
+        "idSender": "user010",
+        "isGroup": true,
+        "groupName": "ABC",
+        "groupAvatar": "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp",
+        "idNewestMessage": null,
+        "isBlock": false,
+        "groupMembers": [
+            "user004",
+            "user005"
+        ],
+        "mutedMembers": [],
+        "listImage": [],
+        "listFile": [],
+        "lastChange": "2025-04-16T08:41:26.223Z",
+        "createdAt": "2025-04-16T08:30:21.609Z",
+        "updatedAt": "2025-04-16T08:49:33.031Z",
+        "__v": 0
+    }
+}
+
+(người bị xoá)
+output
+{
+    "success": true,
+    "conversationId": "0d7ad58e-0461-48c5-93e0-9b4c6db2433e",
+    "removedBy": {
+        "id": "user010",
+        "fullname": "Hoàng Thị Lan"
+    },
+    "message": "Bạn đã bị xóa khỏi nhóm ABC"
+}
+
+(Những ng trong nhóm)
+output
+{
+    "success": true,
+    "message": "Xóa thành viên thành công",
+    "removedMembers": [
+        {
+            "id": "user003",
+            "fullname": "Alice Johnson",
+            "urlavatar": "https://example.com/avatars/alice.jpg"
+        }
+    ],
+    "conversation": {
+        "rules": {
+            "IDOwner": "user010",
+            "listIDCoOwner": []
+        },
+        "_id": "67ff6a9df527ec2f343e7386",
+        "idConversation": "0d7ad58e-0461-48c5-93e0-9b4c6db2433e",
+        "idSender": "user010",
+        "isGroup": true,
+        "groupName": "ABC",
+        "groupAvatar": "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp",
+        "idNewestMessage": "ff43a8a1-d1db-4a47-ba6b-fa3e4d630af1",
+        "isBlock": false,
+        "groupMembers": [
+            "user004",
+            "user005"
+        ],
+        "mutedMembers": [],
+        "listImage": [],
+        "listFile": [],
+        "lastChange": "2025-04-16T08:55:18.103Z",
+        "createdAt": "2025-04-16T08:30:21.609Z",
+        "updatedAt": "2025-04-16T08:55:24.052Z",
+        "__v": 0
+    }
+}
