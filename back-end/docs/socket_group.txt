@@ -1,0 +1,80 @@
+Test tạo nhóm
+Emit: create_group_conversation
+Events: new_group_conversation, create_group_conversation_response(Cho người tạo nhóm)
+input
+{
+    "IDOwner": "user010",
+    "groupName": "ABC",
+    "groupMembers": ["user003", "user004"]
+}
+output (cho cả người tạo nhóm và các thành viên trong nhóm)
+{
+    "success": true,
+    "conversation": {
+        "idConversation": "4c02d0a0-50a1-4017-8bfc-03bd725fa640",
+        "idSender": "user010",
+        "isGroup": true,
+        "groupName": "ABC",
+        "groupAvatar": "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp",
+        "idNewestMessage": null,
+        "isBlock": false,
+        "rules": {
+            "IDOwner": "user010",
+            "listIDCoOwner": []
+        },
+        "groupMembers": [
+            "user003",
+            "user004"
+        ],
+        "mutedMembers": [],
+        "listImage": [],
+        "listFile": [],
+        "lastChange": "2025-04-16T14:38:26.437",
+        "_id": "67ff5e726775d06f26a7278c",
+        "createdAt": "2025-04-16T07:38:26.455Z",
+        "updatedAt": "2025-04-16T07:38:26.455Z",
+        "__v": 0
+    },
+    "members": [
+        {
+            "id": "user003",
+            "fullname": "Alice Johnson",
+            "urlavatar": "https://example.com/avatars/alice.jpg",
+            "phone": "0933445566"
+        },
+        {
+            "id": "user004",
+            "fullname": "Alice Johnson",
+            "urlavatar": "https://example.com/avatars/alice.jpg",
+            "phone": "0933445566"
+        }
+    ],
+    "message": "Group conversation created successfully"
+}
+
+input
+{
+    "IDOwner": "user010",
+    "groupName": "ABC",
+    "groupMembers": []
+}
+output
+{
+    "success": false,
+    "message": "Cần thêm ít nhất 1 thành viên để tạo nhóm"
+}
+
+input
+{
+    "IDOwner": "user010",
+    "groupName": "ABC",
+    "groupMembers": ["user009"]
+}
+output
+{
+    "success": false,
+    "message": "Không thể tạo nhóm với người không nằm trong danh sách bạn bè",
+    "nonFriendMembers": [
+        "user009"
+    ]
+}
