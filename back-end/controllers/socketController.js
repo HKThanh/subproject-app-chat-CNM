@@ -906,8 +906,6 @@ const handleCreateConversation = async (io, socket) => {
     });
 };
 
-
-
 // Khi người dùng join vào một cuộc trò chuyện
 const handleJoinConversation = (io, socket) => {
     socket.on("join_conversation", async (payload) => {
@@ -931,9 +929,6 @@ const handleJoinConversation = (io, socket) => {
             
             // Tham gia room
             socket.join(IDConversation);
-            
-            // Cập nhật trạng thái người dùng đang trong cuộc trò chuyện này
-            addUserToConversation(IDUser, IDConversation, socket.id);
             
             // Thông báo cho các thành viên khác
             socket.to(IDConversation).emit("user_joined_conversation", {
@@ -968,9 +963,6 @@ const handleLeaveConversation = (io, socket) => {
             
             // Rời khỏi room
             socket.leave(IDConversation);
-            
-            // Cập nhật trạng thái người dùng
-            removeUserFromConversation(IDUser, IDConversation);
             
             // Thông báo cho các thành viên khác
             socket.to(IDConversation).emit("user_left_conversation", {
@@ -1043,6 +1035,8 @@ const handleCreatGroupConversation = (io, socket) => {
             });
             return;
         }
+
+        groupMembers.push(IDOwner); // Thêm người tạo vào danh sách thành viên nhóm
 
         const data = await conversationController.createNewGroupConversation(
             IDOwner,
@@ -1373,7 +1367,7 @@ const handleDeleteGroup = async (io, socket) => {
                 success: true,
                 message: "Nhóm đã được xóa thành công!",
             }
-        );
+        )
 
         groupMembers.forEach(async (member) => {
             const user = getUser(member);
@@ -1404,26 +1398,107 @@ const handleLoadMemberOfGroup = async (io, socket) => {
 const handleChangeOwnerGroup = async (io, socket) => {
     socket.on("change_owner_group", async (payload) => {
         const { IDConversation, IDUser, IDNewOwner } = payload;
-        const listConversation = await conversationController.getAllConversationByID(IDConversation);
-        const list = listConversation.Items || [];
+        const conversation = await Conversation.findOne({ idConversation: IDConversation });
 
-        // Check permission
-        if (list[0].rules.IDOwner !== IDUser) {
-            socket.emit("message_from_server", "Bạn không phải trưởng nhóm!");
+        if (!conversation) {
+            socket.emit("message_from_server", 
+                {
+                    success: false,
+                    message: "Cuộc trò chuyện không tồn tại!",
+                }
+            );
             return;
         }
 
-        for (let conversation of list) {
-            conversation.rules.IDOwner = IDNewOwner;
-            let CoOwner = new Set(conversation.rules.listIDCoOwner);
-            if (CoOwner.has(IDNewOwner)) {
-                CoOwner.delete(IDNewOwner);
-                conversation.rules.listIDCoOwner = Array.from(CoOwner);
-            }
-            const data = await conversationController.updateConversation(conversation);
+        // Check permission
+        if (!(conversation.rules.IDOwner === IDUser)) {
+            socket.emit(
+                "message_from_server",
+                {
+                    success: false,
+                    message: "Chỉ có trưởng nhóm mới quyền thay đổi chủ nhóm!",
+                }
+            );
+            return;
         }
 
-        io.to(IDConversation).emit("new_group_conversation", "Load conversation again!");
+        // Kiểm tra xem người mới có trong danh sách thành viên không
+        if (!conversation.groupMembers.includes(IDNewOwner)) {
+            socket.emit("message_from_server",
+                {
+                    success: false,
+                    message: "Người này không có trong danh sách thành viên nhóm!",
+                }
+            );
+            return;
+        }
+
+        // Cập nhật chủ nhóm mới
+        conversation.rules.IDOwner = IDNewOwner;
+        conversation.idSender = IDNewOwner;
+        conversation.groupMembers = conversation.groupMembers.shift(IDNewOwner); // Đưa chủ nhóm mới lên đầu danh sách thành viên
+        
+        if (conversation.rules.listIDCoOwner) {
+            conversation.rules.listIDCoOwner = conversation.rules.listIDCoOwner.filter(coOwner => coOwner !== IDNewOwner);
+        }
+        
+        const updatedConversation = await conversationController.updateConversation(conversation);
+
+        await updateLastChangeConversation(IDConversation, updatedConversation.idNewestMessage);
+
+        const user = await User.findOne({ id: IDUser }).select('fullname');
+        const newOwner = await User.findOne({ id: IDNewOwner }).select('fullname');
+        const systemMessage = await MessageDetail.create({
+            idMessage: uuidv4(),
+            idSender: "system",
+            idConversation: IDConversation,
+            type: "system",
+            content: `${user?.fullname || IDUser} đã chuyển quyền chủ nhóm cho ${newOwner?.fullname || IDNewOwner}`,
+            dateTime: new Date().toISOString(),
+            isRead: false
+        });
+        // Cập nhật lastChange và idNewestMessage
+        await updateLastChangeConversation(
+            IDConversation,
+            systemMessage.idMessage
+        );
+
+        // Thông báo cho người thực hiện thay đổi
+        socket.emit("message_from_server",
+            {
+                success: true,
+                message: "Thay đổi chủ nhóm thành công",
+                conversation: updatedConversation
+            }
+        );
+
+        // Thông báo cho người mới
+        const newOwnerSocket = getUser(IDNewOwner);
+        if (newOwnerSocket) {
+            io.to(newOwnerSocket.socketId).emit(
+                "new_group_owner_noti",
+                {
+                    success: true,
+                    conversation: updatedConversation,
+                    message: `Bạn đã trở thành chủ nhóm ${conversation.groupName}`,
+                }
+            );
+        }
+
+        // Thông báo cho các thành viên còn lại
+        conversation.groupMembers.forEach(member => {
+            if (member !== IDUser) {
+                const userSocket = getUser(member);
+                if (userSocket) {
+                    io.to(userSocket.socketId).emit("member_removed_notification", {
+                        success: true,
+                        conversationId: IDConversation,
+                        systemMessage,
+                        message: `${user?.fullname || IDUser} đã chuyển quyền chủ nhóm cho ${newOwner?.fullname || IDNewOwner}`
+                    });
+                }
+            }
+        });
     });
 };
 
@@ -2203,6 +2278,124 @@ const handleLeaveGroup = (io, socket) => {
     });
 };
 
+const handleLoadGroupConversation = (io, socket) => {
+    socket.on("load_group_conversations", async (payload) => {
+        try {
+            const { IDUser, lastEvaluatedKey } = payload;
+            const skip = lastEvaluatedKey ? parseInt(lastEvaluatedKey) : 0;
+            const limit = 10;
+
+            // Query only group conversations
+            const conversations = await Conversation.find({
+                isGroup: true,
+                groupMembers: IDUser  // Only find groups where user is a member
+            })
+            .sort({ lastChange: -1 })
+            .skip(skip)
+            .limit(limit);
+
+            // Enhance conversations with additional details
+            const conversationsWithDetails = await Promise.all(
+                conversations.map(async (conv) => {
+                    // Identify the owner, co-owners and regular members
+                    const ownerId = conv.rules?.IDOwner || '';
+                    const coOwnerIds = conv.rules?.listIDCoOwner || [];
+                    const allMemberIds = conv.groupMembers || [];
+                    
+                    // Filter out owner and co-owners from regular members
+                    const regularMemberIds = allMemberIds.filter(id => 
+                        id !== ownerId && !coOwnerIds.includes(id)
+                    );
+                    
+                    // Get owner info
+                    const ownerInfo = await User.findOne({ 
+                        id: ownerId 
+                    }).select('id fullname urlavatar status');
+                    
+                    // Get co-owners info
+                    const coOwnersInfo = await User.find({ 
+                        id: { $in: coOwnerIds } 
+                    }).select('id fullname urlavatar status');
+                    
+                    // Get regular members info (limit displayed members)
+                    const displayLimit = 5 - (1 + coOwnerIds.length); // Adjust display limit based on owner + co-owners
+                    const membersLimit = displayLimit > 0 ? displayLimit : 0;
+                    const regularMembersInfo = await User.find({ 
+                        id: { $in: regularMemberIds.slice(0, membersLimit) } 
+                    }).select('id fullname urlavatar status');
+
+                    // Get latest message
+                    const latestMessage = await MessageDetail.findOne({
+                        idConversation: conv.idConversation
+                    })
+                    .sort({ dateTime: -1 })
+                    .limit(1)
+                    .populate('idSender', 'id fullname');
+
+                    let messagePreview = latestMessage ? {
+                        ...latestMessage.toObject(),
+                        preview: latestMessage.type !== 'text' ? 
+                            `Đã gửi một ${
+                                latestMessage.type === 'image' ? 'hình ảnh' :
+                                latestMessage.type === 'video' ? 'video' :
+                                'tệp đính kèm'
+                            }` : latestMessage.content
+                    } : null;
+
+                    // Count unread messages for this user
+                    const unreadCount = await MessageDetail.countDocuments({
+                        idConversation: conv.idConversation,
+                        idReceiver: IDUser,
+                        isRead: false
+                    });
+
+                    // Count total members
+                    const memberCount = allMemberIds.length;
+                    
+                    // Count not displayed members
+                    const hiddenMembersCount = regularMemberIds.length - regularMembersInfo.length;
+
+                    return {
+                        ...conv.toObject(),
+                        owner: ownerInfo,
+                        coOwners: coOwnersInfo,
+                        regularMembers: regularMembersInfo,
+                        hiddenMembersCount,
+                        totalMembers: memberCount,
+                        latestMessage: messagePreview,
+                        unreadCount,
+                        userRole: {
+                            isOwner: ownerId === IDUser,
+                            isCoOwner: coOwnerIds.includes(IDUser)
+                        }
+                    };
+                })
+            );
+
+            // Calculate total for pagination
+            const total = await Conversation.countDocuments({
+                isGroup: true,
+                groupMembers: IDUser
+            });
+
+            const hasMore = total > skip + limit;
+
+            socket.emit("load_group_conversations_response", {
+                Items: conversationsWithDetails,
+                LastEvaluatedKey: hasMore ? skip + limit : null,
+                total
+            });
+
+        } catch (error) {
+            console.error("Error loading group conversations:", error);
+            socket.emit("error", {
+                message: "Lỗi khi tải cuộc trò chuyện nhóm",
+                error: error.message
+            });
+        }
+    });
+};
+
 module.exports = {
     handleUserOnline,
     handleLoadConversation,
@@ -2234,6 +2427,7 @@ module.exports = {
     handleDemoteMember,
     handleSearchMessagesInGroup,
     handlePinGroupMessage,
-    handleLeaveGroup
+    handleLeaveGroup,
+    handleLoadGroupConversation
 };
 

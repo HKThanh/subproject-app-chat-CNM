@@ -85,6 +85,7 @@ const initSocket = (server) => {
         // Thêm hàm quản lý room conversation
         socketController.handleJoinConversation(io, socket);
         socketController.handleLeaveConversation(io, socket);
+        socketController.handleLoadGroupConversation(io, socket);
         // socketController.handleTyping(io, socket);
 
         socket.on("disconnect", () => {

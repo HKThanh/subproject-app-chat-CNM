@@ -316,3 +316,176 @@ output
     "success": true,
     "message": "Nhóm ABC đã bị xóa"
 }
+
+* Thay đổi chủ nhóm
+Events: message_from_server
+Emit: change_owner_group
+
+input
+{
+    "IDUser": "user010",
+    "IDConversation": "6725d123-c75c-41b9-bc94-89bce4d30",
+    "IDNewOwner": "user003"
+}
+output
+{
+    "success": false,
+    "message": "Cuộc trò chuyện không tồn tại!"
+}   
+
+input
+{
+    "IDUser": "user004",
+    "IDConversation": "6725d123-c75c-41b9-bc94-89bce4d30fcb",
+    "IDNewOwner": "user003"
+}
+output
+{
+    "success": false,
+    "message": "Chỉ có trưởng nhóm mới quyền thay đổi chủ nhóm!"
+}
+
+input
+{
+    "IDUser": "user010",
+    "IDConversation": "6725d123-c75c-41b9-bc94-89bce4d30fcb",
+    "IDNewOwner": "user005"
+}
+output
+{
+    "success": false,
+    "message": "Người này không có trong danh sách thành viên nhóm!"
+}
+
+input
+{
+    "IDUser": "user010",
+    "IDConversation": "6725d123-c75c-41b9-bc94-89bce4d30fcb",
+    "IDNewOwner": "user003"
+}
+output
+{
+    "success": true,
+    "message": "Thay đổi chủ nhóm thành công",
+    "conversation": {
+        "rules": {
+            "IDOwner": "user003",
+            "listIDCoOwner": []
+        },
+        "_id": "67ff7512a5c8526fc219e2bf",
+        "idConversation": "6725d123-c75c-41b9-bc94-89bce4d30fcb",
+        "idSender": "user010",
+        "isGroup": true,
+        "groupName": "ABC",
+        "groupAvatar": "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp",
+        "idNewestMessage": null,
+        "isBlock": false,
+        "groupMembers": [
+            "user003",
+            "user004"
+        ],
+        "mutedMembers": [],
+        "listImage": [],
+        "listFile": [],
+        "lastChange": "2025-04-16T16:14:58.113",
+        "createdAt": "2025-04-16T09:14:58.130Z",
+        "updatedAt": "2025-04-16T09:22:21.954Z",
+        "__v": 0
+    }
+}
+
+//Thành viên trong nhóm trừ người được chuyển quyền
+{
+    "success": true,
+    "conversationId": "6725d123-c75c-41b9-bc94-89bce4d30fcb",
+    "systemMessage": {
+        "idMessage": "d61edab8-66a1-4c49-8b0a-4e9d76004af8",
+        "idSender": "system",
+        "idConversation": "6725d123-c75c-41b9-bc94-89bce4d30fcb",
+        "type": "system",
+        "content": "Hoàng Thị Lan đã chuyển quyền chủ nhóm cho Alice Johnson",
+        "dateTime": "2025-04-16T09:22:21.970Z",
+        "isRead": false,
+        "isRecall": false,
+        "isReply": false,
+        "isForward": false,
+        "isRemove": false,
+        "idMessageReply": null,
+        "_id": "67ff76cd0fc2cda93952e4b8",
+        "createdAt": "2025-04-16T09:22:21.973Z",
+        "updatedAt": "2025-04-16T09:22:21.973Z",
+        "__v": 0
+    },
+    "message": "Hoàng Thị Lan đã chuyển quyền chủ nhóm cho Alice Johnson"
+}
+
+load group conversation
+Emit: load_group_conversation
+Events: load_group_conversation_response
+
+input
+{
+    "IDUser": "user010",
+}
+output
+{
+    "Items": [
+        {
+            "rules": {
+                "IDOwner": "user010",
+                "listIDCoOwner": []
+            },
+            "_id": "67ffb9fefe899c0d6f006124",
+            "idConversation": "0a6acb3e-62c9-4315-8726-5b47eb7f0dd4",
+            "idSender": "user010",
+            "isGroup": true,
+            "groupName": "ABCX",
+            "groupAvatar": "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp",
+            "idNewestMessage": null,
+            "isBlock": false,
+            "groupMembers": [
+                "user003",
+                "user004",
+                "user010"
+            ],
+            "mutedMembers": [],
+            "listImage": [],
+            "listFile": [],
+            "lastChange": "2025-04-16T21:09:02.240",
+            "createdAt": "2025-04-16T14:09:02.254Z",
+            "updatedAt": "2025-04-16T14:09:02.254Z",
+            "__v": 0,
+            "owner": {
+                "_id": "67fe6588f640dd369dfe691a",
+                "id": "user010",
+                "fullname": "Hoàng Thị Lan",
+                "urlavatar": "https://example.com/avatars/lan.jpg"
+            },
+            "coOwners": [],
+            "regularMembers": [
+                {
+                    "_id": "67fe6588f640dd369dfe6913",
+                    "id": "user003",
+                    "fullname": "Alice Johnson",
+                    "urlavatar": "https://example.com/avatars/alice.jpg"
+                },
+                {
+                    "_id": "67fe6588f640dd369dfe6914",
+                    "id": "user004",
+                    "fullname": "Alice Johnson",
+                    "urlavatar": "https://example.com/avatars/alice.jpg"
+                }
+            ],
+            "hiddenMembersCount": 0,
+            "totalMembers": 3,
+            "latestMessage": null,
+            "unreadCount": 0,
+            "userRole": {
+                "isOwner": true,
+                "isCoOwner": false
+            }
+        }
+    ],
+    "LastEvaluatedKey": null,
+    "total": 1
+}
