@@ -285,3 +285,23 @@ output
     "error": "Friend request not found or not authorized",
     "code": 0
 }
+
+//Lấy danh sách bạn bè
+*localhost:3000/user/friend/get-friends
+input: accessToken
+output
+{
+    "code": 0,
+    "message": "Lấy danh sách bạn bè thành công",
+    "data": [
+        {
+            "_id": "67fe6588f640dd369dfe6913",
+            "id": "user003",
+            "fullname": "Alice Johnson",
+            "email": "alice.johnson@example.com",
+            "coverPhoto": "https://example.com/covers/alice.jpg",
+            "phone": "0933445566",
+            "urlavatar": "https://example.com/avatars/alice.jpg"
+        }
+    ]
+}
