@@ -44,7 +44,11 @@ const MessageDetailSchema = new Schema({
     idMessageReply: {
         type: String,
         default: null
-    }
+    },
+    isPinned: {
+        type: Boolean,
+        default: false
+    },
 }, {
     timestamps: true
 });
