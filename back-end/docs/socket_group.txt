@@ -284,3 +284,35 @@ output
         "__v": 0
     }
 }
+
+Delete Group
+Events: message_from_server
+Emit: delete_group
+input
+{
+    "IDUser": "user003",
+    "IDConversation": "0d7ad58e-0461-48c5-93e0-9b4c6db2433e"
+}
+output
+{
+    "success": false,
+    "message": "Chỉ có trưởng nhóm mới quyền xóa nhóm!"
+}
+
+input
+{
+    "IDUser": "user003",
+    "IDConversation": "0d7ad58e-0461-48c5-93e0-9b4c6db24"
+}
+output
+{
+    "success": false,
+    "message": "Cuộc trò chuyện không tồn tại!"
+}
+
+//Các thành viên trong nhóm
+output
+{
+    "success": true,
+    "message": "Nhóm ABC đã bị xóa"
+}

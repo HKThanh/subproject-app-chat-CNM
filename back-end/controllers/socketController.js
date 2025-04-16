@@ -1341,7 +1341,12 @@ const handleDeleteGroup = async (io, socket) => {
         const { IDConversation, IDUser } = payload;
         const conversation = await Conversation.findOne({ idConversation: IDConversation });
         if (!conversation) {
-            socket.emit("message_from_server", "Cuộc trò chuyện không tồn tại!");
+            socket.emit("message_from_server", 
+                {
+                    success: false,
+                    message: "Cuộc trò chuyện không tồn tại!",
+                }
+            );
             return;
         }
 
@@ -1349,21 +1354,36 @@ const handleDeleteGroup = async (io, socket) => {
         if (conversation.rules.IDOwner !== IDUser) {
             socket.emit(
                 "message_from_server",
-                "Chỉ có trưởng nhóm mới quyền xóa nhóm!"
+                {
+                    success: false,
+                    message: "Chỉ có trưởng nhóm mới quyền xóa nhóm!",
+                }
             );
             return;
         }
 
         // Xóa nhóm
+        const group = await Conversation.findOne({ idConversation: IDConversation, isGroup: true });
+        const groupName = group.groupName;
+        const groupMembers = group.groupMembers || [];
+
         await Conversation.deleteOne({ idConversation: IDConversation });
-        socket.emit("message_from_server", "Xóa nhóm thành công!");
+        socket.emit("message_from_server",
+            {
+                success: true,
+                message: "Nhóm đã được xóa thành công!",
+            }
+        );
 
         groupMembers.forEach(async (member) => {
             const user = getUser(member);
             if (user?.socketId) {
                 io.to(user.socketId).emit(
                     "new_group_conversation",
-                    "Load conversation again!"
+                    {
+                        success: true,
+                        message: `Nhóm ${groupName} đã bị xóa`,
+                    }
                 );
             }
         });
