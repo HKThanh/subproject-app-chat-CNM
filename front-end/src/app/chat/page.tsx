@@ -8,9 +8,8 @@ import ChatDetail from "@/containers/chat-main/chat-detail";
 import { useChatContext } from "@/socket/ChatContext";
 import { useSocketContext } from "@/socket/SocketContext";
 import { useEffect, useState } from "react";
-import { Users, UsersRound } from "lucide-react";
 
-export default function ChatPage() {
+export default function Home() {
   const [showChatInfo, setShowChatInfo] = useState(false);
   const [activeConversation, setActiveConversation] = useState<string | null>(
     null
@@ -169,22 +168,8 @@ export default function ChatPage() {
           showChatInfo ? "w-1/5" : "w-1/4"
         } flex flex-col border-r border-gray-200 transition-all duration-300`}
       >
-        <div className="p-4 bg-gray-100">
-          <div className="relative flex items-center">
-            <input
-              type="text"
-              placeholder="Tìm kiếm"
-              className="w-full px-4 py-2 bg-gray-200 rounded-full text-sm focus:outline-none"
-            />
-            <div className="absolute right-3 flex items-center gap-2">
-              <button className="p-1 hover:bg-gray-300 rounded-full">
-                <Users className="w-5 h-5 text-gray-500" />
-              </button>
-              <button className="p-1 hover:bg-gray-300 rounded-full">
-                <UsersRound className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-          </div>
+        <div className="p-4">
+          <SearchBar onSelectConversation={handleSelectConversation} />
         </div>
         <div className="flex-1 overflow-hidden flex flex-col">
           <TabNavigation />

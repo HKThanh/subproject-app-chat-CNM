@@ -65,58 +65,23 @@ export default function ContactList({
         <h2 className="text-xl font-semibold">Bạn bè (379)</h2>
       </div>
 
-      {/* Search bar and filters */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex-1 relative">
-          <div className="flex items-center w-full bg-gray-100 rounded-lg">
-            <div className="pl-3 pr-2">
-              <Search className="w-4 h-4 text-gray-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="Tìm bạn"
-              className="flex-1 py-2 bg-transparent text-sm focus:outline-none placeholder:text-gray-400"
-              value={searchQuery}
-              onChange={(e) => {
-                const cursorPosition = e.target.selectionStart;
-                onSearchChange(e.target.value);
-                setTimeout(() => {
-                  e.target.setSelectionRange(cursorPosition, cursorPosition);
-                }, 0);
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 ml-4">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-1 px-3 py-2 text-sm hover:bg-gray-100 rounded-lg">
-                Tên (A-Z)
-                <ChevronDown className="w-4 h-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[200px]">
-              <DropdownMenuItem>Tên (A-Z)</DropdownMenuItem>
-              <DropdownMenuItem>Tên (Z-A)</DropdownMenuItem>
-              <DropdownMenuItem>Thời gian kết bạn (Mới nhất)</DropdownMenuItem>
-              <DropdownMenuItem>Thời gian kết bạn (Cũ nhất)</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-1 px-3 py-2 text-sm hover:bg-gray-100 rounded-lg">
-                Tất cả
-                <Filter className="w-4 h-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[200px]">
-              <DropdownMenuItem>Tất cả bạn bè</DropdownMenuItem>
-              <DropdownMenuItem>Mới truy cập gần đây</DropdownMenuItem>
-              <DropdownMenuItem>Mới kết bạn</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+      {/* Search bar */}
+      <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 mb-6">
+        <div className="flex items-center flex-1">
+          <Search className="w-4 h-4 text-gray-400 mr-2" />
+          <input
+            type="text"
+            placeholder="Tìm kiếm"
+            className="w-full bg-transparent text-sm focus:outline-none placeholder:text-gray-400"
+            value={searchQuery}
+            onChange={(e) => {
+              const cursorPosition = e.target.selectionStart;
+              onSearchChange(e.target.value);
+              setTimeout(() => {
+                e.target.setSelectionRange(cursorPosition, cursorPosition);
+              }, 0);
+            }}
+          />
         </div>
       </div>
 

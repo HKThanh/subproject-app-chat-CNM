@@ -5,6 +5,7 @@ import { Search } from "lucide-react";
 import { getAuthToken } from "@/utils/auth-utils";
 import UserAddIcon from "@/assets/common/icon-user-add";
 import { useSocketContext } from "@/socket/SocketContext";
+import { UserIcon, UsersIcon } from "lucide-react";
 
 interface SearchBarProps {
   onSelectConversation: (id: string) => void;
@@ -98,15 +99,32 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   };
 
   return (
-    <div className="relative flex-1 mr-4">
-      <input
-        type="text"
-        value={searchText}
-        onChange={(e) => handleSearch(e.target.value)}
-        onFocus={() => setShowResults(true)}
-        className="w-full py-2 pl-10 pr-4 bg-gray-100 rounded-md text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-300"
-        placeholder="Tìm kiếm"
-      />
+    <div className="relative flex-1">
+      <div className="flex items-center gap-2">
+        <div
+          className={`flex-1 flex items-center rounded-lg px-3 py-2 ${
+            searchText ? "border border-[#0866FF]" : "bg-[#F3F3F5]"
+          }`}
+        >
+          <Search className="w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchText}
+            onChange={(e) => handleSearch(e.target.value)}
+            onFocus={() => setShowResults(true)}
+            className="flex-1 bg-transparent border-none text-sm focus:outline-none placeholder:text-gray-400 ml-2"
+            placeholder="Tìm kiếm"
+          />
+          <div className="flex items-center gap-2">
+            <button className="p-1">
+              <UserIcon className="w-4 h-4 text-gray-500" />
+            </button>
+            <button className="p-1">
+              <UsersIcon className="w-4 h-4 text-gray-500" />
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Search Results Overlay */}
       {showResults && (

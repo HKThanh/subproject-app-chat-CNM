@@ -6,7 +6,10 @@ interface ContactSidebarProps {
   setActiveSection: (section: string) => void;
 }
 
-export default function ContactSidebar({ activeSection, setActiveSection }: ContactSidebarProps) {
+export default function ContactSidebar({
+  activeSection,
+  setActiveSection,
+}: ContactSidebarProps) {
   const handleSelectConversation = (id: string) => {
     console.log("Selected conversation:", id);
   };
@@ -19,7 +22,9 @@ export default function ContactSidebar({ activeSection, setActiveSection }: Cont
       <div className="space-y-1">
         <button
           className={`w-full px-4 py-2 text-left flex items-center gap-3 ${
-            activeSection === "friends" ? "bg-blue-50 text-blue-600" : "hover:bg-gray-100"
+            activeSection === "friends"
+              ? "bg-blue-50 text-blue-600"
+              : "hover:bg-gray-100"
           }`}
           onClick={() => setActiveSection("friends")}
         >
@@ -28,7 +33,9 @@ export default function ContactSidebar({ activeSection, setActiveSection }: Cont
         </button>
         <button
           className={`w-full px-4 py-2 text-left flex items-center gap-3 ${
-            activeSection === "groups" ? "bg-blue-50 text-blue-600" : "hover:bg-gray-100"
+            activeSection === "groups"
+              ? "bg-blue-50 text-blue-600"
+              : "hover:bg-gray-100"
           }`}
           onClick={() => setActiveSection("groups")}
         >
@@ -37,7 +44,9 @@ export default function ContactSidebar({ activeSection, setActiveSection }: Cont
         </button>
         <button
           className={`w-full px-4 py-2 text-left flex items-center gap-3 ${
-            activeSection === "requests" ? "bg-blue-50 text-blue-600" : "hover:bg-gray-100"
+            activeSection === "requests"
+              ? "bg-blue-50 text-blue-600"
+              : "hover:bg-gray-100"
           }`}
           onClick={() => setActiveSection("requests")}
         >
@@ -46,7 +55,9 @@ export default function ContactSidebar({ activeSection, setActiveSection }: Cont
         </button>
         <button
           className={`w-full px-4 py-2 text-left flex items-center gap-3 ${
-            activeSection === "group-invites" ? "bg-blue-50 text-blue-600" : "hover:bg-gray-100"
+            activeSection === "group-invites"
+              ? "bg-blue-50 text-blue-600"
+              : "hover:bg-gray-100"
           }`}
           onClick={() => setActiveSection("group-invites")}
         >
