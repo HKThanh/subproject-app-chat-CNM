@@ -98,15 +98,18 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   };
 
   return (
-    <div className="relative flex-1 mr-4">
-      <input
-        type="text"
-        value={searchText}
-        onChange={(e) => handleSearch(e.target.value)}
-        onFocus={() => setShowResults(true)}
-        className="w-full py-2 pl-10 pr-4 bg-gray-100 rounded-md text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-300"
-        placeholder="Tìm kiếm"
-      />
+    <div className="relative w-full">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <input
+          type="text"
+          value={searchText}
+          onChange={(e) => handleSearch(e.target.value)}
+          onFocus={() => setShowResults(true)}
+          className="w-full py-2 pl-10 pr-4 bg-gray-100 rounded-md text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-300"
+          placeholder="Tìm kiếm"
+        />
+      </div>
 
       {/* Search Results Overlay */}
       {showResults && (

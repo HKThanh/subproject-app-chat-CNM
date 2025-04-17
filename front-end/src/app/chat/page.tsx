@@ -168,11 +168,8 @@ export default function Home() {
           showChatInfo ? "w-1/5" : "w-1/4"
         } flex flex-col border-r border-gray-200 transition-all duration-300`}
       >
-        <div className="p-4">
-          <SearchBar onSelectConversation={handleSelectConversation} />
-        </div>
         <div className="flex-1 overflow-hidden flex flex-col">
-          <TabNavigation />
+          <TabNavigation onSelectConversation={handleSelectConversation} />
           <MessageList
             conversations={conversations}
             activeConversationId={activeConversation}
