@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/select";
 import { X, ChevronLeft } from "lucide-react";
 import type { UserProfile } from "./profile-modal";
-import { motion } from "framer-motion";
+// Remove motion import if not needed for performance
+// import { motion } from "framer-motion";
 
 interface ProfileEditProps {
   profile: UserProfile;
@@ -28,26 +29,45 @@ export default function ProfileEdit({
   onUpdate,
   onCancel,
 }: ProfileEditProps) {
-  const [formData, setFormData] = useState<UserProfile>({ ...profile });
+  // Use separate state for each field instead of a single object
+  // This prevents re-rendering all inputs when one changes
+  const [fullname, setFullname] = useState(profile.fullname || '');
+  const [bio, setBio] = useState(profile.bio || '');
+  const [gender, setGender] = useState(profile.gender || '');
+  const [birthDay, setBirthDay] = useState(profile.birthDay || '');
+  const [birthMonth, setBirthMonth] = useState(profile.birthMonth || '');
+  const [birthYear, setBirthYear] = useState(profile.birthYear || '');
+  const [phone, setPhone] = useState(profile.phone || '');
 
-  // Hàm xử lý thay đổi giá trị form
-  const handleChange = (field: keyof UserProfile, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  // Memoize these arrays to prevent unnecessary recalculations
+  const days = useMemo(() => 
+    Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0")),
+    []
+  );
+  
+  const months = useMemo(() => 
+    Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0")),
+    []
+  );
+  
+  const years = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return Array.from({ length: 100 }, (_, i) => String(currentYear - i));
+  }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Optimize form submission
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    onUpdate(formData);
-  };
-
-  const days = Array.from({ length: 31 }, (_, i) =>
-    String(i + 1).padStart(2, "0")
-  );
-  const months = Array.from({ length: 12 }, (_, i) =>
-    String(i + 1).padStart(2, "0")
-  );
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 100 }, (_, i) => String(currentYear - i));
+    onUpdate({
+      fullname,
+      bio,
+      gender: gender as "Nam" | "Nữ",
+      birthDay,
+      birthMonth,
+      birthYear,
+      phone,
+    });
+  }, [fullname, bio, gender, birthDay, birthMonth, birthYear, phone, onUpdate]);
 
   return (
     <div className="relative">
@@ -78,8 +98,9 @@ export default function ProfileEdit({
           <Label htmlFor="name">Tên hiển thị</Label>
           <Input
             id="name"
-            value={formData.fullname}
-            onChange={(e) => handleChange("fullname", e.target.value)}
+            value={fullname}
+            onChange={(e) => setFullname(e.target.value)}
+            autoComplete="off"
           />
         </div>
 
@@ -87,18 +108,17 @@ export default function ProfileEdit({
           <Label htmlFor="bio">Bio</Label>
           <Input
             id="bio"
-            value={formData.bio}
-            onChange={(e) => handleChange("bio", e.target.value)}
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            autoComplete="off"
           />
         </div>
 
         <div className="space-y-2">
           <Label>Thông tin cá nhân</Label>
           <RadioGroup
-            value={formData.gender}
-            onValueChange={(value) =>
-              handleChange("gender", value as "Nam" | "Nữ")
-            }
+            value={gender}
+            onValueChange={setGender}
             className="flex items-center gap-4"
           >
             <div className="flex items-center space-x-2">
@@ -114,10 +134,10 @@ export default function ProfileEdit({
 
         <div className="space-y-2">
           <Label>Ngày sinh</Label>
-          <div className="flex gap-2 z-10">
+          <div className="flex gap-2">
             <Select
-              value={formData.birthDay}
-              onValueChange={(value) => handleChange("birthDay", value)}
+              value={birthDay}
+              onValueChange={setBirthDay}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Ngày" />
@@ -132,8 +152,8 @@ export default function ProfileEdit({
             </Select>
 
             <Select
-              value={formData.birthMonth}
-              onValueChange={(value) => handleChange("birthMonth", value)}
+              value={birthMonth}
+              onValueChange={setBirthMonth}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Tháng" />
@@ -148,8 +168,8 @@ export default function ProfileEdit({
             </Select>
 
             <Select
-              value={formData.birthYear}
-              onValueChange={(value) => handleChange("birthYear", value)}
+              value={birthYear}
+              onValueChange={setBirthYear}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Năm" />
@@ -169,26 +189,20 @@ export default function ProfileEdit({
           <Label htmlFor="phone">Điện thoại</Label>
           <Input
             id="phone"
-            value={formData.phone}
-            onChange={(e) => handleChange("phone", e.target.value)}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            autoComplete="off"
           />
         </div>
 
-        <motion.div
-          className="flex justify-end gap-2 pt-4 border-t mt-6"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Hủy
-            </Button>
-          </motion.div>
-          <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-            <Button type="submit">Cập nhật</Button>
-          </motion.div>
-        </motion.div>
+        <div className="flex justify-end gap-2 pt-4 border-t mt-6">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Hủy
+          </Button>
+          <Button type="submit">
+            Cập nhật
+          </Button>
+        </div>
       </form>
     </div>
   );
