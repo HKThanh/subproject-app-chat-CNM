@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Conversation } from "@/socket/useChat";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import useUserStore from "@/stores/useUserStoree";
 import { Avatar } from "@/components/ui/avatar";
 
@@ -21,6 +21,55 @@ export default function MessageList({
   onSelectConversation,
   loading,
 }: MessageListProps) {
+  // Track previous conversation order to detect changes
+  const prevConversationsRef = useRef<string[]>([]);
+  const [animatingItems, setAnimatingItems] = useState<Set<string>>(new Set());
+  
+  // Sort conversations by lastChange date (most recent first)
+  const sortedConversations = [...conversations].sort((a, b) => {
+    // Convert dates to timestamps for comparison
+    const dateA = new Date(a.lastChange).getTime();
+    const dateB = new Date(b.lastChange).getTime();
+    
+    // Sort in descending order (newest first)
+    return dateB - dateA;
+  });
+
+  // Track conversation order changes and trigger animations
+  useEffect(() => {
+    // Get current conversation IDs in order
+    const currentIds = sortedConversations.map(c => c.idConversation);
+    const prevIds = prevConversationsRef.current;
+    
+    // Find conversations that changed position
+    const changedItems = new Set<string>();
+    
+    if (prevIds.length > 0) {
+      currentIds.forEach((id, index) => {
+        const prevIndex = prevIds.indexOf(id);
+        // If item moved up in the list (lower index = higher in the list)
+        if (prevIndex > index && prevIndex !== -1) {
+          changedItems.add(id);
+        }
+      });
+    }
+    
+    // Update ref with current order
+    prevConversationsRef.current = currentIds;
+    
+    // Set animating items
+    if (changedItems.size > 0) {
+      setAnimatingItems(changedItems);
+      
+      // Clear animation flags after animation completes
+      const timer = setTimeout(() => {
+        setAnimatingItems(new Set());
+      }, 500); // Match this to your animation duration
+      
+      return () => clearTimeout(timer);
+    }
+  }, [sortedConversations]);
+
   useEffect(() => {
     // Log thông tin về trạng thái online của tất cả các cuộc trò chuyện
     console.log("Danh sách trạng thái online của các cuộc trò chuyện:");
@@ -105,12 +154,15 @@ export default function MessageList({
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-thin bg-gray-200">
-      {conversations.map((conversation) => {
+      {sortedConversations.map((conversation) => {
         // Check if there are unread messages
         const hasUnread = (conversation.unreadCount ?? 0) > 0;
 
         // Xác định xem cuộc trò chuyện có đang được chọn không
         const isActive = activeConversationId === conversation.idConversation;
+        
+        // Check if this item should be animated
+        const isAnimating = animatingItems.has(conversation.idConversation);
 
         // Get message type icon
         const getMessageTypeIcon = () => {
