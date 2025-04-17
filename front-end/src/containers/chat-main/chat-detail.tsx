@@ -47,6 +47,7 @@ export default function ChatDetail({
   const { socket } = useSocketContext();
 
   const [replyingTo, setReplyingTo] = useState<{
+    name: string;
     messageId: string;
     content: string;
     type: string;
@@ -83,6 +84,7 @@ export default function ChatDetail({
 
   const handleReply = (messageId: string, content: string, type: string) => {
     setReplyingTo({
+      name: activeConversation?.otherUser?.fullname || "Người dùng",
       messageId,
       content,
       type,

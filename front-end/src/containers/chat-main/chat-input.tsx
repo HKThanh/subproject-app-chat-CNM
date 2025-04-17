@@ -18,6 +18,7 @@ import { toast } from "sonner";
 interface ChatInputProps {
   onSendMessage: (text: string, type?: string, fileUrl?: string) => void;
   replyingTo?: {
+    name: string;
     messageId: string;
     content: string;
     type: string;
@@ -66,6 +67,17 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
       if (replyingTo && onCancelReply) {
         onCancelReply();
       }
+    }
+  };
+
+  // Add new function to handle thumbs up click
+  const handleThumbsUpClick = () => {
+    // Send thumbs up emoji as a message
+    onSendMessage("👍", "text");
+    
+    // Clear reply state if exists
+    if (replyingTo && onCancelReply) {
+      onCancelReply();
     }
   };
 
@@ -199,12 +211,12 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
   };
 
   return (
-    <div className="p-3 border-t border-gray-200 bg-gray-50">
+    <div className="p-3 border-t border-gray-200 bg-white">
       {/* Reply bar */}
       {replyingTo && (
-        <div className="mb-3 bg-blue-50 p-2 rounded-lg border-l-4 border-blue-500 flex items-center justify-between">
+        <div className="mb-3 bg-purple-50 p-2 rounded-lg border-l-4 border-purple-500 flex items-center justify-between">
           <div className="flex flex-col">
-            <span className="text-xs text-blue-600 font-medium">Trả lời Thơ</span>
+            <span className="text-xs text-purple-600 font-medium">{replyingTo.name}</span>
             <p className="text-sm text-gray-700 truncate">{replyingTo.content}</p>
           </div>
           <button
@@ -226,7 +238,7 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2.5">
             <div 
-              className="bg-blue-500 h-2.5 rounded-full transition-all duration-300 ease-in-out" 
+              className="bg-purple-500 h-2.5 rounded-full transition-all duration-300 ease-in-out" 
               style={{ width: `${uploadProgress}%` }}
             ></div>
           </div>
@@ -358,7 +370,7 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
         />
         {message.trim() || selectedFiles.length > 0 ? (
           <button
-            className={`p-2 ml-2 rounded-full ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
+            className={`p-2 ml-2 rounded-full ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#8A56FF] hover:bg-[#7442FF]'} text-white`}
             onClick={handleSendMessage}
             disabled={isUploading}
           >
@@ -369,8 +381,12 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
             )}
           </button>
         ) : (
-          <button className="p-2 ml-2 rounded-full hover:bg-gray-200" disabled={isUploading}>
-            <ThumbsUp className="w-5 h-5 text-gray-500" />
+          <button 
+            className="p-2 ml-2 rounded-full hover:bg-gray-200" 
+            disabled={isUploading}
+            onClick={handleThumbsUpClick}
+          >
+            <ThumbsUp className="w-5 h-5 text-gray-500" width={30} color="#f6ca51"/>
           </button>
         )}
       </div>

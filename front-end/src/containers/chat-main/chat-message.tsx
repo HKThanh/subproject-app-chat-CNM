@@ -64,8 +64,8 @@ export default function ChatMessage({
                 />
               </a>
               <div className="mt-2 flex items-center">
-                <ImageIcon className="w-4 h-4 mr-1" />
-                <span className="text-sm">{message}</span>
+                <ImageIcon className="w-4 h-4 mr-1 text-gray-800" />
+                <span className="text-sm text-gray-800">{message}</span>
               </div>
             </div>
           )
@@ -225,11 +225,11 @@ export default function ChatMessage({
             type !== "text"
               ? "bg-transparent"
               : isOwn
-                ? "bg-[#4285F4] text-white max-w-xs md:max-w-md lg:max-w-lg"
+                ? "bg-[#8A56FF] text-white max-w-xs md:max-w-md lg:max-w-lg"
                 : "bg-gray-100 text-gray-800 inline-block"
           }`}
           style={{
-            backgroundColor: type !== "text" ? "transparent" : isOwn ? "#4285F4" : "",
+            backgroundColor: type !== "text" ? "transparent" : isOwn ? "#8A56FF" : "",
             color: type !== "text" ? (isOwn ? "white" : "black") : isOwn ? "white" : "",
             maxWidth: !isOwn ? "80%" : "",
           }}
