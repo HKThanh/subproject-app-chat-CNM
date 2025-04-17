@@ -1,5 +1,6 @@
 import useUserStore from "@/stores/useUserStoree";
 import { getAuthToken } from "@/utils/auth-utils";
+
 import {
   Smile,
   ImageIcon,
@@ -9,8 +10,10 @@ import {
   ThumbsUp,
   Send,
   X,
+  Loader2,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { toast } from "sonner";
 
 interface ChatInputProps {
   onSendMessage: (text: string, type?: string, fileUrl?: string) => void;
@@ -41,7 +44,8 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
-
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   // Focus on input when replying
   useEffect(() => {
     if (replyingTo && messageInputRef.current) {
@@ -67,10 +71,21 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
 
   const handleFileUpload = async () => {
     if (selectedFiles.length === 0) return;
+    if (isUploading) {
+      toast.info("Đang tải lên tệp, vui lòng đợi...");
+      return;
+    }
 
+    setIsUploading(true);
+    setUploadProgress(0);
+    
     try {
+      // Calculate total files for progress tracking
+      const totalFiles = selectedFiles.length;
+      let completedFiles = 0;
+      
       // Upload each file and collect URLs
-      const uploadPromises = selectedFiles.map(async (file) => {
+      const uploadPromises = selectedFiles.map(async (file, index) => {
         const formData = new FormData();
         formData.append("file", file);
 
@@ -87,6 +102,11 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
         }
 
         const data = await response.json();
+        
+        // Update progress after each file completes
+        completedFiles++;
+        setUploadProgress(Math.round((completedFiles / totalFiles) * 100));
+        
         return data;
       });
 
@@ -114,9 +134,13 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
       setSelectedFiles([]);
       setFilePreviews([]);
       setFileType(null);
+      toast.success("Tải lên tệp thành công!");
     } catch (error) {
       console.error("Lỗi khi upload file:", error);
-      alert("Không thể upload file. Vui lòng thử lại sau.");
+      toast.error("Không thể upload file. Vui lòng thử lại sau.");
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -192,8 +216,25 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
         </div>
       )}
 
+      {/* Upload Progress Indicator */}
+      {isUploading && (
+        <div className="mb-3 bg-white p-2 rounded-lg shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm font-medium text-gray-700">
+              Đang tải lên tệp... {uploadProgress}%
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div 
+              className="bg-blue-500 h-2.5 rounded-full transition-all duration-300 ease-in-out" 
+              style={{ width: `${uploadProgress}%` }}
+            ></div>
+          </div>
+        </div>
+      )}
+
       {/* File previews */}
-      {filePreviews.length > 0 && (
+      {filePreviews.length > 0 && !isUploading && (
         <div className="mb-3 relative bg-gray-100 p-2 rounded-lg">
           {/* Clear all button */}
           <button
@@ -313,16 +354,22 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
+          disabled={isUploading}
         />
         {message.trim() || selectedFiles.length > 0 ? (
           <button
-            className="p-2 ml-2 rounded-full bg-blue-500 hover:bg-blue-600 text-white"
+            className={`p-2 ml-2 rounded-full ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
             onClick={handleSendMessage}
+            disabled={isUploading}
           >
-            <Send className="w-5 h-5" />
+            {isUploading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Send className="w-5 h-5" />
+            )}
           </button>
         ) : (
-          <button className="p-2 ml-2 rounded-full hover:bg-gray-200">
+          <button className="p-2 ml-2 rounded-full hover:bg-gray-200" disabled={isUploading}>
             <ThumbsUp className="w-5 h-5 text-gray-500" />
           </button>
         )}
