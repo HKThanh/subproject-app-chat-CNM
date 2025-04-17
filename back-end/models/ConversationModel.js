@@ -33,6 +33,10 @@ const ConversationSchema = new Schema({
         type: [String],
         default: []
     },
+    mutedMembers: {
+        type: [String],
+        default: []
+    },
     listImage: {
         type: [String],
         default: []
