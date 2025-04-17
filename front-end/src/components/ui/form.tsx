@@ -135,23 +135,23 @@ function FormDescription({ className, ...props }: React.ComponentProps<"p">) {
   )
 }
 
-function FormMessage({ className, ...props }: React.ComponentProps<"p">) {
+function FormMessage({ className, children, ...props }: React.ComponentProps<"div">) {
   const { error, formMessageId } = useFormField()
-  const body = error ? String(error?.message ?? "") : props.children
+  const body = error ? String(error?.message ?? "") : children
 
   if (!body) {
     return null
   }
 
   return (
-    <p
+    <div
       data-slot="form-message"
       id={formMessageId}
       className={cn("text-destructive text-sm", className)}
       {...props}
     >
       {body}
-    </p>
+    </div>
   )
 }
 

@@ -156,8 +156,9 @@ export default function LoginForm() {
                       </div>
                     </FormControl>                    
                     <FormMessage>
-                      <div className="flex justify-end">
+                      <div className="flex justify-end mt-1">
                         <Button
+                          type="button"
                           variant="link"
                           className="p-0 h-auto text-sm font-semibold text-gray-800 hover:text-orange-600"
                           onClick={handleForgotPassword}
