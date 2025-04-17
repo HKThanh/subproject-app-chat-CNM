@@ -122,8 +122,7 @@ export default function ContactList({
               </svg>
               <select className="border-none bg-transparent pr-8 py-2 text-sm focus:ring-0">
                 <option>Tất cả</option>
-                <option>Trực tuyến</option>
-                <option>Ngoại tuyến</option>
+                <option>Phân loại</option>
               </select>
             </div>
           </div>
