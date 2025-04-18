@@ -29,35 +29,11 @@ export default function FriendRequests() {
     fetchFriendRequests();
   }, []);
 
-  // Thêm useEffect để lắng nghe custom event
-  useEffect(() => {
-    const handleNewSentRequest = (event: CustomEvent<FriendRequest>) => {
-      console.log("New sent request received:", event.detail);
-      setSentRequests((prev) => [event.detail, ...prev]);
-    };
-
-    // Đăng ký listener
-    window.addEventListener(
-      "newSentFriendRequest",
-      handleNewSentRequest as EventListener
-    );
-
-    return () => {
-      // Hủy đăng ký listener khi component unmount
-      window.removeEventListener(
-        "newSentFriendRequest",
-        handleNewSentRequest as EventListener
-      );
-    };
-  }, []);
-
-  // Thêm useEffect để lắng nghe sự kiện socket
   useEffect(() => {
     if (!socket) return;
 
     // Lắng nghe khi có yêu cầu kết bạn mới
     socket.on("newFriendRequest", (data) => {
-      // Thêm vào danh sách lời mời kết bạn mới
       const newRequest: FriendRequest = {
         id: data.requestId,
         sender: {
@@ -67,15 +43,12 @@ export default function FriendRequests() {
         },
         createdAt: new Date().toISOString(),
       };
-
-      // Cập nhật state trong FriendRequests component
       setReceivedRequests((prev) => [newRequest, ...prev]);
     });
 
     // Lắng nghe khi có người hủy lời mời kết bạn
     socket.on("friendRequestCancelled", (response) => {
       if (response.success) {
-        // Cập nhật danh sách lời mời nhận được
         if (Array.isArray(response.data)) {
           setReceivedRequests(response.data);
         } else {
@@ -86,9 +59,19 @@ export default function FriendRequests() {
       }
     });
 
+    // Lắng nghe khi có người từ chối lời mời kết bạn
+    socket.on("friendRequestDeclined", (response) => {
+      if (response.success) {
+        setSentRequests((prev) =>
+          prev.filter((req) => req.id !== response.data.requestId)
+        );
+      }
+    });
+
     return () => {
       socket.off("newFriendRequest");
       socket.off("friendRequestCancelled");
+      socket.off("friendRequestDeclined");
     };
   }, [socket]);
 
@@ -252,9 +235,61 @@ export default function FriendRequests() {
                       <Button
                         variant="secondary"
                         className="w-24"
-                        onClick={() =>
-                          handleFriendRequest(request.id, "DECLINED")
-                        }
+                        onClick={async () => {
+                          try {
+                            const token = await getAuthToken();
+                            const response = await fetch(
+                              `${process.env.NEXT_PUBLIC_API_URL}/user/handle`,
+                              {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                  Authorization: `Bearer ${token}`,
+                                },
+                                body: JSON.stringify({
+                                  id: request.id,
+                                  type: "DECLINED",
+                                }),
+                              }
+                            );
+
+                            const data = await response.json();
+
+                            if (data.success) {
+                              // Cập nhật UI bên người nhận
+                              setReceivedRequests((prev) =>
+                                prev.filter((req) => req.id !== request.id)
+                              );
+
+                              // Thông báo thành công
+                              toast.success("Đã từ chối lời mời");
+
+                              // Emit socket event để thông báo cho người gửi
+                              socket?.emit("friendRequestDeclined", {
+                                success: true,
+                                data: {
+                                  requestId: request.id,
+                                  senderId: request.sender?.id,
+                                  receiverId: data.data.receiverId,
+                                },
+                              });
+                            } else if (data.code === 0) {
+                              toast.error("Không tìm thấy yêu cầu kết bạn");
+                            } else if (data.code === -2) {
+                              toast.error("Loại yêu cầu không hợp lệ");
+                            } else {
+                              toast.error(
+                                data.message || "Không thể xử lý yêu cầu"
+                              );
+                            }
+                          } catch (error) {
+                            console.error(
+                              "Error declining friend request:",
+                              error
+                            );
+                            toast.error("Không thể từ chối lời mời kết bạn");
+                          }
+                        }}
                       >
                         Từ chối
                       </Button>
