@@ -2,7 +2,7 @@ import ChatHeader from "./chat-header";
 import ChatInput from "./chat-input";
 import ChatMessage from "./chat-message";
 import { Conversation, Message } from "@/socket/useChat";
-import { Loader2 } from "lucide-react";
+import { Info, Loader2, Phone } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSocketContext } from "@/socket/SocketContext";
 import {
@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import Image from "next/image";
 
 interface ChatDetailProps {
   onToggleInfo: () => void;
@@ -152,14 +153,66 @@ export default function ChatDetail({
     );
   }
 
+  // Update the header section of the ChatDetail component to show group information
+  // Find the section that renders the conversation header and update it:
+  
+  // Inside the ChatDetail component's return statement, update the header section:
   return (
-    <div className="flex flex-col h-full bg-gray-200">
-      <ChatHeader
-        onToggleInfo={onToggleInfo}
-        showChatInfo={showChatInfo}
-        conversation={activeConversation}
-      />
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      {/* Header */}
+    <div className="flex items-center justify-between p-3 border-b border-gray-200">
+      <div className="flex items-center">
+        <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
+          {activeConversation?.isGroup ? (
+            <Image
+              src={activeConversation.groupAvatar || "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp"}
+              alt={activeConversation.groupName || "Group"}
+              width={40}
+              height={40}
+              className="object-cover"
+            />
+          ) : (
+            <Image
+              src={activeConversation?.otherUser?.urlavatar || `https://ui-avatars.com/api/?name=${activeConversation?.otherUser?.fullname || "User"}`}
+              alt={activeConversation?.otherUser?.fullname || "User"}
+              width={40}
+              height={40}
+              className="object-cover"
+            />
+          )}
+        </div>
+        <div>
+          <h3 className="font-medium">
+            {activeConversation?.isGroup 
+              ? activeConversation.groupName 
+              : activeConversation?.otherUser?.fullname || "Người dùng"}
+          </h3>
+          <p className="text-xs text-gray-500">
+            {activeConversation?.isGroup 
+              ? `${activeConversation.groupMembers?.length || 0} thành viên` 
+              : activeConversation?.otherUser?.isOnline 
+                ? "Đang hoạt động" 
+                : "Không hoạt động"}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center">
+        <button className="p-2 rounded-full hover:bg-gray-100">
+          <Phone className="w-5 h-5 text-blue-600" />
+        </button>
+        <button
+          className="p-2 rounded-full hover:bg-gray-100"
+          onClick={onToggleInfo}
+        >
+          <Info className="w-5 h-5 text-blue-600" />
+        </button>
+      </div>
+    </div>
+
+    {/* Rest of the component remains the same */}
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50 pb-8">
+        
         {chatMessages.length > 0 ? (
           <>
           <div className="space-y-4">
@@ -196,6 +249,16 @@ export default function ChatDetail({
                   }
                 }
 
+                // Find sender name for group chats
+                let senderName = "";
+                if (activeConversation?.isGroup && msg.idSender) {
+                  // Try to find the sender in the group members
+                  const member = activeConversation.groupMembers?.find(
+                    member => member.id === msg.idSender
+                  );
+                  senderName = member?.fullname || msg.idSender;
+                }
+
                 return (
                   <ChatMessage
                     key={msg.idMessage || index}
@@ -217,6 +280,8 @@ export default function ChatDetail({
                     type={msg.type}
                     fileUrl={fileUrl}
                     isRecall={msg.isRecall || false}
+                    isGroup={activeConversation?.isGroup}
+                    senderName={senderName}
                     onReply={handleReply}
                     onForward={handleForward}
                     onRecallMessage={onRecallMessage}

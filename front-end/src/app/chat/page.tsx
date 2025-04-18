@@ -167,8 +167,8 @@ export default function Home() {
         } flex flex-col border-r border-gray-200 transition-all duration-300`}
       >
         <div className="flex-1 overflow-hidden flex flex-col">
-          <TabNavigation 
-            onSelectConversation={handleSelectConversation} 
+          <TabNavigation
+            onSelectConversation={handleSelectConversation}
             activeConversationId={activeConversation}
           />
         </div>

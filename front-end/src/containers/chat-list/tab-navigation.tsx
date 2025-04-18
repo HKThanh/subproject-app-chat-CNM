@@ -37,7 +37,7 @@ export default function TabNavigation({
   // Get socket, current user, and chat context
   const { socket } = useSocketContext();
   const currentUser = useUserStore((state) => state.user);
-  const { conversations, loading } = useChatContext(); // Get conversations and loading state from context
+  const { conversations, loading, createGroupConversation } = useChatContext(); // Add createGroupConversation
   
   // Use a ref for API_URL to keep it stable between renders
   const API_URL = useRef(process.env.NODE_PUBLIC_API_URL || "http://localhost:3000").current;
@@ -145,7 +145,7 @@ export default function TabNavigation({
   };
 
   const handleCreateGroup = () => {
-    if (!socket || !currentUser) {
+    if (!createGroupConversation || !currentUser) {
       toast.error("Không thể kết nối đến máy chủ");
       return;
     }
@@ -164,13 +164,12 @@ export default function TabNavigation({
 
     console.log("Creating group with members:", selectedUsers);
     
-    // Send request to create group - ensure payload matches backend expectations
-    socket.emit("create_group_conversation", {
-      IDOwner: currentUser.id,
-      groupName: groupName.trim(),
-      groupMembers: selectedUsers,
-      groupAvatar: null, 
-    });
+    // Use the createGroupConversation function from useChat
+    createGroupConversation(
+      groupName.trim(),
+      selectedUsers,
+      undefined // groupAvatar
+    );
     
     // Add a timeout to handle cases where the server doesn't respond
     setTimeout(() => {

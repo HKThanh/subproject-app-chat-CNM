@@ -15,6 +15,7 @@ import {
 import { useState } from "react"
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
+// Add senderName and isGroup props to the interface
 interface ChatMessageProps {
   message: string
   timestamp: string
@@ -24,6 +25,8 @@ interface ChatMessageProps {
   messageId?: string
   isRemove: boolean
   isRecall?: boolean
+  senderName?: string  
+  isGroup?: boolean   
   onReply?: (messageId: string, content: string, type: string) => void
   onForward?: (messageId: string) => void
   onDelete?: (messageId: string) => void
@@ -39,6 +42,8 @@ export default function ChatMessage({
   isRemove,
   isRecall,
   messageId = "",
+  senderName,    
+  isGroup = false,
   onReply,
   onForward,
   onDelete,
@@ -219,6 +224,13 @@ export default function ChatMessage({
       onMouseLeave={() => setIsHovered(false)}
     >
       <div className={`relative ${isOwn ? "pr-2" : "pl-2"}`}>
+        {/* Display sender name for group chats when not own message */}
+        {isGroup && !isOwn && senderName && (
+          <div className="text-xs text-gray-500 mb-1 font-medium pl-1">
+            {senderName}
+          </div>
+        )}
+        
         {/* Container cho nội dung tin nhắn */}
         <div
           className={`rounded-lg p-3 ${

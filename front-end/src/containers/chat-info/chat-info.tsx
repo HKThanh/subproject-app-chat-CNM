@@ -10,40 +10,64 @@ import {
   AlertTriangle,
   Trash2,
   Pencil,
+  UserPlus,
+  LogOut,
+  Settings,
 } from "lucide-react";
 import Image from "next/image";
 import { Conversation } from "@/socket/useChat";
+import { useState } from "react";
 
 interface ChatInfoProps {
   activeConversation: Conversation | null;
 }
 
 export default function ChatInfo({ activeConversation }: ChatInfoProps) {
+  const [showMembers, setShowMembers] = useState(true);
+  
+  // Determine if this is a group conversation
+  const isGroup = activeConversation?.isGroup === true;
+  
+  // Get group members if this is a group
+  const groupMembers = activeConversation?.groupMembers || [];
+  
   return (
     <div className="h-full overflow-y-auto bg-gray-50 text-gray-900">
       {/* Header */}
       <div className="p-4 border-b border-gray-200 text-center">
-        <h2 className="text-lg font-medium">Thông tin hội thoại</h2>
+        <h2 className="text-lg font-medium">Thông tin {isGroup ? "nhóm" : "hội thoại"}</h2>
       </div>
 
       {/* Profile */}
       <div className="p-4 flex flex-col items-center border-b border-gray-200">
         <div className="relative mb-2">
           <div className="w-20 h-20 rounded-full overflow-hidden">
-            <Image
-              src={activeConversation?.otherUser?.urlavatar || `https://ui-avatars.com/api/?name=${activeConversation?.otherUser?.fullname || "User"}`}
-              alt={activeConversation?.otherUser?.fullname || "User"}
-              width={80}
-              height={80}
-              className="object-cover"
-            />
+            {isGroup ? (
+              <Image
+                src={activeConversation?.groupAvatar || "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp"}
+                alt={activeConversation?.groupName || "Group"}
+                width={80}
+                height={80}
+                className="object-cover"
+              />
+            ) : (
+              <Image
+                src={activeConversation?.otherUser?.urlavatar || `https://ui-avatars.com/api/?name=${activeConversation?.otherUser?.fullname || "User"}`}
+                alt={activeConversation?.otherUser?.fullname || "User"}
+                width={80}
+                height={80}
+                className="object-cover"
+              />
+            )}
           </div>
           <button className="absolute bottom-0 right-0 bg-gray-200 p-1 rounded-full">
             <Pencil className="w-4 h-4 text-gray-600" />
           </button>
         </div>
         <h3 className="text-lg font-medium mb-4">
-          {activeConversation?.otherUser?.fullname || "Người dùng"}
+          {isGroup 
+            ? activeConversation?.groupName || "Nhóm" 
+            : activeConversation?.otherUser?.fullname || "Người dùng"}
         </h3>
 
         {/* Action buttons */}
@@ -60,14 +84,96 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
             </button>
             <span className="text-xs text-center">Ghim hội thoại</span>
           </div>
-          <div className="flex flex-col items-center">
-            <button className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center mb-1">
-              <Users className="w-5 h-5 text-blue-900" />
-            </button>
-            <span className="text-xs text-center">Tạo nhóm trò chuyện</span>
-          </div>
+          {isGroup ? (
+            <div className="flex flex-col items-center">
+              <button className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center mb-1">
+                <UserPlus className="w-5 h-5 text-blue-900" />
+              </button>
+              <span className="text-xs text-center">Thêm thành viên</span>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center">
+              <button className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center mb-1">
+                <Users className="w-5 h-5 text-blue-900" />
+              </button>
+              <span className="text-xs text-center">Tạo nhóm</span>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Group Members (only for groups) */}
+      {isGroup && (
+        <div className="border-b border-gray-200">
+          <div 
+            className="p-4 flex items-center justify-between cursor-pointer"
+            onClick={() => setShowMembers(!showMembers)}
+          >
+            <div className="flex items-center">
+              <Users className="w-5 h-5 text-blue-900 mr-2" />
+              <span className="font-medium">Thành viên nhóm ({groupMembers.length})</span>
+            </div>
+            <ChevronDown className={`w-5 h-5 transition-transform ${showMembers ? 'rotate-180' : ''}`} />
+          </div>
+          
+          {showMembers && (
+            <div className="px-4 pb-4 space-y-3">
+              {/* Group Owner */}
+              {activeConversation?.rules?.IDOwner && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
+                      <Image
+                        src={groupMembers.find(member => member.id === activeConversation.rules.IDOwner)?.urlavatar || "https://ui-avatars.com/api/?name=Owner"}
+                        alt="Group Owner"
+                        width={40}
+                        height={40}
+                        className="object-cover"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Chủ nhóm</p>
+                      <p className="text-xs text-gray-500">
+                        {groupMembers.find(member => member.id === activeConversation.rules.IDOwner)?.fullname || activeConversation.rules.IDOwner}
+                      </p>
+                    </div>
+                  </div>
+                  <Settings className="w-5 h-5 text-gray-500" />
+                </div>
+              )}
+              
+              {/* Group Members (excluding owner) */}
+              {groupMembers
+                .filter(member => member.id !== activeConversation?.rules?.IDOwner)
+                .map((member, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
+                        <Image
+                          src={member.urlavatar || 'https://nodebucketcnm203.s3.ap-southeast-1.amazonaws.com/avtdefault.avif'}
+                          alt={member.fullname}
+                          width={40}
+                          height={40}
+                          className="object-cover"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{member.fullname}</p>
+                        <p className="text-xs text-gray-500">Thành viên</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              
+              {/* Add Member Button */}
+              <button className="w-full py-2 mt-2 text-blue-600 text-sm font-medium flex items-center justify-center border border-blue-600 rounded-md">
+                <UserPlus className="w-4 h-4 mr-2" />
+                Thêm thành viên
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Reminders */}
       <div className="p-4 border-b border-gray-200">
@@ -77,13 +183,15 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
         </div>
       </div>
 
-      {/* Common groups */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center">
-          <Users className="w-5 h-5 text-blue-900 mr-2" />
-          <span className="text-blue-900 font-medium">4 nhóm chung</span>
+      {/* Common groups - only show for direct chats */}
+      {!isGroup && (
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center">
+            <Users className="w-5 h-5 text-blue-900 mr-2" />
+            <span className="text-blue-900 font-medium">Nhóm chung</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Photos/Videos */}
       <div className="border-b border-gray-200">
@@ -93,17 +201,20 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
         </div>
         <div className="px-4 pb-2">
           <div className="grid grid-cols-3 gap-1 mb-3">
-            <div className="aspect-square relative">
-              <Image
-                src="/placeholder.svg?height=100&width=100"
-                alt="Shared media"
-                width={100}
-                height={100}
-                className="object-cover rounded-md"
-              />
-            </div>
+            {/* Image placeholders */}
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="aspect-square relative">
+                <Image
+                  src="/placeholder.svg?height=100&width=100"
+                  alt="Media"
+                  width={100}
+                  height={100}
+                  className="object-cover w-full h-full"
+                />
+              </div>
+            ))}
           </div>
-          <button className="w-full py-2 bg-gray-200 rounded-md text-center text-gray-700">
+          <button className="w-full text-center text-blue-600 text-sm">
             Xem tất cả
           </button>
         </div>
@@ -115,87 +226,32 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
           <span className="font-medium">File</span>
           <ChevronDown className="w-5 h-5" />
         </div>
-        <div className="px-4 pb-4 text-center text-gray-500 text-sm">
-          Chưa có File được chia sẻ từ sau 9/4/2025
-        </div>
       </div>
 
       {/* Links */}
       <div className="border-b border-gray-200">
         <div className="p-4 flex items-center justify-between">
-          <span className="font-medium">Link</span>
+          <span className="font-medium">Liên kết</span>
           <ChevronDown className="w-5 h-5" />
         </div>
-        <div className="px-4 pb-2">
-          <div className="bg-gray-200 p-3 rounded-md mb-3 flex">
-            <div className="w-10 h-10 bg-gray-300 rounded-md flex items-center justify-center mr-3">
-              <Link className="w-5 h-5 text-gray-600" />
-            </div>
-            <div className="flex-1">
-              <div className="text-sm mb-1 truncate">
-                http://www.w3.org/2000/svg
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-blue-600">www.w3.org</span>
-                <span className="text-xs text-gray-500">Hôm nay</span>
-              </div>
-            </div>
-          </div>
-          <button className="w-full py-2 bg-gray-200 rounded-md text-center text-gray-700">
-            Xem tất cả
+      </div>
+
+      {/* Leave/Delete Group - only for groups */}
+      {isGroup && (
+        <div className="p-4">
+          <button className="w-full py-2 text-red-600 text-sm font-medium flex items-center justify-center border border-red-600 rounded-md mb-3">
+            <LogOut className="w-4 h-4 mr-2" />
+            Rời nhóm
           </button>
+          
+          {activeConversation?.rules?.IDOwner === "currentUserId" && (
+            <button className="w-full py-2 text-red-600 text-sm font-medium flex items-center justify-center border border-red-600 rounded-md">
+              <Trash2 className="w-4 h-4 mr-2" />
+              Xóa nhóm
+            </button>
+          )}
         </div>
-      </div>
-
-      {/* Security settings */}
-      <div className="border-b border-gray-200">
-        <div className="p-4 flex items-center justify-between">
-          <span className="font-medium">Thiết lập bảo mật</span>
-          <ChevronDown className="w-5 h-5" />
-        </div>
-        <div className="px-4 pb-4">
-          {/* Self-destructing messages */}
-          <div className="flex items-center mb-4">
-            <Clock3 className="w-5 h-5 text-gray-600 mr-3" />
-            <div className="flex-1">
-              <div className="flex justify-between items-center">
-                <div>
-                  <div className="text-sm font-medium">Tin nhắn tự xóa</div>
-                  <div className="text-xs text-gray-500">Không bao giờ</div>
-                </div>
-                <button className="text-gray-400 text-lg">?</button>
-              </div>
-            </div>
-          </div>
-
-          {/* Hide conversation */}
-          <div className="flex items-center mb-4">
-            <Eye className="w-5 h-5 text-gray-600 mr-3" />
-            <div className="flex-1">
-              <div className="flex justify-between items-center">
-                <div className="text-sm font-medium">Ẩn trò chuyện</div>
-                <div className="w-10 h-5 bg-gray-300 rounded-full relative">
-                  <div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Report and Delete */}
-      <div className="p-4">
-        <div className="flex items-center mb-4">
-          <AlertTriangle className="w-5 h-5 text-gray-600 mr-3" />
-          <span className="text-sm font-medium">Báo xấu</span>
-        </div>
-        <div className="flex items-center">
-          <Trash2 className="w-5 h-5 text-red-600 mr-3" />
-          <span className="text-sm font-medium text-red-600">
-            Xóa lịch sử trò chuyện
-          </span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

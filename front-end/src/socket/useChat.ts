@@ -52,6 +52,13 @@ export interface Conversation {
   isGroup: boolean;
   groupName: string,
   groupAvatar: string,
+  groupMembers: Array<{
+    id: string;
+    fullname: string;
+    urlavatar?: string;
+    phone?: string;
+    status?: string;
+  }>
   lastChange: string;
   unreadCount?: number;
   otherUser?: {
@@ -61,6 +68,10 @@ export interface Conversation {
     phone?: string;
     status?: string;
     isOnline?: boolean;
+  };
+  rules: {
+    IDOwner: string;
+    listIDCoOwner: string[];
   };
 }
 type ChatState = {
@@ -85,7 +96,8 @@ type ChatAction =
   | { type: 'MARK_MESSAGES_READ', payload: { conversationId: string, messageIds: string[] } }
   | { type: 'UPDATE_CONVERSATION', payload: { conversationId: string, updates: Partial<Conversation> } }
   | { type: 'FORWARD_MESSAGE_SUCCESS', payload: { results: Array<{ conversationId: string, message: Message }> } }
-  | { type: 'UPDATE_CONVERSATION_LATEST_MESSAGE', payload: { conversationId: string, latestMessage: Message } };
+  | { type: 'UPDATE_CONVERSATION_LATEST_MESSAGE', payload: { conversationId: string, latestMessage: Message } }
+  | { type: 'ADD_GROUP_CONVERSATION', payload: Conversation };
 ;
 const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
   switch (action.type) {
@@ -225,6 +237,30 @@ const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
         )
       };
     }
+    case 'ADD_GROUP_CONVERSATION': {
+      // Check if conversation already exists
+      const existingConversation = state.conversations.find(
+        conv => conv.idConversation === action.payload.idConversation
+      );
+      
+      if (existingConversation) {
+        // Update existing conversation
+        return {
+          ...state,
+          conversations: state.conversations.map(conv => 
+            conv.idConversation === action.payload.idConversation 
+              ? { ...conv, ...action.payload } 
+              : conv
+          )
+        };
+      } else {
+        // Add new conversation
+        return {
+          ...state,
+          conversations: [...state.conversations, action.payload]
+        };
+      }
+    }
     default:
       return state;
   }
@@ -354,6 +390,29 @@ export const useChat = (userId: string) => {
 
     dispatch({ type: 'SET_LOADING', payload: false });
   }, [state.conversations]); // Phụ thuộc vào state.conversations để luôn có danh sách mới nhất
+  const createGroupConversation = useCallback((
+    groupName: string,
+    groupMembers: string[],
+    groupAvatar?: string
+  ) => {
+    if (!socket || !userId) {
+      console.error("Cannot create group: Socket not connected or user not logged in");
+      return;
+    }
+    
+    console.log("Creating group conversation:", {
+      groupName,
+      groupMembers,
+      groupAvatar
+    });
+    
+    socket.emit("create_group_conversation", {
+      IDOwner: userId,
+      groupName,
+      groupMembers,
+      groupAvatar: groupAvatar || ""
+    });
+  }, [socket, userId]);
   // Gộp các useEffect đăng ký sự kiện socket
   useEffect(() => {
     if (!socket) return;
@@ -362,7 +421,57 @@ export const useChat = (userId: string) => {
     socket.on("load_conversations_response", handleLoadConversationsResponse);
     socket.on("load_group_conversations_response", handleLoadGroupConversationsResponse);
     socket.on("error", handleError);
-
+    const handleGroupConversationCreated = (data: {
+      success: boolean;
+      conversation: Conversation;
+      members: Array<{
+        id: string;
+        fullname: string;
+        urlavatar?: string;
+        phone?: string;
+        status?: string;
+      }>;
+      message: string;
+    }) => {
+      console.log("Group conversation creation response:", data);
+      
+      if (data.success && data.conversation) {
+        // Enhance the conversation object with members information
+        const enhancedConversation: Conversation = {
+          ...data.conversation,
+          groupMembers: data.members || [],
+          isGroup: true,
+          // Set default values for any missing fields
+          lastChange: data.conversation.lastChange || new Date().toISOString(),
+          unreadCount: 0,
+          // Make sure rules exist
+          rules: data.conversation.rules || {
+            IDOwner: userId,
+            listIDCoOwner: []
+          }
+        };
+        
+        // Add the new group conversation to state
+        dispatch({
+          type: 'ADD_GROUP_CONVERSATION',
+          payload: enhancedConversation
+        });
+        
+        // Automatically load messages for this conversation
+        loadMessages(data.conversation.idConversation);
+        
+        // Show success notification
+        console.log("Group created successfully:", data.message);
+      } else {
+        // Handle error
+        console.error("Failed to create group:", data.message);
+        dispatch({ 
+          type: 'SET_ERROR', 
+          payload: `Failed to create group: ${data.message}` 
+        });
+      }
+    };
+    socket.on("create_group_conversation_response", handleGroupConversationCreated);
     // Xử lý phản hồi tải tin nhắn
     const handleLoadMessagesResponseDirect = (data: any) => {
       console.log("Received load_messages_response directly:", data);
@@ -667,9 +776,10 @@ export const useChat = (userId: string) => {
       socket.off("connection_error", handleConnectionError);
       socket.off("unread_messages", handleUnreadMessages);
       socket.off('users_status', handleUsersStatus);
+      socket.off("create_group_conversation_response", handleGroupConversationCreated);
       socket.offAny();
     };
-  }, [socket, userId, messages, conversations, loadConversations]); // Giảm dependencies
+  }, [socket, userId, messages, conversations, loadConversations]);
 
   // Kết nối người dùng khi socket sẵn sàng
   useEffect(() => {
@@ -1157,7 +1267,6 @@ export const useChat = (userId: string) => {
       throttledCheckStatus.cancel();
     };
   }, [socket, userIds, dispatch]);
-
   // Trả về các giá trị và hàm
   return {
     conversations,
@@ -1172,5 +1281,6 @@ export const useChat = (userId: string) => {
     markMessagesAsRead,
     deleteMessage,
     forwardMessage,
+    createGroupConversation
   };
 };
