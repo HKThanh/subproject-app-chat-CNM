@@ -377,11 +377,13 @@ const getMemberInfoByIDConversation = async (req, res) => {
           fullname: member.fullname,
           urlavatar: member.urlavatar,
           email: member.email,
+          phone: member.phone,
+          bio: member.bio,
+          coverPhoto: member.coverPhoto,
           roles: {
             isOwner: memberID === conversationRules.IDOwner,
             isCoOwner: conversationRules.listIDCoOwner.includes(memberID)
           },
-          status: member.status || 'active'
         };
       })
     );

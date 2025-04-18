@@ -1064,7 +1064,6 @@ const handleCreatGroupConversation = (io, socket) => {
                     bio: userInfo ? userInfo.bio : null,
                     birthday: userInfo ? userInfo.birthday : null,
                     coverPhoto: userInfo ? userInfo.coverPhoto : null,
-                    status: userInfo ? userInfo.status : 'offline'
                 };
             })
         );
@@ -1080,7 +1079,6 @@ const handleCreatGroupConversation = (io, socket) => {
             bio: ownerInfo ? ownerInfo.bio : null,
             birthday: ownerInfo ? ownerInfo.birthday : null,
             coverPhoto: ownerInfo ? ownerInfo.coverPhoto : null,
-            status: ownerInfo ? ownerInfo.status : 'offline'
         };
         
         socket.emit("create_group_conversation_response", {
