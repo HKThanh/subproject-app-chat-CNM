@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-
 import { toast } from "sonner";
-
 import { getAuthToken } from "@/utils/auth-utils";
 import { useSocketContext } from "@/socket/SocketContext";
 
@@ -30,6 +28,29 @@ export default function FriendRequests() {
   useEffect(() => {
     fetchFriendRequests();
   }, []);
+
+  // Thêm useEffect để lắng nghe sự kiện socket
+  useEffect(() => {
+    if (!socket) return;
+
+    // Lắng nghe khi có người hủy lời mời kết bạn
+    socket.on("friendRequestCancelled", (response) => {
+      if (response.success) {
+        // Cập nhật danh sách lời mời nhận được
+        if (Array.isArray(response.data)) {
+          setReceivedRequests(response.data);
+        } else {
+          setReceivedRequests((prev) =>
+            prev.filter((req) => req.id !== response.data.requestId)
+          );
+        }
+      }
+    });
+
+    return () => {
+      socket.off("friendRequestCancelled");
+    };
+  }, [socket]);
 
   const fetchFriendRequests = async () => {
     try {
@@ -90,6 +111,41 @@ export default function FriendRequests() {
       }
     } catch (error) {
       toast.error("Không thể xử lý yêu cầu");
+    }
+  };
+
+  const handleCancelRequest = async (requestId: string) => {
+    try {
+      const token = await getAuthToken();
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/user/cancel/${requestId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Emit socket event để thông báo cho người nhận
+        socket?.emit("friendRequestCancelled", {
+          requestId,
+          receiverId: data.data.receiverId,
+        });
+
+        toast.success("Đã thu hồi lời mời kết bạn");
+        // Cập nhật UI ngay lập tức cho người gửi
+        setSentRequests((prev) => prev.filter((req) => req.id !== requestId));
+      } else {
+        toast.error(data.message || "Không thể thu hồi lời mời");
+      }
+    } catch (error) {
+      console.error("Error cancelling friend request:", error);
+      toast.error("Không thể thu hồi lời mời kết bạn");
     }
   };
 
@@ -184,9 +240,19 @@ export default function FriendRequests() {
                       <h3 className="font-medium">
                         {request.receiver?.fullname}
                       </h3>
-                      <span className="text-sm text-gray-500">
-                        {formatTimestamp(request.createdAt)}
-                      </span>
+                      <div className="flex flex-col items-end">
+                        <span className="text-sm text-gray-500">
+                          {formatTimestamp(request.createdAt)}
+                        </span>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleCancelRequest(request.id)}
+                          className="w-24 mt-2"
+                        >
+                          Thu hồi
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
