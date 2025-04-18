@@ -1055,12 +1055,13 @@ const handleCreatGroupConversation = (io, socket) => {
         const groupMembersInfos = await Promise.all(
             groupMembers.map(async (member) => {
                 const userInfo = await User.findOne({ id: member })
-                    .select('id fullname urlavatar phone status');
+                    .select('id fullname urlavatar phone email bio birthday coverPhoto');
                 return {
                     id: member,
                     fullname: userInfo ? userInfo.fullname : 'Unknown User',
                     urlavatar: userInfo ? userInfo.urlavatar : null,
                     phone: userInfo ? userInfo.phone : null,
+                    email: userInfo ? userInfo.email : null,
                     bio: userInfo ? userInfo.bio : null,
                     birthday: userInfo ? userInfo.birthday : null,
                     coverPhoto: userInfo ? userInfo.coverPhoto : null,
@@ -1069,16 +1070,15 @@ const handleCreatGroupConversation = (io, socket) => {
         );
 
         // Lấy thông tin người tạo nhóm
-        const ownerInfo = await User.findOne({ id: IDOwner });
-
         const ownerData = {
             id: IDOwner,
-            fullname: ownerInfo ? ownerInfo.fullname : 'Unknown User',
-            urlavatar: ownerInfo ? ownerInfo.urlavatar : null,
-            phone: ownerInfo ? ownerInfo.phone : null,
-            bio: ownerInfo ? ownerInfo.bio : null,
-            birthday: ownerInfo ? ownerInfo.birthday : null,
-            coverPhoto: ownerInfo ? ownerInfo.coverPhoto : null,
+            fullname: owner ? owner.fullname : 'Unknown User',
+            urlavatar: owner ? owner.urlavatar : null,
+            phone: owner ? owner.phone : null,
+            email: owner ? owner.email : null,
+            bio: owner ? owner.bio : null,
+            birthday: owner ? owner.birthday : null,
+            coverPhoto: owner ? owner.coverPhoto : null,
         };
         
         socket.emit("create_group_conversation_response", {
@@ -1086,7 +1086,7 @@ const handleCreatGroupConversation = (io, socket) => {
             conversation: data,
             owner: ownerData,
             members: groupMembersInfos,
-            message: "Group conversation created successfully"
+            message: "Tạo nhóm thành công",
         });
 
         groupMembers.forEach(async (member) => {
@@ -1097,6 +1097,7 @@ const handleCreatGroupConversation = (io, socket) => {
                     {
                         success: true,
                         conversation: data,
+                        owner: ownerData,
                         members: groupMembersInfos,
                         message: "Group conversation created successfully"
                     }
