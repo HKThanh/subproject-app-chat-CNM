@@ -194,6 +194,25 @@ export default function FriendRequests() {
     return date.toLocaleDateString("vi-VN");
   };
 
+  useEffect(() => {
+    // Listen for sent requests updates
+    const handleUpdateSentRequests = (event: CustomEvent) => {
+      setSentRequests(event.detail);
+    };
+
+    window.addEventListener(
+      "updateSentRequests",
+      handleUpdateSentRequests as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "updateSentRequests",
+        handleUpdateSentRequests as EventListener
+      );
+    };
+  }, []);
+
   return (
     <div className="h-full bg-gray-50">
       <div className="p-4">

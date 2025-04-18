@@ -106,21 +106,43 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
         });
 
         // Tạo một event tùy chỉnh để cập nhật danh sách "Lời mời đã gửi"
-        const customEvent = new CustomEvent("newSentFriendRequest", {
-          detail: {
-            id: data.data.requestId, // ID từ response của server
-            receiver: {
-              id: userId,
-              fullname: userData.fullname,
-              urlavatar: userData.urlavatar,
-            },
-            createdAt: new Date().toISOString(),
+        const newRequest = {
+          id: data.data.requestId,
+          receiver: {
+            id: userId,
+            fullname: userData.fullname,
+            urlavatar: userData.urlavatar,
           },
+          createdAt: new Date().toISOString(),
+        };
+
+        // Emit sự kiện để cập nhật danh sách lời mời đã gửi
+        socket?.emit("update_sent_requests", newRequest);
+
+        // Dispatch custom event
+        const customEvent = new CustomEvent("newSentFriendRequest", {
+          detail: newRequest,
         });
         window.dispatchEvent(customEvent);
 
+        // Fetch lại danh sách lời mời đã gửi để đảm bảo dữ liệu đồng bộ
+        const sentResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/user/get-sended-friend-requests`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        const sentData = await sentResponse.json();
+        if (sentData.success) {
+          // Dispatch event để cập nhật UI
+          const updateEvent = new CustomEvent("updateSentRequests", {
+            detail: sentData.data,
+          });
+          window.dispatchEvent(updateEvent);
+        }
+
         toast.success("Lời mời kết bạn đã được gửi");
-        setShowResults(false); // Đóng dropdown search results
+        setShowResults(false);
       } else if (data.code === 0) {
         toast.info("Yêu cầu đã được gửi trước đó");
       } else if (data.code === 2 || data.code === 3) {
