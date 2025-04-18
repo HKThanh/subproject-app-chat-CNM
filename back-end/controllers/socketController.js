@@ -144,7 +144,7 @@ const handleUserOnline = (socket) => {
     });
 };
 
-
+// Hàm dành cho chat đơn
 const handleLoadConversation = (io, socket) => {
     socket.on("load_conversations", async (payload) => {
         try {
@@ -297,6 +297,22 @@ const handleSendFile = async (io, socket) => {
             };
 
             const uploadedFile = await s3.upload(params).promise();
+            const fileUrl = uploadedFile.Location;
+
+            // Xác định loại file và cập nhật conversation
+            const fileType = type.startsWith('image/') ? 'image' : 'file';
+            const updateField = {};
+            if (fileType === 'image') {
+                updateField.$push = { listImage: fileUrl };
+            } else {
+                updateField.$push = { listFile: fileUrl };
+            }
+
+            // Cập nhật conversation
+            await Conversation.findOneAndUpdate(
+                { idConversation },
+                updateField
+            );
 
             // Create message
             const newMessage = await MessageDetail.create({
@@ -340,6 +356,7 @@ const handleSendFile = async (io, socket) => {
     });
 };
 
+// Hàm dành cho chat đơn
 const handleSendMessage = async (io, socket) => {
     socket.on("send_message", async (payload) => {
         try {
@@ -365,8 +382,23 @@ const handleSendMessage = async (io, socket) => {
 
             // Tạo message detail dựa vào type
             let messageContent = textMessage;
-            if (type !== 'text') {
-                messageContent = fileUrl; // URL từ S3 sau khi upload
+            if (type !== 'text' && fileUrl) {
+                messageContent = fileUrl;
+                
+                // Cập nhật listImage hoặc listFile trong conversation
+                const updateField = {};
+                if (type === 'image') {
+                    updateField.$push = { listImage: fileUrl };
+                } else if (['video', 'document', 'file'].includes(type)) {
+                    updateField.$push = { listFile: fileUrl };
+                }
+                
+                if (Object.keys(updateField).length > 0) {
+                    await Conversation.findOneAndUpdate(
+                        { idConversation: conversation.idConversation },
+                        updateField
+                    );
+                }
             }
 
             const messageDetail = await MessageDetail.create({
