@@ -504,6 +504,11 @@ const handleRecallMessage = async (io, socket) => {
                 updatedMessage: updatedMessage
             });
 
+            io.to(idConversation).emit("receive_message", {
+                messageId: idMessage,
+                updatedMessage: updatedMessage
+            });
+
             // Gửi thông báo thành công cho người gửi
             socket.emit("recall_message_success", {
                 messageId: idMessage,
@@ -575,6 +580,8 @@ const handleForwardMessage = async (io, socket) => {
                 if (receiverOnline) {
                     io.to(receiverOnline.socketId).emit("receive_message", messageWithUser);
                 }
+
+                io.to(IDConversation).emit("receive_message", messageWithUser);
 
                 results.push({
                     conversationId: IDConversation,
@@ -994,10 +1001,10 @@ const handleCreatGroupConversation = (io, socket) => {
         const { IDOwner, groupName, groupMembers } = payload;
         const groupAvatar = payload.groupAvatar;
         
-        if (groupMembers.length < 1) {
+        if (groupMembers.length < 2) {
             socket.emit("create_group_conversation_response", {
                 success: false,
-                message: "Cần thêm ít nhất 1 thành viên để tạo nhóm"
+                message: "Cần thêm ít nhất 2 thành viên để tạo nhóm"
             });
             return;
         }
@@ -1054,14 +1061,32 @@ const handleCreatGroupConversation = (io, socket) => {
                     fullname: userInfo ? userInfo.fullname : 'Unknown User',
                     urlavatar: userInfo ? userInfo.urlavatar : null,
                     phone: userInfo ? userInfo.phone : null,
+                    bio: userInfo ? userInfo.bio : null,
+                    birthday: userInfo ? userInfo.birthday : null,
+                    coverPhoto: userInfo ? userInfo.coverPhoto : null,
                     status: userInfo ? userInfo.status : 'offline'
                 };
             })
         );
+
+        // Lấy thông tin người tạo nhóm
+        const ownerInfo = await User.findOne({ id: IDOwner });
+
+        const ownerData = {
+            id: IDOwner,
+            fullname: ownerInfo ? ownerInfo.fullname : 'Unknown User',
+            urlavatar: ownerInfo ? ownerInfo.urlavatar : null,
+            phone: ownerInfo ? ownerInfo.phone : null,
+            bio: ownerInfo ? ownerInfo.bio : null,
+            birthday: ownerInfo ? ownerInfo.birthday : null,
+            coverPhoto: ownerInfo ? ownerInfo.coverPhoto : null,
+            status: ownerInfo ? ownerInfo.status : 'offline'
+        };
         
         socket.emit("create_group_conversation_response", {
             success: true,
             conversation: data,
+            owner: ownerData,
             members: groupMembersInfos,
             message: "Group conversation created successfully"
         });

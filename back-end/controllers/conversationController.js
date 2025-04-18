@@ -354,7 +354,6 @@ const getMemberInfoByIDConversation = async (req, res) => {
     // Tìm conversation
     const conversation = await Conversation.findOne({
       idConversation: IDConversation,
-      idSender: IDSender
     });
 
     if (!conversation || !conversation.groupMembers?.length) {
@@ -369,7 +368,7 @@ const getMemberInfoByIDConversation = async (req, res) => {
     // Lấy thông tin members
     const membersInfo = await Promise.all(
       conversation.groupMembers.map(async (memberID) => {
-        const member = await UserModel.findOne({ id: memberID });
+        const member = await User.findOne({ id: memberID });
         
         if (!member) return null;
 
