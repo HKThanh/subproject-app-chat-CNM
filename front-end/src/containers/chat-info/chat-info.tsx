@@ -24,18 +24,20 @@ interface ChatInfoProps {
 
 export default function ChatInfo({ activeConversation }: ChatInfoProps) {
   const [showMembers, setShowMembers] = useState(true);
-  
+
   // Determine if this is a group conversation
   const isGroup = activeConversation?.isGroup === true;
-  
+
   // Get group members if this is a group
   const groupMembers = activeConversation?.groupMembers || [];
-  
+
   return (
     <div className="h-full overflow-y-auto bg-gray-50 text-gray-900">
       {/* Header */}
       <div className="p-4 border-b border-gray-200 text-center">
-        <h2 className="text-lg font-medium">Thông tin {isGroup ? "nhóm" : "hội thoại"}</h2>
+        <h2 className="text-lg font-medium">
+          Thông tin {isGroup ? "nhóm" : "hội thoại"}
+        </h2>
       </div>
 
       {/* Profile */}
@@ -44,7 +46,10 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
           <div className="w-20 h-20 rounded-full overflow-hidden">
             {isGroup ? (
               <Image
-                src={activeConversation?.groupAvatar || "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp"}
+                src={
+                  activeConversation?.groupAvatar ||
+                  "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp"
+                }
                 alt={activeConversation?.groupName || "Group"}
                 width={80}
                 height={80}
@@ -52,7 +57,12 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
               />
             ) : (
               <Image
-                src={activeConversation?.otherUser?.urlavatar || `https://ui-avatars.com/api/?name=${activeConversation?.otherUser?.fullname || "User"}`}
+                src={
+                  activeConversation?.otherUser?.urlavatar ||
+                  `https://ui-avatars.com/api/?name=${
+                    activeConversation?.otherUser?.fullname || "User"
+                  }`
+                }
                 alt={activeConversation?.otherUser?.fullname || "User"}
                 width={80}
                 height={80}
@@ -65,8 +75,8 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
           </button>
         </div>
         <h3 className="text-lg font-medium mb-4">
-          {isGroup 
-            ? activeConversation?.groupName || "Nhóm" 
+          {isGroup
+            ? activeConversation?.groupName || "Nhóm"
             : activeConversation?.otherUser?.fullname || "Người dùng"}
         </h3>
 
@@ -105,17 +115,23 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
       {/* Group Members (only for groups) */}
       {isGroup && (
         <div className="border-b border-gray-200">
-          <div 
+          <div
             className="p-4 flex items-center justify-between cursor-pointer"
             onClick={() => setShowMembers(!showMembers)}
           >
             <div className="flex items-center">
               <Users className="w-5 h-5 text-blue-900 mr-2" />
-              <span className="font-medium">Thành viên nhóm ({groupMembers.length})</span>
+              <span className="font-medium">
+                Thành viên nhóm ({groupMembers.length})
+              </span>
             </div>
-            <ChevronDown className={`w-5 h-5 transition-transform ${showMembers ? 'rotate-180' : ''}`} />
+            <ChevronDown
+              className={`w-5 h-5 transition-transform ${
+                showMembers ? "rotate-180" : ""
+              }`}
+            />
           </div>
-          
+
           {showMembers && (
             <div className="px-4 pb-4 space-y-3">
               {/* Group Owner */}
@@ -124,7 +140,13 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
                   <div className="flex items-center">
                     <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
                       <Image
-                        src={groupMembers.find(member => member.id === activeConversation.rules.IDOwner)?.urlavatar || "https://ui-avatars.com/api/?name=Owner"}
+                        src={
+                          groupMembers.find(
+                            (member) =>
+                              member.id === activeConversation.rules.IDOwner
+                          )?.urlavatar ||
+                          "https://ui-avatars.com/api/?name=Owner"
+                        }
                         alt="Group Owner"
                         width={40}
                         height={40}
@@ -134,23 +156,34 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
                     <div>
                       <p className="text-sm font-medium">Chủ nhóm</p>
                       <p className="text-xs text-gray-500">
-                        {groupMembers.find(member => member.id === activeConversation.rules.IDOwner)?.fullname || activeConversation.rules.IDOwner}
+                        {groupMembers.find(
+                          (member) =>
+                            member.id === activeConversation.rules.IDOwner
+                        )?.fullname || activeConversation.rules.IDOwner}
                       </p>
                     </div>
                   </div>
                   <Settings className="w-5 h-5 text-gray-500" />
                 </div>
               )}
-              
+
               {/* Group Members (excluding owner) */}
               {groupMembers
-                .filter(member => member.id !== activeConversation?.rules?.IDOwner)
+                .filter(
+                  (member) => member.id !== activeConversation?.rules?.IDOwner
+                )
                 .map((member, index) => (
-                  <div key={index} className="flex items-center justify-between">
+                  <div
+                    key={index}
+                    className="flex items-center justify-between"
+                  >
                     <div className="flex items-center">
                       <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
                         <Image
-                          src={member.urlavatar || 'https://nodebucketcnm203.s3.ap-southeast-1.amazonaws.com/avtdefault.avif'}
+                          src={
+                            member.urlavatar ||
+                            "https://nodebucketcnm203.s3.ap-southeast-1.amazonaws.com/avtdefault.avif"
+                          }
                           alt={member.fullname}
                           width={40}
                           height={40}
@@ -164,7 +197,7 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
                     </div>
                   </div>
                 ))}
-              
+
               {/* Add Member Button */}
               <button className="w-full py-2 mt-2 text-blue-600 text-sm font-medium flex items-center justify-center border border-blue-600 rounded-md">
                 <UserPlus className="w-4 h-4 mr-2" />
@@ -176,12 +209,12 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
       )}
 
       {/* Reminders */}
-      <div className="p-4 border-b border-gray-200">
+      {/* <div className="p-4 border-b border-gray-200">
         <div className="flex items-center mb-2">
           <Clock className="w-5 h-5 text-blue-900 mr-2" />
           <span className="text-blue-900 font-medium">Danh sách nhắc hẹn</span>
         </div>
-      </div>
+      </div> */}
 
       {/* Common groups - only show for direct chats */}
       {!isGroup && (
@@ -202,17 +235,18 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
         <div className="px-4 pb-2">
           <div className="grid grid-cols-3 gap-1 mb-3">
             {/* Image placeholders */}
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="aspect-square relative">
-                <Image
-                  src="/placeholder.svg?height=100&width=100"
-                  alt="Media"
-                  width={100}
-                  height={100}
-                  className="object-cover w-full h-full"
-                />
-              </div>
-            ))}
+            {activeConversation?.listImage &&
+              activeConversation.listImage.map((imageUrl) => (
+                <div key={imageUrl} className="aspect-square relative">
+                  <Image
+                    src={imageUrl}
+                    alt="Media"
+                    width={100}
+                    height={100}
+                    className="object-cover w-full h-full"
+                  />
+                </div>
+              ))}
           </div>
           <button className="w-full text-center text-blue-600 text-sm">
             Xem tất cả
@@ -222,9 +256,43 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
 
       {/* Files */}
       <div className="border-b border-gray-200">
-        <div className="p-4 flex items-center justify-between">
+        <div className="p-4 flex items-center justify-between cursor-pointer">
           <span className="font-medium">File</span>
           <ChevronDown className="w-5 h-5" />
+        </div>
+        <div className="px-4 pb-4">
+          {activeConversation?.listFile &&
+            activeConversation.listFile.map((file, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
+              >
+                <div className="flex items-center">
+                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
+                    <Link className="w-5 h-5 text-gray-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium truncate max-w-[200px]">
+                      {file.name}
+                    </p>
+                    <p className="text-xs text-gray-500">{file.size}</p>
+                  </div>
+                </div>
+                <a
+                  href={file.url}
+                  download
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  <Eye className="w-5 h-5" />
+                </a>
+              </div>
+            ))}
+          {(!activeConversation?.listFile ||
+            activeConversation.listFile.length === 0) && (
+            <p className="text-center text-gray-500 text-sm py-2">
+              Không có file nào
+            </p>
+          )}
         </div>
       </div>
 
@@ -243,7 +311,7 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
             <LogOut className="w-4 h-4 mr-2" />
             Rời nhóm
           </button>
-          
+
           {activeConversation?.rules?.IDOwner === "currentUserId" && (
             <button className="w-full py-2 text-red-600 text-sm font-medium flex items-center justify-center border border-red-600 rounded-md">
               <Trash2 className="w-4 h-4 mr-2" />

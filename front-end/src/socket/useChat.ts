@@ -38,6 +38,9 @@ export interface Conversation {
   idConversation: string;
   idSender: string;
   idReceiver: string;
+  listImage: string[];
+  listFile: string[];
+  listVideo: string[];
   latestMessage: {
     content: string;
     dateTime: string;
