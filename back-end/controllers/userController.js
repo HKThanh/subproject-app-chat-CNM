@@ -248,27 +248,40 @@ userController.sendFriendRequest = async (req, res, io) => {
     });
   }
 
-  const existing = await FriendRequestModel.findOne({ senderId: senderId, receiverId: receiverId });
-  
   const alreadyFriend = await UserModel.findOne({
     id: senderId,
     friendList: { $in: [receiverId] }
   });
-  console.log(alreadyFriend);
-  
-
-  if (existing) {
-    if (existing.status === "ACCEPTED") {
-      return res.json({ code: 2, message: "Hai bạn đã kết bạn" });
-    }
-    return res.json({ code: 0, message: "Yêu cầu đã được gửi" });
-  }
 
   if (alreadyFriend) {
     return res.json({ code: 3, message: "Hai bạn đã kết bạn" });
   }
 
+  const existing = await FriendRequestModel.findOne(
+    {
+      $or: [
+        { senderId, receiverId },
+        { senderId: receiverId, receiverId: senderId }
+      ]
+    }
+  )
+  
+  if (existing) {
+    if (existing.status === "ACCEPTED") {
+      return res.json({ code: 2, message: "Hai bạn đã kết bạn" });
+    } else if (existing.status === "PENDING") {
+      return res.json({ code: 0, message: "Yêu cầu đã được gửi", data: existing });
+    }
+  }
+
   const sender = await UserModel.get(senderId);
+  if (!sender) {
+    return res.status(404).json({
+      code: -1,
+      message: "Không tìm thấy người gửi",
+    });
+  }
+
   const newRequest = await FriendRequestModel.create({
     senderId,
     receiverId,
@@ -282,8 +295,12 @@ userController.sendFriendRequest = async (req, res, io) => {
     sender: {
       id: sender.id,
       fullname: sender.fullname,
-      urlavatar: sender.urlavatar
-    }
+      urlavatar: sender.urlavatar,
+      phone: sender.phone,
+      email: sender.email,
+      coverPhoto: sender.coverPhoto,
+    },
+    requestInfo: newRequest,
   });
 
   return res.json({
@@ -1004,5 +1021,77 @@ userController.getBlockedUsers = async (req, res) => {
     });
   }
 };
+
+userController.unFriend = async (req, res, io) => {
+  const { friendId } = req.body; // ID của người bạn muốn hủy kết bạn
+  const userId = req.user.id; // ID của người dùng hiện tại
+
+  if (!friendId) {
+    return res.status(400).json({
+      code: -1,
+      message: "Thiếu thông tin",
+    });
+  }
+
+  try {
+    // Tìm người dùng hiện tại
+    const user = await UserModel.findOne({ id: userId });
+    if (!user) {
+      return res.status(404).json({
+        code: -1,
+        message: "Không tìm thấy người dùng",
+      });
+    }
+
+    // Tìm người bạn cần hủy kết bạn
+    const friend = await UserModel.findOne({ id: friendId });
+    if (!friend) {
+      return res.status(404).json({
+        code: -1,
+        message: "Không tìm thấy người dùng bạn muốn hủy kết bạn",
+      });
+    }
+
+    // Kiểm tra xem người bạn có trong danh sách bạn bè không
+    if (!user.friendList.includes(friendId)) {
+      return res.status(400).json({
+        code: -1,
+        message: "Người này không có trong danh sách bạn bè",
+      });
+    }
+
+    // Xóa ID của người bạn khỏi danh sách bạn bè của người dùng hiện tại
+    user.friendList = user.friendList.filter(id => id !== friendId);
+    await user.save();
+
+    // Xóa ID của người dùng hiện tại khỏi danh sách bạn bè của người bạn
+    friend.friendList = friend.friendList.filter(id => id !== userId);
+    await friend.save();
+
+    // Emit socket event cho cả hai bên
+    io.to(userId).emit('unFriend', {
+      message: `Bạn đã hủy kết bạn với ${friend.fullname}`,
+      friendId: friendId,
+    });
+
+    io.to(friendId).emit('unFriend', {
+      message: `${user.fullname} đã hủy kết bạn với bạn`,
+      friendId: userId,
+    });
+
+    return res.status(200).json({
+      code: 1,
+      message: "Hủy kết bạn thành công",
+      data: { userId, friendId },
+    });
+  } catch (error) {
+    console.error("Error unFriending:", error);
+    return res.status(500).json({
+      code: -1,
+      message: "Lỗi server khi hủy kết bạn",
+      error: error.message,
+    });
+  }
+}
 
 module.exports = userController;
