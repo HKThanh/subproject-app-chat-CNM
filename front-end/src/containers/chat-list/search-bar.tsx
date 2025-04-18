@@ -98,14 +98,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
       const data = await response.json();
 
       if (data.code === 1) {
-        // Emit event để cập nhật UI của người nhận
-        socket?.emit("send_friend_request", {
-          senderId: JSON.parse(sessionStorage.getItem("user-session") || "{}")
-            ?.state?.user?.id,
-          receiverId: userId,
-        });
-
-        // Tạo một event tùy chỉnh để cập nhật danh sách "Lời mời đã gửi"
+        // Tạo object mới cho lời mời vừa gửi
         const newRequest = {
           id: data.data.requestId,
           receiver: {
@@ -116,14 +109,18 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
           createdAt: new Date().toISOString(),
         };
 
-        // Emit sự kiện để cập nhật danh sách lời mời đã gửi
-        socket?.emit("update_sent_requests", newRequest);
+        // Emit socket event
+        socket?.emit("send_friend_request", {
+          senderId: JSON.parse(sessionStorage.getItem("user-session") || "{}")
+            ?.state?.user?.id,
+          receiverId: userId,
+        });
 
-        // Dispatch custom event
-        const customEvent = new CustomEvent("newSentFriendRequest", {
+        // Dispatch event để cập nhật UI ngay lập tức
+        const updateEvent = new CustomEvent("updateSentRequests", {
           detail: newRequest,
         });
-        window.dispatchEvent(customEvent);
+        window.dispatchEvent(updateEvent);
 
         // Fetch lại danh sách lời mời đã gửi để đảm bảo dữ liệu đồng bộ
         const sentResponse = await fetch(
@@ -134,15 +131,14 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
         );
         const sentData = await sentResponse.json();
         if (sentData.success) {
-          // Dispatch event để cập nhật UI
-          const updateEvent = new CustomEvent("updateSentRequests", {
+          // Dispatch event để cập nhật UI với dữ liệu mới nhất
+          const refreshEvent = new CustomEvent("refreshSentRequests", {
             detail: sentData.data,
           });
-          window.dispatchEvent(updateEvent);
+          window.dispatchEvent(refreshEvent);
         }
 
-        toast.success("Lời mời kết bạn đã được gửi");
-        setShowResults(false);
+        toast.success("Đã gửi lời mời kết bạn");
       } else if (data.code === 0) {
         toast.info("Yêu cầu đã được gửi trước đó");
       } else if (data.code === 2 || data.code === 3) {

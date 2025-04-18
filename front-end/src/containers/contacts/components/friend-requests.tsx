@@ -129,13 +129,16 @@ export default function FriendRequests() {
 
       const data = await response.json();
       if (data.success) {
-        // Cập nhật UI bằng cách xóa request đã được chấp nhận
+        // Cập nhật UI bằng cách xóa request đã được xử lý
         setReceivedRequests((prev) =>
-          prev.filter((req) => req.id !== requestId)
+          Array.isArray(prev) ? prev.filter((req) => req.id !== requestId) : []
+        );
+
+        setSentRequests((prev) =>
+          Array.isArray(prev) ? prev.filter((req) => req.id !== requestId) : []
         );
 
         if (action === "ACCEPTED") {
-          // Emit socket event để thông báo cho người gửi
           socket?.emit("friendRequestAccepted", {
             success: true,
             data: {
@@ -145,19 +148,33 @@ export default function FriendRequests() {
             },
           });
 
-          // Dispatch event để cập nhật danh sách bạn bè
           window.dispatchEvent(new Event("friendRequestAccepted"));
 
           toast.success("Đã chấp nhận lời mời");
-          // Chuyển hướng đến trang danh sách bạn bè
           router.push("/contacts");
         } else {
+          // Xử lý khi từ chối
+          socket?.emit("friendRequestDeclined", {
+            success: true,
+            data: {
+              requestId: requestId,
+              senderId: data.data.userId,
+              receiverId: data.data.receiverId,
+            },
+          });
+
+          window.dispatchEvent(
+            new CustomEvent("updateSentRequests", {
+              detail: { requestId, action: "DECLINED" },
+            })
+          );
+
           toast.success("Đã từ chối lời mời");
         }
       }
     } catch (error) {
       console.error("Error handling friend request:", error);
-      toast.error("Không thể xử lý yêu cầu");
+      toast.error("Không thể xử lý yêu cầu kết bạn");
     }
   };
 
@@ -204,7 +221,93 @@ export default function FriendRequests() {
   useEffect(() => {
     // Listen for sent requests updates
     const handleUpdateSentRequests = (event: CustomEvent) => {
-      setSentRequests(event.detail);
+      const { requestId, action } = event.detail;
+
+      // Cập nhật danh sách sent requests
+      setSentRequests((prev) => {
+        if (!Array.isArray(prev)) return [];
+        return prev.filter((req) => req.id !== requestId);
+      });
+    };
+
+    window.addEventListener(
+      "updateSentRequests",
+      handleUpdateSentRequests as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "updateSentRequests",
+        handleUpdateSentRequests as EventListener
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on("friendRequestAccepted", (response) => {
+      if (response.success) {
+        // Xóa request khỏi danh sách đã gửi
+        setSentRequests((prev) =>
+          prev.filter((req) => req.id !== response.data.requestId)
+        );
+
+        // Xóa khỏi danh sách đã nhận nếu có
+        setReceivedRequests((prev) =>
+          prev.filter((req) => req.id !== response.data.requestId)
+        );
+      }
+    });
+
+    socket.on("friendRequestDeclined", (response) => {
+      if (response.success) {
+        // Xóa request khỏi cả hai danh sách
+        setSentRequests((prev) =>
+          prev.filter((req) => req.id !== response.data.requestId)
+        );
+        setReceivedRequests((prev) =>
+          prev.filter((req) => req.id !== response.data.requestId)
+        );
+      }
+    });
+
+    return () => {
+      socket.off("friendRequestAccepted");
+      socket.off("friendRequestDeclined");
+    };
+  }, [socket]);
+
+  // Thêm effect để lắng nghe sự kiện cập nhật danh sách lời mời đã gửi
+  useEffect(() => {
+    const handleRefreshSentRequests = (event: CustomEvent) => {
+      const updatedRequests = event.detail;
+      if (Array.isArray(updatedRequests)) {
+        setSentRequests(updatedRequests);
+      }
+    };
+
+    window.addEventListener(
+      "refreshSentRequests",
+      handleRefreshSentRequests as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "refreshSentRequests",
+        handleRefreshSentRequests as EventListener
+      );
+    };
+  }, []);
+
+  // Cập nhật effect xử lý updateSentRequests
+  useEffect(() => {
+    const handleUpdateSentRequests = (event: CustomEvent) => {
+      const newRequest = event.detail;
+      setSentRequests((prev) => {
+        if (!Array.isArray(prev)) return [newRequest];
+        return [newRequest, ...prev];
+      });
     };
 
     window.addEventListener(
@@ -339,7 +442,7 @@ export default function FriendRequests() {
             <h2 className="font-medium">Lời mời đã gửi</h2>
           </div>
           <div className="p-4 space-y-4">
-            {sentRequests.length === 0 ? (
+            {!Array.isArray(sentRequests) || sentRequests.length === 0 ? (
               <p className="text-gray-500 text-center">Chưa gửi lời mời nào</p>
             ) : (
               sentRequests.map((request) => (
