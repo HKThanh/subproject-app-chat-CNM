@@ -29,8 +29,12 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
   const isGroup = activeConversation?.isGroup === true;
 
   // Get group members if this is a group
-  const groupMembers = activeConversation?.groupMembers || [];
-
+  const groupMembers = activeConversation?.regularMembers || [];
+  console.log("check group members:", groupMembers);
+  console.log("check group members:", activeConversation?.groupName);
+  console.log("check group members:", activeConversation?.groupAvatar);
+  console.log("check group members:", activeConversation?.owner?.fullname);
+  
   return (
     <div className="h-full overflow-y-auto bg-gray-50 text-gray-900">
       {/* Header */}
@@ -156,10 +160,7 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
                     <div>
                       <p className="text-sm font-medium">Chủ nhóm</p>
                       <p className="text-xs text-gray-500">
-                        {groupMembers.find(
-                          (member) =>
-                            member.id === activeConversation.rules.IDOwner
-                        )?.fullname || activeConversation.rules.IDOwner}
+                        {activeConversation.owner.fullname}
                       </p>
                     </div>
                   </div>
@@ -255,7 +256,7 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
       </div>
 
       {/* Files */}
-      <div className="border-b border-gray-200">
+      {/* <div className="border-b border-gray-200">
         <div className="p-4 flex items-center justify-between cursor-pointer">
           <span className="font-medium">File</span>
           <ChevronDown className="w-5 h-5" />
@@ -294,15 +295,15 @@ export default function ChatInfo({ activeConversation }: ChatInfoProps) {
             </p>
           )}
         </div>
-      </div>
+      </div> */}
 
       {/* Links */}
-      <div className="border-b border-gray-200">
+      {/* <div className="border-b border-gray-200">
         <div className="p-4 flex items-center justify-between">
           <span className="font-medium">Liên kết</span>
           <ChevronDown className="w-5 h-5" />
         </div>
-      </div>
+      </div> */}
 
       {/* Leave/Delete Group - only for groups */}
       {isGroup && (

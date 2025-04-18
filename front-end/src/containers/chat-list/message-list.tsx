@@ -34,11 +34,6 @@ export default function MessageList({
     if (!conversations || conversations.length === 0) {
       return [];
     }
-
-    console.log(`Filtering ${conversations.length} conversations for ${activeTab} tab`);
-    console.log("Conversations with isGroup=true:", conversations.filter(conv => conv.isGroup).length);
-    console.log("Conversations with isGroup=false:", conversations.filter(conv => !conv.isGroup).length);
-
     // First filter by tab type
     let filtered = conversations.filter(conv => {
       if (activeTab === "DIRECT") return !conv.isGroup;

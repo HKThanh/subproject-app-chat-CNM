@@ -253,7 +253,7 @@ export default function ChatDetail({
                 let senderName = "";
                 if (activeConversation?.isGroup && msg.idSender) {
                   // Try to find the sender in the group members
-                  const member = activeConversation.groupMembers?.find(
+                  const member = activeConversation.regularMembers?.find(
                     member => member.id === msg.idSender
                   );
                   senderName = member?.fullname || msg.idSender;

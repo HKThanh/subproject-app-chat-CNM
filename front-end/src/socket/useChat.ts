@@ -55,11 +55,26 @@ export interface Conversation {
   isGroup: boolean;
   groupName: string,
   groupAvatar: string,
-  groupMembers: Array<{
+  owner: {
     id: string;
     fullname: string;
     urlavatar?: string;
     phone?: string;
+    email?: string;
+    bio?: string;
+    birthday?: string;
+    coverPhoto?: string;
+  }
+  groupMembers?: string[];
+  regularMembers: Array<{
+    id: string;
+    fullname: string;
+    urlavatar?: string;
+    phone?: string;
+    bio?: string,
+    birthday?: string,
+    coverPhoto?: string;
+    email?: string;
     status?: string;
   }>
   lastChange: string;
@@ -101,6 +116,7 @@ type ChatAction =
   | { type: 'FORWARD_MESSAGE_SUCCESS', payload: { results: Array<{ conversationId: string, message: Message }> } }
   | { type: 'UPDATE_CONVERSATION_LATEST_MESSAGE', payload: { conversationId: string, latestMessage: Message } }
   | { type: 'ADD_GROUP_CONVERSATION', payload: Conversation };
+
 ;
 const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
   switch (action.type) {
@@ -245,14 +261,14 @@ const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
       const existingConversation = state.conversations.find(
         conv => conv.idConversation === action.payload.idConversation
       );
-      
+
       if (existingConversation) {
         // Update existing conversation
         return {
           ...state,
-          conversations: state.conversations.map(conv => 
-            conv.idConversation === action.payload.idConversation 
-              ? { ...conv, ...action.payload } 
+          conversations: state.conversations.map(conv =>
+            conv.idConversation === action.payload.idConversation
+              ? { ...conv, ...action.payload }
               : conv
           )
         };
@@ -402,13 +418,13 @@ export const useChat = (userId: string) => {
       console.error("Cannot create group: Socket not connected or user not logged in");
       return;
     }
-    
+
     console.log("Creating group conversation:", {
       groupName,
       groupMembers,
       groupAvatar
     });
-    
+
     socket.emit("create_group_conversation", {
       IDOwner: userId,
       groupName,
@@ -424,26 +440,19 @@ export const useChat = (userId: string) => {
     socket.on("load_conversations_response", handleLoadConversationsResponse);
     socket.on("load_group_conversations_response", handleLoadGroupConversationsResponse);
     socket.on("error", handleError);
-    const handleGroupConversationCreated = (data: {
-      success: boolean;
-      conversation: Conversation;
-      members: Array<{
-        id: string;
-        fullname: string;
-        urlavatar?: string;
-        phone?: string;
-        status?: string;
-      }>;
-      message: string;
-    }) => {
+    const handleGroupConversationCreated = (data: any) => {
       console.log("Group conversation creation response:", data);
-      
+
       if (data.success && data.conversation) {
+        console.log("Members from backend:", data.members);
+        console.log("Owner from backend:", data.owner);
         // Enhance the conversation object with members information
         const enhancedConversation: Conversation = {
           ...data.conversation,
-          groupMembers: data.members || [],
+          owner: data.owner,
           isGroup: true,
+          groupMembers: Array.isArray(data.members) ? data.members : [],
+          regularMembers: data.members || [],
           // Set default values for any missing fields
           lastChange: data.conversation.lastChange || new Date().toISOString(),
           unreadCount: 0,
@@ -453,28 +462,104 @@ export const useChat = (userId: string) => {
             listIDCoOwner: []
           }
         };
-        
+        console.log("check member in enhancedConversation: ", enhancedConversation.groupMembers)
+        console.log("check data member is respose>> ", data.members);
+
         // Add the new group conversation to state
         dispatch({
           type: 'ADD_GROUP_CONVERSATION',
           payload: enhancedConversation
         });
-        
+
         // Automatically load messages for this conversation
         loadMessages(data.conversation.idConversation);
-        
+
         // Show success notification
         console.log("Group created successfully:", data.message);
       } else {
         // Handle error
         console.error("Failed to create group:", data.message);
-        dispatch({ 
-          type: 'SET_ERROR', 
-          payload: `Failed to create group: ${data.message}` 
+        dispatch({
+          type: 'SET_ERROR',
+          payload: `Failed to create group: ${data.message}`
         });
       }
     };
     socket.on("create_group_conversation_response", handleGroupConversationCreated);
+    const handleGroupMessageResponse = (data: any) => {
+      console.log("Group message response received:", data);
+
+      // Process the response similar to regular messages
+      let message: Message;
+      let conversationId: string;
+
+      if (data.conversationId && data.message) {
+        message = data.message;
+        conversationId = data.conversationId;
+      } else if (data.idConversation) {
+        message = data;
+        conversationId = data.idConversation;
+      } else {
+        console.error("Invalid group message response format:", data);
+        return;
+      }
+
+      // Check if this is the current user's message
+      const isOwnMessage = message.idSender === userId;
+
+      // Enhance the message with additional properties
+      const enhancedMessage = {
+        ...message,
+        isOwn: isOwnMessage,
+        dateTime: message.dateTime || new Date().toISOString()
+      };
+
+      // Find and replace any temporary message
+      const conversationMessages = messages[conversationId] || [];
+      const tempMessageIndex = conversationMessages.findIndex(msg =>
+        msg && msg.idMessage && msg.idMessage.startsWith('temp-') && msg.content === message.content
+      );
+
+      if (tempMessageIndex !== -1) {
+        // Replace the temporary message
+        dispatch({
+          type: 'UPDATE_MESSAGE',
+          payload: {
+            conversationId,
+            messageId: conversationMessages[tempMessageIndex].idMessage,
+            updates: enhancedMessage
+          }
+        });
+      } else {
+        // Add as a new message
+        dispatch({
+          type: 'ADD_MESSAGE',
+          payload: {
+            conversationId,
+            message: enhancedMessage
+          }
+        });
+      }
+
+      // Update the conversation's latest message
+      dispatch({
+        type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+        payload: {
+          conversationId,
+          latestMessage: {
+            content: message.content,
+            dateTime: message.dateTime || new Date().toISOString(),
+            isRead: false,
+            type: message.type,
+            idSender: message.idSender,
+            idReceiver: message.idReceiver
+          }
+        }
+      });
+    };
+
+    socket.on("group_message_response", handleGroupMessageResponse);
+    socket.on("receive_group_message", handleGroupMessageResponse);
     // Xử lý phản hồi tải tin nhắn
     const handleLoadMessagesResponseDirect = (data: any) => {
       console.log("Received load_messages_response directly:", data);
@@ -780,6 +865,8 @@ export const useChat = (userId: string) => {
       socket.off("unread_messages", handleUnreadMessages);
       socket.off('users_status', handleUsersStatus);
       socket.off("create_group_conversation_response", handleGroupConversationCreated);
+      socket.off("group_message_response", handleGroupMessageResponse);
+      socket.off("receive_group_message", handleGroupMessageResponse);
       socket.offAny();
     };
   }, [socket, userId, messages, conversations, loadConversations]);
@@ -947,29 +1034,28 @@ export const useChat = (userId: string) => {
         console.log("Không thể gửi tin nhắn: Socket chưa sẵn sàng");
         return;
       }
-
+  
       console.log(`Gửi tin nhắn đến cuộc trò chuyện ${idConversation}: ${text}, type: ${type}`);
-
+  
       // Tìm thông tin người nhận từ cuộc trò chuyện
       const conversation = conversations.find(
         (conv) => conv.idConversation === idConversation
       );
-
+  
       if (!conversation) {
         console.error("Không tìm thấy cuộc trò chuyện");
         return;
       }
-
+  
       // Xác định người nhận
       const receiverId = conversation.idSender === userId
         ? conversation.idReceiver
         : conversation.idSender;
-
+  
       // Tạo tin nhắn tạm thời để hiển thị ngay lập tức
       const tempMessage: Message = {
         idMessage: `temp-${Date.now()}`,
         idSender: userId,
-        idReceiver: receiverId,
         idConversation: idConversation,
         type: type,
         content: type === "text" ? text : (fileUrl || ""),
@@ -980,7 +1066,7 @@ export const useChat = (userId: string) => {
           id: userId
         }
       };
-
+  
       // Cập nhật danh sách tin nhắn với tin nhắn tạm thời
       dispatch({
         type: 'ADD_MESSAGE',
@@ -989,15 +1075,19 @@ export const useChat = (userId: string) => {
           message: tempMessage
         }
       });
-
+  
       // Chuẩn bị payload dựa trên loại tin nhắn
       const payload: any = {
         IDSender: userId,
-        IDReceiver: receiverId,
         IDConversation: idConversation,
         type: type
       };
-
+  
+      // For direct messages, add the receiver ID
+      if (!conversation.isGroup) {
+        payload.IDReceiver = receiverId;
+      }
+  
       // Nếu là tin nhắn văn bản
       if (type === "text") {
         payload.textMessage = text;
@@ -1007,28 +1097,44 @@ export const useChat = (userId: string) => {
         payload.fileUrl = fileUrl;
         payload.textMessage = text || "Gửi một tệp đính kèm";
       }
-
-      // Gửi tin nhắn đến server
-      socket.emit("send_message", payload);
+  
+      // Emit the appropriate event based on conversation type
+      if (conversation.isGroup) {
+        console.log("Sending group message:", payload);
+        socket.emit("send_group_message", payload);
+      } else {
+        console.log("Sending direct message:", payload);
+        socket.emit("send_message", payload);
+      }
+  
       // After sending the message, listen for the success response
-      socket.once("send_message_success", (response) => {
-        // Update messages state
-        dispatch({
-          type: 'ADD_MESSAGE',
-          payload: {
-            conversationId: response.conversationId,
-            message: response.message
-          }
-        });
-
-        // Also update the conversation with the latest message
-        dispatch({
-          type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
-          payload: {
-            conversationId: response.conversationId,
-            latestMessage: response.message
-          }
-        });
+      const successEvent = conversation.isGroup ? "group_message_response" : "send_message_success";
+      socket.once(successEvent, (response) => {
+        console.log(`${successEvent} received:`, response);
+        
+        // Extract the message and conversation ID from the response
+        const responseMessage = response.message || response;
+        const responseConversationId = response.conversationId || response.idConversation;
+        
+        if (responseMessage && responseConversationId) {
+          // Update messages state
+          dispatch({
+            type: 'ADD_MESSAGE',
+            payload: {
+              conversationId: responseConversationId,
+              message: responseMessage
+            }
+          });
+  
+          // Also update the conversation with the latest message
+          dispatch({
+            type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+            payload: {
+              conversationId: responseConversationId,
+              latestMessage: responseMessage
+            }
+          });
+        }
       });
     },
     [socket, conversations, userId, dispatch]
@@ -1229,17 +1335,13 @@ export const useChat = (userId: string) => {
   useEffect(() => {
     if (!socket || userIds.length === 0) return;
 
-    console.log('Danh sách userIds để kiểm tra trạng thái:', userIds);
-
     // Tạo phiên bản throttled của hàm kiểm tra trạng thái
     const throttledCheckStatus = throttle(() => {
-      console.log('Gửi yêu cầu kiểm tra trạng thái cho users:', userIds);
       socket.emit('check_users_status', { userIds });
     }, 3000);
 
     // Xử lý phản hồi trạng thái từ server
     const handleUsersStatus = (data: { statuses: Record<string, boolean> }) => {
-      console.log('Nhận trạng thái người dùng:', data.statuses);
 
       if (!data?.statuses) {
         console.error('Dữ liệu trạng thái không hợp lệ:', data);
