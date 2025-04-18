@@ -55,6 +55,8 @@ const userRoutes = (io) => {
 
   router.get('/friend/get-friends', authMiddleware, (req, res) => friendRequestController.getAllFriendsById(req, res));
 
+  router.post("/friend/unfriend", authMiddleware, (req, res) => userController.unFriend(req, res, io));
+
   return router;
 }
 
