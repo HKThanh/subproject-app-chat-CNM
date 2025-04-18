@@ -33,6 +33,23 @@ export default function FriendRequests() {
   useEffect(() => {
     if (!socket) return;
 
+    // Lắng nghe khi có yêu cầu kết bạn mới
+    socket.on("newFriendRequest", (data) => {
+      // Thêm vào danh sách lời mời kết bạn mới
+      const newRequest: FriendRequest = {
+        id: data.requestId,
+        sender: {
+          id: data.sender.id,
+          fullname: data.sender.fullname,
+          urlavatar: data.sender.urlavatar,
+        },
+        createdAt: new Date().toISOString(),
+      };
+
+      // Cập nhật state trong FriendRequests component
+      setReceivedRequests((prev) => [newRequest, ...prev]);
+    });
+
     // Lắng nghe khi có người hủy lời mời kết bạn
     socket.on("friendRequestCancelled", (response) => {
       if (response.success) {
@@ -48,6 +65,7 @@ export default function FriendRequests() {
     });
 
     return () => {
+      socket.off("newFriendRequest");
       socket.off("friendRequestCancelled");
     };
   }, [socket]);

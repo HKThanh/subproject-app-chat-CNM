@@ -33,20 +33,6 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   useEffect(() => {
     if (!socket) return;
 
-    // Lắng nghe khi có yêu cầu kết bạn mới
-    socket.on("newFriendRequest", (data) => {
-      toast.info("Bạn có yêu cầu kết bạn mới", {
-        description: `${data.sender.fullname} đã gửi lời mời kết bạn`,
-        action: {
-          label: "Xem",
-          onClick: () => {
-            // Có thể thêm navigation đến trang contacts
-            window.location.href = "/contacts";
-          },
-        },
-      });
-    });
-
     // Lắng nghe khi yêu cầu kết bạn được chấp nhận
     socket.on("friendRequestAccepted", (data) => {
       toast.success("Yêu cầu kết bạn đã được chấp nhận", {
@@ -60,7 +46,6 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
     });
 
     return () => {
-      socket.off("newFriendRequest");
       socket.off("friendRequestAccepted");
       socket.off("friendRequestDeclined");
     };
