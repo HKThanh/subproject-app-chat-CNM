@@ -49,6 +49,9 @@ export interface Conversation {
     isRecall?: boolean;
     isReply?: boolean;
   };
+  isGroup: boolean;
+  groupName: string,
+  groupAvatar: string,
   lastChange: string;
   unreadCount?: number;
   otherUser?: {
@@ -83,7 +86,7 @@ type ChatAction =
   | { type: 'UPDATE_CONVERSATION', payload: { conversationId: string, updates: Partial<Conversation> } }
   | { type: 'FORWARD_MESSAGE_SUCCESS', payload: { results: Array<{ conversationId: string, message: Message }> } }
   | { type: 'UPDATE_CONVERSATION_LATEST_MESSAGE', payload: { conversationId: string, latestMessage: Message } };
-  ;
+;
 const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
   switch (action.type) {
     case 'SET_CONVERSATIONS':
@@ -212,12 +215,12 @@ const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
     }
     case 'UPDATE_CONVERSATION_LATEST_MESSAGE': {
       const { conversationId, latestMessage } = action.payload;
-      
+
       return {
         ...state,
-        conversations: state.conversations.map(conv => 
-          conv.idConversation === conversationId 
-            ? { ...conv, latestMessage } 
+        conversations: state.conversations.map(conv =>
+          conv.idConversation === conversationId
+            ? { ...conv, latestMessage }
             : conv
         )
       };
@@ -314,7 +317,12 @@ export const useChat = (userId: string) => {
       IDUser: userId,
       lastEvaluatedKey: 0,
     });
-
+    // Đồng thời tải cuộc trò chuyện nhóm
+    console.log("Tải danh sách cuộc trò chuyện nhóm cho người dùng:", userId);
+    socket.emit("load_group_conversations", {
+      IDUser: userId,
+      lastEvaluatedKey: 0,
+    });
     // Timeout để tránh trạng thái loading vô hạn
     const timeoutId = setTimeout(() => {
       console.log("Timeout khi tải cuộc trò chuyện");
@@ -326,13 +334,33 @@ export const useChat = (userId: string) => {
       clearTimeout(timeoutId);
     };
   }, [socket, isConnected, userId, isValidUserId, isUserConnected]);
+  // Xử lý phản hồi tải cuộc trò chuyện nhóm
+  const handleLoadGroupConversationsResponse = useCallback((data: {
+    Items: Conversation[];
+    LastEvaluatedKey: number;
+  }) => {
+    console.log("Nhận danh sách cuộc trò chuyện nhóm:", data);
 
+    // Kết hợp cuộc trò chuyện nhóm với cuộc trò chuyện hiện có
+    if (data.Items && Array.isArray(data.Items)) {
+      dispatch({
+        type: 'SET_CONVERSATIONS',
+        payload: [...state.conversations, ...data.Items].filter((conv, index, self) =>
+          // Loại bỏ các cuộc trò chuyện trùng lặp
+          index === self.findIndex(c => c.idConversation === conv.idConversation)
+        )
+      });
+    }
+
+    dispatch({ type: 'SET_LOADING', payload: false });
+  }, [state.conversations]); // Phụ thuộc vào state.conversations để luôn có danh sách mới nhất
   // Gộp các useEffect đăng ký sự kiện socket
   useEffect(() => {
     if (!socket) return;
 
     // Đăng ký lắng nghe các sự kiện
     socket.on("load_conversations_response", handleLoadConversationsResponse);
+    socket.on("load_group_conversations_response", handleLoadGroupConversationsResponse);
     socket.on("error", handleError);
 
     // Xử lý phản hồi tải tin nhắn
@@ -628,6 +656,7 @@ export const useChat = (userId: string) => {
     return () => {
       // Hủy đăng ký tất cả sự kiện khi unmount
       socket.off("load_conversations_response", handleLoadConversationsResponse);
+      socket.off("load_group_conversations_response", handleLoadGroupConversationsResponse);
       socket.off("error", handleError);
       socket.off("load_messages_response", handleLoadMessagesResponseDirect);
       socket.off("receive_message", handleReceiveMessage);
@@ -878,7 +907,7 @@ export const useChat = (userId: string) => {
             message: response.message
           }
         });
-        
+
         // Also update the conversation with the latest message
         dispatch({
           type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
@@ -888,260 +917,260 @@ export const useChat = (userId: string) => {
           }
         });
       });
-},
-  [socket, conversations, userId, dispatch]
+    },
+    [socket, conversations, userId, dispatch]
   );
 
-// Đánh dấu tin nhắn đã đọc - tối ưu dependencies
-const markMessagesAsRead = useCallback(
-  (messageIds: string[], idConversation: string) => {
-    if (!socket) {
-      console.log("Không thể đánh dấu đã đọc: Socket chưa sẵn sàng");
-      return;
-    }
-
-    if (!messageIds.length) {
-      return;
-    }
-
-    // Tìm thông tin cuộc trò chuyện
-    const conversation = conversations.find(
-      (conv) => conv.idConversation === idConversation
-    );
-
-    if (!conversation) {
-      console.error("Không tìm thấy cuộc trò chuyện");
-      return;
-    }
-
-    console.log(`Đánh dấu ${messageIds.length} tin nhắn đã đọc trong cuộc trò chuyện ${idConversation}`);
-
-    // Gửi yêu cầu đánh dấu đã đọc
-    socket.emit("mark_messages_read", {
-      conversationId: idConversation,
-      receiverId: userId,
-    });
-
-    // Cập nhật trạng thái tin nhắn trong state
-    dispatch({
-      type: 'MARK_MESSAGES_READ',
-      payload: {
-        conversationId: idConversation,
-        messageIds
+  // Đánh dấu tin nhắn đã đọc - tối ưu dependencies
+  const markMessagesAsRead = useCallback(
+    (messageIds: string[], idConversation: string) => {
+      if (!socket) {
+        console.log("Không thể đánh dấu đã đọc: Socket chưa sẵn sàng");
+        return;
       }
-    });
-  },
-  [socket, conversations, userId, dispatch]
-);
-// forwardMessage function 
-const forwardMessage = useCallback((messageId: string, targetConversations: string[]) => {
-  if (!socket) return;
 
-  dispatch({ type: 'SET_LOADING', payload: true });
+      if (!messageIds.length) {
+        return;
+      }
 
-  socket.emit('forward_message', {
-    IDMessageDetail: messageId,
-    targetConversations,
-    IDSender: userId
-  });
+      // Tìm thông tin cuộc trò chuyện
+      const conversation = conversations.find(
+        (conv) => conv.idConversation === idConversation
+      );
 
-  socket.once('forward_message_success', (response) => {
-    if (response.success) {
-      // First dispatch the forwarded messages
-      dispatch({ type: 'FORWARD_MESSAGE_SUCCESS', payload: response });
-      console.log("Tin nhắn đã được chuyển tiếp thành công");
-      
-      // Then update each conversation's latest message
-      response.results.forEach((result: { conversationId: string, message: Message }) => {
-        const { conversationId, message } = result;
-        dispatch({
-          type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
-          payload: {
-            conversationId: conversationId,
-            latestMessage: message
-          }
-        });
+      if (!conversation) {
+        console.error("Không tìm thấy cuộc trò chuyện");
+        return;
+      }
+
+      console.log(`Đánh dấu ${messageIds.length} tin nhắn đã đọc trong cuộc trò chuyện ${idConversation}`);
+
+      // Gửi yêu cầu đánh dấu đã đọc
+      socket.emit("mark_messages_read", {
+        conversationId: idConversation,
+        receiverId: userId,
       });
-    }
-    dispatch({ type: 'SET_LOADING', payload: false });
-  });
 
-  socket.once('error', (error) => {
-    console.error('Forward message error:', error);
-    console.log('Không thể chuyển tiếp tin nhắn');
-    dispatch({ type: 'SET_LOADING', payload: false });
-  });
-}, [socket, userId]);
-// Xóa tin nhắn - tối ưu dependencies
-const deleteMessage = useCallback(
-  (messageId: string, idConversation: string) => {
-    if (!socket) {
-      console.log("Không thể xóa tin nhắn: Chưa sẵn sàng");
-      return;
-    }
+      // Cập nhật trạng thái tin nhắn trong state
+      dispatch({
+        type: 'MARK_MESSAGES_READ',
+        payload: {
+          conversationId: idConversation,
+          messageIds
+        }
+      });
+    },
+    [socket, conversations, userId, dispatch]
+  );
+  // forwardMessage function 
+  const forwardMessage = useCallback((messageId: string, targetConversations: string[]) => {
+    if (!socket) return;
 
-    console.log(`Xóa tin nhắn ${messageId} trong cuộc trò chuyện ${idConversation}`);
+    dispatch({ type: 'SET_LOADING', payload: true });
 
-    // Gửi yêu cầu xóa tin nhắn
-    socket.emit("delete_message", {
-      idMessage: messageId,
-      idSender: userId,
+    socket.emit('forward_message', {
+      IDMessageDetail: messageId,
+      targetConversations,
+      IDSender: userId
     });
 
-    // Cập nhật trạng thái tin nhắn trong state ngay lập tức (optimistic update)
-    dispatch({
-      type: 'UPDATE_MESSAGE',
-      payload: {
-        conversationId: idConversation,
-        messageId,
-        updates: { isRemove: true }
+    socket.once('forward_message_success', (response) => {
+      if (response.success) {
+        // First dispatch the forwarded messages
+        dispatch({ type: 'FORWARD_MESSAGE_SUCCESS', payload: response });
+        console.log("Tin nhắn đã được chuyển tiếp thành công");
+
+        // Then update each conversation's latest message
+        response.results.forEach((result: { conversationId: string, message: Message }) => {
+          const { conversationId, message } = result;
+          dispatch({
+            type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+            payload: {
+              conversationId: conversationId,
+              latestMessage: message
+            }
+          });
+        });
       }
+      dispatch({ type: 'SET_LOADING', payload: false });
     });
-  },
-  [socket, userId, dispatch]
-);
-const recallMessage = useCallback((messageId: string, conversationId: string) => {
-  if (!socket || !isConnected || !isValidUserId) {
-    console.log("Không thể thu hồi tin nhắn: Socket chưa kết nối hoặc userId không hợp lệ");
-    return;
-  }
 
-  console.log(`Đang thu hồi tin nhắn ${messageId} trong cuộc trò chuyện ${conversationId}`);
-
-  // Gửi yêu cầu thu hồi tin nhắn đến server
-  socket.emit("recall_message", {
-    idMessage: messageId,
-    idConversation: conversationId,
-  });
-
-  // Cập nhật UI ngay lập tức (optimistic update)
-  dispatch({
-    type: 'UPDATE_MESSAGE',
-    payload: {
-      conversationId,
-      messageId,
-      updates: {
-        isRecall: true,
-        content: "Tin nhắn đã được thu hồi"
+    socket.once('error', (error) => {
+      console.error('Forward message error:', error);
+      console.log('Không thể chuyển tiếp tin nhắn');
+      dispatch({ type: 'SET_LOADING', payload: false });
+    });
+  }, [socket, userId]);
+  // Xóa tin nhắn - tối ưu dependencies
+  const deleteMessage = useCallback(
+    (messageId: string, idConversation: string) => {
+      if (!socket) {
+        console.log("Không thể xóa tin nhắn: Chưa sẵn sàng");
+        return;
       }
-    }
-  });
 
-}, [socket, isConnected, isValidUserId, userId]);
-// Thêm xử lý sự kiện recall_message_success và message_recalled
-useEffect(() => {
-  if (!socket) return;
+      console.log(`Xóa tin nhắn ${messageId} trong cuộc trò chuyện ${idConversation}`);
 
-  // Xử lý phản hồi thu hồi tin nhắn thành công
-  const handleRecallMessageSuccess = (data: any) => {
-    console.log("Nhận phản hồi thu hồi tin nhắn:", data);
+      // Gửi yêu cầu xóa tin nhắn
+      socket.emit("delete_message", {
+        idMessage: messageId,
+        idSender: userId,
+      });
 
-    if (data.success) {
-      // Cập nhật tin nhắn trong state đã được thực hiện trong optimistic update
-      console.log(`Tin nhắn ${data.messageId} đã được thu hồi thành công`);
-    } else {
-      console.error("Lỗi khi thu hồi tin nhắn:", data.error);
-      // Khôi phục trạng thái tin nhắn nếu thu hồi thất bại
-      // Cần biết conversationId để khôi phục
-      // Có thể lưu trữ một bản đồ messageId -> conversationId để sử dụng ở đây
-    }
-  };
-
-  socket.on("recall_message_success", handleRecallMessageSuccess);
-
-  // Xử lý thông báo tin nhắn bị thu hồi từ người khác
-  const handleMessageRecalled = (data: any) => {
-    console.log("Nhận thông báo tin nhắn bị thu hồi:", data);
-
-    if (data.updatedMessage && data.updatedMessage.idConversation) {
+      // Cập nhật trạng thái tin nhắn trong state ngay lập tức (optimistic update)
       dispatch({
         type: 'UPDATE_MESSAGE',
         payload: {
-          conversationId: data.updatedMessage.idConversation,
-          messageId: data.messageId,
-          updates: {
-            isRecall: true,
-            content: "Tin nhắn đã được thu hồi"
-          }
+          conversationId: idConversation,
+          messageId,
+          updates: { isRemove: true }
         }
       });
-    }
-  };
-
-  socket.on("message_recalled", handleMessageRecalled);
-
-  return () => {
-    socket.off("recall_message_success", handleRecallMessageSuccess);
-    socket.off("message_recalled", handleMessageRecalled);
-  };
-}, [socket]);
-// Tối ưu hóa userIds bằng useMemo
-const userIds = useMemo(() =>
-  conversations
-    .map(conv => conv.otherUser?.id)
-    .filter((id): id is string => Boolean(id)),
-  [conversations]
-);
-
-// Tối ưu hóa việc kiểm tra trạng thái người dùng
-useEffect(() => {
-  if (!socket || userIds.length === 0) return;
-
-  console.log('Danh sách userIds để kiểm tra trạng thái:', userIds);
-
-  // Tạo phiên bản throttled của hàm kiểm tra trạng thái
-  const throttledCheckStatus = throttle(() => {
-    console.log('Gửi yêu cầu kiểm tra trạng thái cho users:', userIds);
-    socket.emit('check_users_status', { userIds });
-  }, 3000);
-
-  // Xử lý phản hồi trạng thái từ server
-  const handleUsersStatus = (data: { statuses: Record<string, boolean> }) => {
-    console.log('Nhận trạng thái người dùng:', data.statuses);
-
-    if (!data?.statuses) {
-      console.error('Dữ liệu trạng thái không hợp lệ:', data);
+    },
+    [socket, userId, dispatch]
+  );
+  const recallMessage = useCallback((messageId: string, conversationId: string) => {
+    if (!socket || !isConnected || !isValidUserId) {
+      console.log("Không thể thu hồi tin nhắn: Socket chưa kết nối hoặc userId không hợp lệ");
       return;
     }
 
-    // Cập nhật trạng thái cho từng người dùng
-    Object.entries(data.statuses).forEach(([userId, isOnline]) => {
-      dispatch({
-        type: 'UPDATE_USER_STATUS',
-        payload: { userId, isOnline: Boolean(isOnline) }
-      });
+    console.log(`Đang thu hồi tin nhắn ${messageId} trong cuộc trò chuyện ${conversationId}`);
+
+    // Gửi yêu cầu thu hồi tin nhắn đến server
+    socket.emit("recall_message", {
+      idMessage: messageId,
+      idConversation: conversationId,
     });
+
+    // Cập nhật UI ngay lập tức (optimistic update)
+    dispatch({
+      type: 'UPDATE_MESSAGE',
+      payload: {
+        conversationId,
+        messageId,
+        updates: {
+          isRecall: true,
+          content: "Tin nhắn đã được thu hồi"
+        }
+      }
+    });
+
+  }, [socket, isConnected, isValidUserId, userId]);
+  // Thêm xử lý sự kiện recall_message_success và message_recalled
+  useEffect(() => {
+    if (!socket) return;
+
+    // Xử lý phản hồi thu hồi tin nhắn thành công
+    const handleRecallMessageSuccess = (data: any) => {
+      console.log("Nhận phản hồi thu hồi tin nhắn:", data);
+
+      if (data.success) {
+        // Cập nhật tin nhắn trong state đã được thực hiện trong optimistic update
+        console.log(`Tin nhắn ${data.messageId} đã được thu hồi thành công`);
+      } else {
+        console.error("Lỗi khi thu hồi tin nhắn:", data.error);
+        // Khôi phục trạng thái tin nhắn nếu thu hồi thất bại
+        // Cần biết conversationId để khôi phục
+        // Có thể lưu trữ một bản đồ messageId -> conversationId để sử dụng ở đây
+      }
+    };
+
+    socket.on("recall_message_success", handleRecallMessageSuccess);
+
+    // Xử lý thông báo tin nhắn bị thu hồi từ người khác
+    const handleMessageRecalled = (data: any) => {
+      console.log("Nhận thông báo tin nhắn bị thu hồi:", data);
+
+      if (data.updatedMessage && data.updatedMessage.idConversation) {
+        dispatch({
+          type: 'UPDATE_MESSAGE',
+          payload: {
+            conversationId: data.updatedMessage.idConversation,
+            messageId: data.messageId,
+            updates: {
+              isRecall: true,
+              content: "Tin nhắn đã được thu hồi"
+            }
+          }
+        });
+      }
+    };
+
+    socket.on("message_recalled", handleMessageRecalled);
+
+    return () => {
+      socket.off("recall_message_success", handleRecallMessageSuccess);
+      socket.off("message_recalled", handleMessageRecalled);
+    };
+  }, [socket]);
+  // Tối ưu hóa userIds bằng useMemo
+  const userIds = useMemo(() =>
+    conversations
+      .map(conv => conv.otherUser?.id)
+      .filter((id): id is string => Boolean(id)),
+    [conversations]
+  );
+
+  // Tối ưu hóa việc kiểm tra trạng thái người dùng
+  useEffect(() => {
+    if (!socket || userIds.length === 0) return;
+
+    console.log('Danh sách userIds để kiểm tra trạng thái:', userIds);
+
+    // Tạo phiên bản throttled của hàm kiểm tra trạng thái
+    const throttledCheckStatus = throttle(() => {
+      console.log('Gửi yêu cầu kiểm tra trạng thái cho users:', userIds);
+      socket.emit('check_users_status', { userIds });
+    }, 3000);
+
+    // Xử lý phản hồi trạng thái từ server
+    const handleUsersStatus = (data: { statuses: Record<string, boolean> }) => {
+      console.log('Nhận trạng thái người dùng:', data.statuses);
+
+      if (!data?.statuses) {
+        console.error('Dữ liệu trạng thái không hợp lệ:', data);
+        return;
+      }
+
+      // Cập nhật trạng thái cho từng người dùng
+      Object.entries(data.statuses).forEach(([userId, isOnline]) => {
+        dispatch({
+          type: 'UPDATE_USER_STATUS',
+          payload: { userId, isOnline: Boolean(isOnline) }
+        });
+      });
+    };
+
+    // Đăng ký lắng nghe sự kiện
+    socket.on('users_status', handleUsersStatus);
+
+    // Kiểm tra trạng thái lần đầu khi mount
+    throttledCheckStatus();
+
+    // Thiết lập interval để kiểm tra định kỳ (60 giây)
+    const intervalId = setInterval(throttledCheckStatus, 60000);
+
+    return () => {
+      socket.off('users_status', handleUsersStatus);
+      clearInterval(intervalId);
+      throttledCheckStatus.cancel();
+    };
+  }, [socket, userIds, dispatch]);
+
+  // Trả về các giá trị và hàm
+  return {
+    conversations,
+    messages,
+    loading,
+    error,
+    unreadMessages,
+    loadConversations,
+    loadMessages,
+    sendMessage,
+    recallMessage,
+    markMessagesAsRead,
+    deleteMessage,
+    forwardMessage,
   };
-
-  // Đăng ký lắng nghe sự kiện
-  socket.on('users_status', handleUsersStatus);
-
-  // Kiểm tra trạng thái lần đầu khi mount
-  throttledCheckStatus();
-
-  // Thiết lập interval để kiểm tra định kỳ (60 giây)
-  const intervalId = setInterval(throttledCheckStatus, 60000);
-
-  return () => {
-    socket.off('users_status', handleUsersStatus);
-    clearInterval(intervalId);
-    throttledCheckStatus.cancel();
-  };
-}, [socket, userIds, dispatch]);
-
-// Trả về các giá trị và hàm
-return {
-  conversations,
-  messages,
-  loading,
-  error,
-  unreadMessages,
-  loadConversations,
-  loadMessages,
-  sendMessage,
-  recallMessage,
-  markMessagesAsRead,
-  deleteMessage,
-  forwardMessage,
-};
 };

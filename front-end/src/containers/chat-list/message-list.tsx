@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Conversation } from "@/socket/useChat";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import useUserStore from "@/stores/useUserStoree";
 import { Avatar } from "@/components/ui/avatar";
 
@@ -13,6 +13,8 @@ interface MessageListProps {
   activeConversationId: string | null;
   onSelectConversation: (conversationId: string) => void;
   loading: boolean;
+  activeTab: "DIRECT" | "GROUPS";
+  searchTerm: string;
 }
 
 export default function MessageList({
@@ -20,25 +22,66 @@ export default function MessageList({
   activeConversationId,
   onSelectConversation,
   loading,
+  activeTab,
+  searchTerm,
 }: MessageListProps) {
   // Track previous conversation order to detect changes
   const prevConversationsRef = useRef<string[]>([]);
   const [animatingItems, setAnimatingItems] = useState<Set<string>>(new Set());
   
-  // Sort conversations by lastChange date (most recent first)
-  const sortedConversations = [...conversations].sort((a, b) => {
-    // Convert dates to timestamps for comparison
-    const dateA = new Date(a.lastChange).getTime();
-    const dateB = new Date(b.lastChange).getTime();
-    
-    // Sort in descending order (newest first)
-    return dateB - dateA;
-  });
+  // Filter conversations based on active tab and search term
+  const filteredConversations = useMemo(() => {
+    if (!conversations || conversations.length === 0) {
+      return [];
+    }
+
+    console.log(`Filtering ${conversations.length} conversations for ${activeTab} tab`);
+    console.log("Conversations with isGroup=true:", conversations.filter(conv => conv.isGroup).length);
+    console.log("Conversations with isGroup=false:", conversations.filter(conv => !conv.isGroup).length);
+
+    // First filter by tab type
+    let filtered = conversations.filter(conv => {
+      if (activeTab === "DIRECT") return !conv.isGroup;
+      if (activeTab === "GROUPS") return conv.isGroup === true;
+      return true;
+    });
+
+    console.log("After tab filtering:", filtered.length);
+
+    // Remove duplicates by conversation ID
+    filtered = Array.from(
+      new Map(filtered.map(conv => [conv.idConversation, conv])).values()
+    );
+
+    console.log("After removing duplicates:", filtered.length);
+
+    // Then filter by search term if provided
+    if ( searchTerm &&searchTerm.trim()) {
+      filtered = filtered.filter((conv) => {
+        const name = conv.isGroup 
+          ? conv.groupName 
+          : (conv.otherUser?.fullname || "");
+        
+        return name.toLowerCase().includes(searchTerm.toLowerCase());
+      });
+      console.log("After search term filtering:", filtered.length);
+    }
+
+    // Sort conversations by lastChange date (most recent first)
+    return [...filtered].sort((a, b) => {
+      // Convert dates to timestamps for comparison
+      const dateA = new Date(a.lastChange).getTime();
+      const dateB = new Date(b.lastChange).getTime();
+      
+      // Sort in descending order (newest first)
+      return dateB - dateA;
+    });
+  }, [conversations, activeTab, searchTerm]);
 
   // Track conversation order changes and trigger animations
   useEffect(() => {
     // Get current conversation IDs in order
-    const currentIds = sortedConversations.map(c => c.idConversation);
+    const currentIds = filteredConversations.map(c => c.idConversation);
     const prevIds = prevConversationsRef.current;
     
     // Find conversations that changed position
@@ -68,27 +111,8 @@ export default function MessageList({
       
       return () => clearTimeout(timer);
     }
-  }, [sortedConversations]);
+  }, [filteredConversations]);
 
-  useEffect(() => {
-    // Log thông tin về trạng thái online của tất cả các cuộc trò chuyện
-    console.log("Danh sách trạng thái online của các cuộc trò chuyện:");
-    conversations.forEach((conv, index) => {
-      console.log(`Conversation ${index}:`, {
-        id: conv.otherUser?.id || null,
-        fullname: conv.otherUser?.fullname || null,
-        isOnline: conv.otherUser?.isOnline || false,
-        latestMessage: conv.latestMessage || null,
-      });
-    });
-
-    // Kiểm tra xem có bất kỳ người dùng nào online không
-    const anyUserOnline = conversations.some(
-      (conv) => conv.otherUser?.isOnline === true
-    );
-    console.log("Có người dùng online:", anyUserOnline);
-  }, [conversations]);
-  
   const user = useUserStore((state) => state.user);
   
   // Format message preview based on message type and sender
@@ -140,13 +164,19 @@ export default function MessageList({
     );
   }
 
-  if (conversations.length === 0) {
+  if (filteredConversations.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-200">
         <div className="flex flex-col items-center">
           <MessageSquare className="h-12 w-12 text-gray-300" />
-          <p className="mt-2 text-gray-500">Không có cuộc trò chuyện nào</p>
-          <p className="text-sm text-gray-400">Bắt đầu trò chuyện mới</p>
+          <p className="mt-2 text-gray-500">
+            {activeTab === "DIRECT" 
+              ? "Không có cuộc trò chuyện trực tiếp nào" 
+              : "Không có nhóm trò chuyện nào"}
+          </p>
+          <p className="text-sm text-gray-400">
+            {searchTerm ? "Thử tìm kiếm với từ khóa khác" : "Bắt đầu trò chuyện mới"}
+          </p>
         </div>
       </div>
     );
@@ -154,7 +184,7 @@ export default function MessageList({
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-thin bg-gray-200">
-      {sortedConversations.map((conversation) => {
+      {filteredConversations.map((conversation) => {
         // Check if there are unread messages
         const hasUnread = (conversation.unreadCount ?? 0) > 0;
 
@@ -181,6 +211,15 @@ export default function MessageList({
           }
         };
 
+        // Determine display name and avatar based on conversation type
+        const displayName = conversation.isGroup 
+          ? conversation.groupName 
+          : (conversation.otherUser?.fullname || "Người dùng");
+        
+        const avatarSrc = conversation.isGroup
+          ? (conversation.groupAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(conversation.groupName || "Group")}&background=random`)
+          : (conversation.otherUser?.urlavatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(conversation.otherUser?.fullname || "User")}&background=random`);
+
         return (
           <div
             key={conversation.idConversation}
@@ -188,22 +227,17 @@ export default function MessageList({
               isActive 
                 ? "bg-chat-dark text-white" 
                 : "bg-white text-gray-900 hover:bg-gray-50"
-            }`}
+            } ${isAnimating ? 'animate-highlight' : ''}`}
             onClick={() => onSelectConversation(conversation.idConversation)}
           >
             <div className="relative mr-3">
               <Avatar className="h-12 w-12 border-2 border-white">
                 <img
-                  src={
-                    conversation.otherUser?.urlavatar ||
-                    `https://ui-avatars.com/api/?name=${
-                      conversation.otherUser?.fullname || "User"
-                    }&background=random`
-                  }
-                  alt="Avatar người dùng"
+                  src={avatarSrc}
+                  alt={`Avatar của ${displayName}`}
                 />
               </Avatar>
-              {conversation.otherUser?.isOnline && (
+              {!conversation.isGroup && conversation.otherUser?.isOnline && (
                 <span
                   className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white bg-green-500"
                   title="Online"
@@ -217,7 +251,7 @@ export default function MessageList({
                     hasUnread ? "font-bold" : "font-semibold"
                   } text-sm truncate`}
                 >
-                  {conversation.otherUser?.fullname || "Người dùng"}
+                  {displayName}
                 </h3>
                 <span className={`text-xs ${
                   isActive ? "text-gray-300" : "text-gray-500"

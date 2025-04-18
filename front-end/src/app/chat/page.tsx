@@ -1,8 +1,6 @@
 "use client";
 
 import ChatInfo from "@/containers/chat-info/chat-info";
-import MessageList from "@/containers/chat-list/message-list";
-import SearchBar from "@/containers/chat-list/search-bar";
 import TabNavigation from "@/containers/chat-list/tab-navigation";
 import ChatDetail from "@/containers/chat-main/chat-detail";
 import { useChatContext } from "@/socket/ChatContext";
@@ -169,12 +167,9 @@ export default function Home() {
         } flex flex-col border-r border-gray-200 transition-all duration-300`}
       >
         <div className="flex-1 overflow-hidden flex flex-col">
-          <TabNavigation onSelectConversation={handleSelectConversation} />
-          <MessageList
-            conversations={conversations}
+          <TabNavigation 
+            onSelectConversation={handleSelectConversation} 
             activeConversationId={activeConversation}
-            onSelectConversation={handleSelectConversation}
-            loading={loading}
           />
         </div>
       </div>
