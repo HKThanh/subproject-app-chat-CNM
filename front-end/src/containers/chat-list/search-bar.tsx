@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import { getAuthToken } from "@/utils/auth-utils";
 import UserAddIcon from "@/assets/common/icon-user-add";
 import { useSocketContext } from "@/socket/SocketContext";
 import { UserIcon, UsersIcon } from "lucide-react";
+import { toast } from "sonner";
 
 interface SearchBarProps {
   onSelectConversation: (id: string) => void;
@@ -27,6 +28,43 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
 
   const END_POINT_URL =
     process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:3000";
+
+  // Thêm useEffect để lắng nghe các sự kiện socket liên quan đến friend request
+  useEffect(() => {
+    if (!socket) return;
+
+    // Lắng nghe khi có yêu cầu kết bạn mới
+    socket.on("newFriendRequest", (data) => {
+      toast.info("Bạn có yêu cầu kết bạn mới", {
+        description: `${data.sender.fullname} đã gửi lời mời kết bạn`,
+        action: {
+          label: "Xem",
+          onClick: () => {
+            // Có thể thêm navigation đến trang contacts
+            window.location.href = "/contacts";
+          },
+        },
+      });
+    });
+
+    // Lắng nghe khi yêu cầu kết bạn được chấp nhận
+    socket.on("friendRequestAccepted", (data) => {
+      toast.success("Yêu cầu kết bạn đã được chấp nhận", {
+        description: "Các bạn đã trở thành bạn bè",
+      });
+    });
+
+    // Lắng nghe khi yêu cầu kết bạn bị từ chối
+    socket.on("friendRequestDeclined", (data) => {
+      toast.error("Yêu cầu kết bạn đã bị từ chối");
+    });
+
+    return () => {
+      socket.off("newFriendRequest");
+      socket.off("friendRequestAccepted");
+      socket.off("friendRequestDeclined");
+    };
+  }, [socket]);
 
   const handleSearch = async (value: string) => {
     setSearchText(value);
@@ -57,9 +95,63 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
     }
   };
 
-  const handleAddFriend = (id: string) => {
-    // Logic for adding friend (you can call an API or update state here)
-    console.log(`Add friend with id: ${id}`);
+  const handleAddFriend = async (userId: string) => {
+    try {
+      if (!socket) {
+        toast.error("Không thể kết nối với server");
+        return;
+      }
+
+      // Lấy thông tin người dùng hiện tại từ session
+      const userSession = sessionStorage.getItem("user-session");
+      const currentUser = userSession
+        ? JSON.parse(userSession).state.user
+        : null;
+
+      if (!currentUser) {
+        toast.error("Vui lòng đăng nhập lại");
+        return;
+      }
+
+      // Emit event gửi lời mời kết bạn
+      socket.emit("send_friend_request", {
+        senderId: currentUser.id,
+        receiverId: userId,
+      });
+
+      // Lắng nghe response từ server
+      socket.once("newFriendRequest", (response) => {
+        if (response.success) {
+          toast.success("Lời mời kết bạn đã được gửi");
+        } else {
+          toast.error(response.message || "Không thể gửi lời mời kết bạn");
+        }
+      });
+
+      // Vẫn giữ lại API call để đồng bộ với database
+      const token = await getAuthToken();
+      const response = await fetch(`${END_POINT_URL}/user/send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ receiverId: userId }),
+      });
+
+      const data = await response.json();
+
+      if (data.code === 0) {
+        toast.info("Yêu cầu đã được gửi trước đó");
+      } else if (data.code === 2 || data.code === 3) {
+        toast.info("Hai bạn đã là bạn bè");
+      } else if (data.code === -2) {
+        toast.error("Không thể gửi lời mời kết bạn cho chính mình");
+      }
+    } catch (error) {
+      console.error("Error sending friend request:", error);
+      toast.error("Không thể gửi lời mời kết bạn");
+    }
   };
 
   const handleSelectUser = (userId: string) => {
