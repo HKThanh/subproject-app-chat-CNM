@@ -29,6 +29,28 @@ export default function FriendRequests() {
     fetchFriendRequests();
   }, []);
 
+  // Thêm useEffect để lắng nghe custom event
+  useEffect(() => {
+    const handleNewSentRequest = (event: CustomEvent<FriendRequest>) => {
+      console.log("New sent request received:", event.detail);
+      setSentRequests((prev) => [event.detail, ...prev]);
+    };
+
+    // Đăng ký listener
+    window.addEventListener(
+      "newSentFriendRequest",
+      handleNewSentRequest as EventListener
+    );
+
+    return () => {
+      // Hủy đăng ký listener khi component unmount
+      window.removeEventListener(
+        "newSentFriendRequest",
+        handleNewSentRequest as EventListener
+      );
+    };
+  }, []);
+
   // Thêm useEffect để lắng nghe sự kiện socket
   useEffect(() => {
     if (!socket) return;

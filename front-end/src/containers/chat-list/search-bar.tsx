@@ -80,53 +80,48 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
     }
   };
 
-  const handleAddFriend = async (userId: string) => {
+  const handleAddFriend = async (userId: string, userData: SearchResult) => {
     try {
-      if (!socket) {
-        toast.error("Không thể kết nối với server");
-        return;
-      }
-
-      // Lấy thông tin người dùng hiện tại từ session
-      const userSession = sessionStorage.getItem("user-session");
-      const currentUser = userSession
-        ? JSON.parse(userSession).state.user
-        : null;
-
-      if (!currentUser) {
-        toast.error("Vui lòng đăng nhập lại");
-        return;
-      }
-
-      // Emit event gửi lời mời kết bạn
-      socket.emit("send_friend_request", {
-        senderId: currentUser.id,
-        receiverId: userId,
-      });
-
-      // Lắng nghe response từ server
-      socket.once("newFriendRequest", (response) => {
-        if (response.success) {
-          toast.success("Lời mời kết bạn đã được gửi");
-        } else {
-          toast.error(response.message || "Không thể gửi lời mời kết bạn");
-        }
-      });
-
-      // Vẫn giữ lại API call để đồng bộ với database
       const token = await getAuthToken();
-      const response = await fetch(`${END_POINT_URL}/user/send`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ receiverId: userId }),
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/user/send`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ receiverId: userId }),
+        }
+      );
 
       const data = await response.json();
 
-      if (data.code === 0) {
+      if (data.code === 1) {
+        // Emit event để cập nhật UI của người nhận
+        socket?.emit("send_friend_request", {
+          senderId: JSON.parse(sessionStorage.getItem("user-session") || "{}")
+            ?.state?.user?.id,
+          receiverId: userId,
+        });
+
+        // Tạo một event tùy chỉnh để cập nhật danh sách "Lời mời đã gửi"
+        const customEvent = new CustomEvent("newSentFriendRequest", {
+          detail: {
+            id: data.data.requestId, // ID từ response của server
+            receiver: {
+              id: userId,
+              fullname: userData.fullname,
+              urlavatar: userData.urlavatar,
+            },
+            createdAt: new Date().toISOString(),
+          },
+        });
+        window.dispatchEvent(customEvent);
+
+        toast.success("Lời mời kết bạn đã được gửi");
+        setShowResults(false); // Đóng dropdown search results
+      } else if (data.code === 0) {
         toast.info("Yêu cầu đã được gửi trước đó");
       } else if (data.code === 2 || data.code === 3) {
         toast.info("Hai bạn đã là bạn bè");
@@ -233,7 +228,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
                     <button
                       onClick={(e) => {
                         e.stopPropagation(); // Prevent the li click event
-                        handleAddFriend(result.id);
+                        handleAddFriend(result.id, result);
                       }}
                       className="ml-auto text-blue-500 text-sm hover:text-blue-700"
                     >
