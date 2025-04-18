@@ -7,7 +7,7 @@ const MessageDetail = require("../models/MessageDetailModel");
 const User = require("../models/UserModel");
 const MessageBucket = require("../models/MessageBucketModel");
 const moment = require("moment-timezone");
-const conversationController = require("./ConversationController");
+const conversationController = require("./conversationController");
 
 let onlineUsers = [];
 
@@ -198,7 +198,6 @@ const handleLoadConversation = (io, socket) => {
                         idReceiver: IDUser,
                         isRead: false
                     });
-
                     return {
                         ...conv.toObject(),
                         otherUser,
@@ -990,7 +989,7 @@ const handleLeaveConversation = (io, socket) => {
 const handleCreatGroupConversation = (io, socket) => {
     socket.on("create_group_conversation", async (payload) => {
         // groupMembers phải có cả IDOwner
-        console.log(payload);
+        console.log("create_group_conversation payload:>>> ",payload);
         const { IDOwner, groupName, groupMembers } = payload;
         const groupAvatar = payload.groupAvatar;
         
@@ -1058,7 +1057,8 @@ const handleCreatGroupConversation = (io, socket) => {
                 };
             })
         );
-        
+        console.log("create_group_conversation_response success",groupMembersInfos )
+        console.log("create_group_conversation_response conversation",data )
         socket.emit("create_group_conversation_response", {
             success: true,
             conversation: data,
