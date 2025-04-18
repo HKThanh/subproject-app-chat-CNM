@@ -503,15 +503,36 @@ export const useChat = (userId: string) => {
         console.error("Invalid group message response format:", data);
         return;
       }
-
+      const conversation = conversations.find(conv => conv.idConversation === conversationId);
+  
+      // Find sender information
+      let senderInfo = null;
+      if (message.idSender && conversation) {
+        // Look for sender in the members list
+        const sender = conversation.regularMembers?.find(member => member.id === message.idSender);
+        if (sender) {
+          senderInfo = {
+            id: sender.id,
+            fullname: sender.fullname,
+            avatar: sender.urlavatar
+          };
+        } else if (conversation.owner?.id === message.idSender) {
+          // Check if sender is the owner
+          senderInfo = {
+            id: conversation.owner.id,
+            fullname: conversation.owner.fullname,
+            avatar: conversation.owner.urlavatar
+          };
+        }
+      }
       // Check if this is the current user's message
       const isOwnMessage = message.idSender === userId;
-
       // Enhance the message with additional properties
       const enhancedMessage = {
         ...message,
         isOwn: isOwnMessage,
-        dateTime: message.dateTime || new Date().toISOString()
+        dateTime: message.dateTime || new Date().toISOString(),
+        senderInfo: senderInfo || message.senderInfo
       };
 
       // Find and replace any temporary message
@@ -597,17 +618,8 @@ export const useChat = (userId: string) => {
           return;
         }
 
-        console.log("Tin nhắn đã xử lý:", {
-          message,
-          conversationId,
-          messageType: typeof message,
-          messageKeys: message ? Object.keys(message) : [],
-          idSender: message ? message.idSender : null
-        });
-
         // Kiểm tra xem tin nhắn có phải của người dùng hiện tại không
         const isOwnMessage = message.idSender === userId;
-        console.log("isOwnMessage:", isOwnMessage, "userId:", userId, "idSender:", message.idSender);
 
         // Đảm bảo tin nhắn có đầy đủ thông tin
         const enhancedMessage = {

@@ -251,12 +251,32 @@ export default function ChatDetail({
 
                 // Find sender name for group chats
                 let senderName = "";
-                if (activeConversation?.isGroup && msg.idSender) {
+                let senderAvatar = "";
+
+                if (msg.senderInfo?.fullname) {
+                  // Use sender info from the message if available
+                  senderName = msg.senderInfo.fullname;
+                  senderAvatar = msg.senderInfo.avatar || "";
+                } else if (activeConversation?.isGroup && msg.idSender) {
                   // Try to find the sender in the group members
                   const member = activeConversation.regularMembers?.find(
                     member => member.id === msg.idSender
                   );
-                  senderName = member?.fullname || msg.idSender;
+                  
+                  if (member) {
+                    senderName = member.fullname || msg.idSender;
+                    senderAvatar = member.urlavatar || "";
+                  } else if (activeConversation.owner?.id === msg.idSender) {
+                    // Check if sender is the owner
+                    senderName = activeConversation.owner.fullname || msg.idSender;
+                    senderAvatar = activeConversation.owner.urlavatar || "";
+                  } else {
+                    senderName = msg.idSender;
+                  }
+                } else if (!activeConversation?.isGroup && !msg.isOwn) {
+                  // For direct conversations, use otherUser info for messages not from current user
+                  senderName = activeConversation?.otherUser?.fullname || msg.idSender;
+                  senderAvatar = activeConversation?.otherUser?.urlavatar || "";
                 }
 
                 return (
@@ -282,6 +302,8 @@ export default function ChatDetail({
                     isRecall={msg.isRecall || false}
                     isGroup={activeConversation?.isGroup}
                     senderName={senderName}
+                    senderAvatar={senderAvatar}
+                    showSenderInfo={activeConversation?.isGroup && !msg.isOwn}
                     onReply={handleReply}
                     onForward={handleForward}
                     onRecallMessage={onRecallMessage}

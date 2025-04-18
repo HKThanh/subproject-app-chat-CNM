@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { useState } from "react"
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import Image from "next/image"
 
 // Add senderName and isGroup props to the interface
 interface ChatMessageProps {
@@ -25,8 +26,10 @@ interface ChatMessageProps {
   messageId?: string
   isRemove: boolean
   isRecall?: boolean
+  isGroup?: boolean
   senderName?: string  
-  isGroup?: boolean   
+  senderAvatar?: string; // Add this prop
+  showSenderInfo?: boolean;
   onReply?: (messageId: string, content: string, type: string) => void
   onForward?: (messageId: string) => void
   onDelete?: (messageId: string) => void
@@ -42,8 +45,10 @@ export default function ChatMessage({
   isRemove,
   isRecall,
   messageId = "",
-  senderName,    
   isGroup = false,
+  senderName = "",
+  senderAvatar = "",
+  showSenderInfo = false,
   onReply,
   onForward,
   onDelete,
@@ -225,9 +230,26 @@ export default function ChatMessage({
     >
       <div className={`relative ${isOwn ? "pr-2" : "pl-2"}`}>
         {/* Display sender name for group chats when not own message */}
-        {isGroup && !isOwn && senderName && (
-          <div className="text-xs text-gray-500 mb-1 font-medium pl-1">
-            {senderName}
+        {showSenderInfo && (
+          <div className="flex items-center mb-1">
+            {senderAvatar ? (
+              <div className="w-6 h-6 rounded-full overflow-hidden mr-1">
+                <Image
+                  src={senderAvatar}
+                  alt={senderName || "User"}
+                  width={24}
+                  height={24}
+                  className="object-cover"
+                />
+              </div>
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center mr-1">
+                <span className="text-xs text-gray-600">
+                  {senderName?.charAt(0) || "U"}
+                </span>
+              </div>
+            )}
+            <span className="text-xs font-medium text-gray-700">{senderName}</span>
           </div>
         )}
         
