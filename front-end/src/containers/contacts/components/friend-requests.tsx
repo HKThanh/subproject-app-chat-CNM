@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getAuthToken } from "@/utils/auth-utils";
 import { useSocketContext } from "@/socket/SocketContext";
+import { useRouter } from "next/navigation";
 
 interface FriendRequest {
   id: string;
@@ -21,6 +22,7 @@ interface FriendRequest {
 }
 
 export default function FriendRequests() {
+  const router = useRouter();
   const [receivedRequests, setReceivedRequests] = useState<FriendRequest[]>([]);
   const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]);
   const { socket } = useSocketContext();
@@ -114,7 +116,7 @@ export default function FriendRequests() {
     try {
       const token = await getAuthToken();
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/user/handle-friend-request`,
+        `${process.env.NEXT_PUBLIC_API_URL}/user/handle`,
         {
           method: "POST",
           headers: {
@@ -127,12 +129,34 @@ export default function FriendRequests() {
 
       const data = await response.json();
       if (data.success) {
-        toast.success(
-          action === "ACCEPTED" ? "Đã chấp nhận lời mời" : "Đã từ chối lời mời"
+        // Cập nhật UI bằng cách xóa request đã được chấp nhận
+        setReceivedRequests((prev) =>
+          prev.filter((req) => req.id !== requestId)
         );
-        fetchFriendRequests(); // Refresh the lists
+
+        if (action === "ACCEPTED") {
+          // Emit socket event để thông báo cho người gửi
+          socket?.emit("friendRequestAccepted", {
+            success: true,
+            data: {
+              requestId: requestId,
+              senderId: data.data.userId,
+              receiverId: data.data.receiverId,
+            },
+          });
+
+          // Dispatch event để cập nhật danh sách bạn bè
+          window.dispatchEvent(new Event("friendRequestAccepted"));
+
+          toast.success("Đã chấp nhận lời mời");
+          // Chuyển hướng đến trang danh sách bạn bè
+          router.push("/contacts");
+        } else {
+          toast.success("Đã từ chối lời mời");
+        }
       }
     } catch (error) {
+      console.error("Error handling friend request:", error);
       toast.error("Không thể xử lý yêu cầu");
     }
   };
