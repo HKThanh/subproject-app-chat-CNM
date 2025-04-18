@@ -25,8 +25,6 @@ const addNewUser = (id, socketId) => {
         onlineUsers.push({ id, socketId });
     }
 
-    // Log danh sách người dùng online sau khi cập nhật
-    console.log("Current online users:", onlineUsers);
 };
 
 const removeUser = (id) => {
@@ -623,8 +621,6 @@ const handleMarkMessagesRead = (socket) => {
     socket.on("mark_messages_read", async (payload) => {
         try {
             const { conversationId, receiverId } = payload;
-            console.log("Marking messages read - Conversation:", conversationId, "Receiver:", receiverId);
-
             // Query để tìm và update tin nhắn chưa đọc
             const result = await MessageDetail.updateMany(
                 {
@@ -635,7 +631,6 @@ const handleMarkMessagesRead = (socket) => {
                 { isRead: true }
             );
 
-            console.log("Update result:", result);
 
             // Emit kết quả
             socket.emit("messages_marked_read", {
@@ -1079,7 +1074,6 @@ const handleCreatGroupConversation = (io, socket) => {
             birthday: owner ? owner.birthday : null,
             coverPhoto: owner ? owner.coverPhoto : null,
         };
-        
         socket.emit("create_group_conversation_response", {
             success: true,
             conversation: data,
