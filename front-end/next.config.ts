@@ -6,7 +6,8 @@ const nextConfig: NextConfig = {
     domains: [
       'ui-avatars.com',
       'nodebucketcnm203.s3.ap-southeast-1.amazonaws.com',
-      'example.com'
+      'example.com',
+      'static.vecteezy.com'
     ],
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',

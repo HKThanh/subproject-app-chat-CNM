@@ -13,7 +13,7 @@ const MessageDetailSchema = new Schema({
     idConversation: String,
     type: {
         type: String,
-        enum: ['text', 'image', 'video', 'file', 'sticker', 'link', 'audio', 'document'],
+        enum: ['text', 'image', 'video', 'file', 'sticker', 'link', 'audio','document', 'system'],
         default: 'text'
     },
     content: String,
@@ -44,7 +44,11 @@ const MessageDetailSchema = new Schema({
     idMessageReply: {
         type: String,
         default: null
-    }
+    },
+    isPinned: {
+        type: Boolean,
+        default: false
+    },
 }, {
     timestamps: true
 });

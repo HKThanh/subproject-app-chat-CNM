@@ -63,10 +63,6 @@ export default function ProfileModal() {
     }
   }, [user])
 
-  useEffect(() => {
-    console.log("Profile updated:", profile);
-  }, [profile]);
-
   const { data: session, update} = useSession()
   const setUser = useUserStore((state) => state.setUser)
 

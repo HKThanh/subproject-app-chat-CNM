@@ -74,4 +74,53 @@ FriendRequestController.getAllRequests = async (req, res) => {
     });
 }
 
+FriendRequestController.getAllFriendsById = async (req, res) => {
+    const userId = req.user.id;
+
+    if (!userId) {
+        return res.status(400).json({
+            code: 1,
+            message: "Thiếu thông tin",
+        });
+    }
+
+    try {
+        const user = await UserModel.findOne({ id: userId });
+
+        if (!user) {
+            return res.status(404).json({
+                code: 1,
+                message: "Không tìm thấy người dùng",
+            });
+        }
+
+        const friendsId = user.friendList;
+        let friends = [];
+        if (friendsId && friendsId.length > 0) {
+            friends = await UserModel.find({ id: { $in: friendsId } })
+            .select('id fullname email phone urlavatar coverPhoto')
+            .lean();
+        }
+
+        if (!friends) {
+            return res.status(404).json({
+                code: 1,
+                message: "Không tìm thấy bạn bè",
+            });
+        }
+
+        return res.status(200).json({
+            code: 0,
+            message: "Lấy danh sách bạn bè thành công",
+            data: friends,
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            code: 1,
+            message: "Lỗi server",
+        });
+    }
+}
+
 module.exports = FriendRequestController;

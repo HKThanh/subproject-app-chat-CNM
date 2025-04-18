@@ -2,7 +2,6 @@ const { Server } = require("socket.io");
 const socketController = require("../controllers/socketController");
 const authController = require("../controllers/authController");
 const redisClient = require("../services/redisClient");
-const webRTCController = require("../controllers/webRTCController");
 
 let io;
 
@@ -62,8 +61,33 @@ const initSocket = (server) => {
         socketController.handleLoadMessages(io, socket);
         socketController.handleMarkMessagesRead(socket);
         socketController.handleCheckUsersStatus(socket);
+        socketController.handleUserDisconnect(socket);
+        socketController.handleCreateConversation(io, socket);
+        // socketController.handleAddMembers(io, socket);
+        socketController.handleAddMemberToGroup(io, socket);
+        
+        // Thêm các hàm quản lý nhóm chat
+        socketController.handleCreatGroupConversation(io, socket);
+        socketController.handleRemoveMemberFromGroup(io, socket);
+        socketController.handleChangeOwnerGroup(io, socket);
+        socketController.handleSendGroupMessage(io, socket);
+        socketController.handleLoadMemberOfGroup(io, socket);
+        socketController.handleLeaveGroup(io, socket);
+        socketController.handleUpdateGroupInfo(io, socket);
+        socketController.handlePromoteMemberToAdmin(io, socket);
+        socketController.handleDemoteMember(io, socket);
+        socketController.handleDeleteGroup(io, socket);
+        
+        // Thêm các tính năng nâng cao cho nhóm
+        socketController.handleSearchMessagesInGroup(io, socket);
+        socketController.handlePinGroupMessage(io, socket);
+        
+        // Thêm hàm quản lý room conversation
+        socketController.handleJoinConversation(io, socket);
+        socketController.handleLeaveConversation(io, socket);
+        socketController.handleLoadGroupConversation(io, socket);
+        // socketController.handleTyping(io, socket);
 
-        webRTCController.handleCall(io, socket);
         socket.on("disconnect", () => {
             console.log("Client disconnected: " + socket.id);
             const user = socketController.getUserBySocketId(socket.id);

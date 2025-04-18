@@ -10,16 +10,13 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   ActivityIndicator,
-<<<<<<< HEAD
-  Alert
-} from 'react-native';
-=======
   Alert,
   Platform,
   Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
->>>>>>> main
+import SocketService from '../services/SocketService';
+import AuthService from '../services/AuthService';
 
 // Define navigation prop type if you're using React Navigation
 type LoginScreenProps = {
@@ -33,16 +30,12 @@ interface User {
   urlavatar: string;
   birthday: string;
   createdAt: string;
-<<<<<<< HEAD
-  phone: string;
-=======
   email: string;
   bio: string;
   phone: string;
   coverPhoto: string;
   ismale: boolean;
   isVerified: boolean;
->>>>>>> main
 }
 
 // Define auth response type
@@ -54,17 +47,11 @@ interface AuthResponse {
 }
 
 const LoginScreen = ({ navigation }: LoginScreenProps) => {
-<<<<<<< HEAD
-  const [phoneNumber, setPhoneNumber] = useState('');
-=======
   const [email, setEmail] = useState('');
->>>>>>> main
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-<<<<<<< HEAD
-=======
   const [showVerifyNotification, setShowVerifyNotification] = useState(false);
   const [verifyMessage, setVerifyMessage] = useState('');
   const [showVerifyModal, setShowVerifyModal] = useState(false);
@@ -94,7 +81,7 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
   // Function to logout a user
   const logoutUser = async (userEmail: string, userPassword: string) => {
     try {
-      const response = await fetch('http://192.168.0.107:3000/auth/logout/mobile', {
+      const response = await fetch('http://192.168.1.9:3000/auth/logout/mobile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,14 +106,11 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
     }
   };
 
->>>>>>> main
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#1FAEEB" />
 
-<<<<<<< HEAD
-=======
         {/* Verification Modal Popup */}
         <Modal
           transparent={true}
@@ -151,7 +135,6 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
           </View>
         )}
 
->>>>>>> main
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
@@ -166,20 +149,6 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
         {/* Main Content */}
         <View style={styles.content}>
           <Text style={styles.instructionText}>
-<<<<<<< HEAD
-            Vui lòng nhập số điện thoại và mật khẩu đăng nhập
-          </Text>
-
-          {/* Phone Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Số điện thoại</Text>
-            <TextInput
-              style={styles.input}
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
-              keyboardType="phone-pad"
-              placeholder="Nhập số điện thoại"
-=======
             Vui lòng nhập email và mật khẩu đăng nhập
           </Text>
 
@@ -193,7 +162,6 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
               keyboardType="email-address"
               autoCapitalize="none"
               placeholder="Nhập email"
->>>>>>> main
               placeholderTextColor="rgba(100, 92, 92, 0.5)"
             />
             <View style={styles.activeInputLine} />
@@ -218,15 +186,6 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
               </TouchableOpacity>
             </View>
             <View style={styles.inputLine} />
-<<<<<<< HEAD
-          </View>
-
-          {/* Forgot Password */}
-          <TouchableOpacity style={styles.forgotPasswordContainer}>
-            <Text style={styles.forgotPasswordText}>Lấy lại mật khẩu</Text>
-          </TouchableOpacity>
-          {/* Login Button */}          
-=======
           </View>     
                {/* Forgot Password */}
           <TouchableOpacity 
@@ -236,19 +195,13 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
             <Text style={styles.forgotPasswordText}>Lấy lại mật khẩu</Text>
           </TouchableOpacity>
           {/* Login Button */}
->>>>>>> main
           <TouchableOpacity
             style={[styles.loginButton, isLoading && styles.disabledButton]}
             disabled={isLoading}
             onPress={async () => {
               // Validate inputs
-<<<<<<< HEAD
-              if (!phoneNumber.trim()) {
-                Alert.alert('Lỗi', 'Vui lòng nhập số điện thoại');
-=======
               if (!email.trim()) {
                 Alert.alert('Lỗi', 'Vui lòng nhập email');
->>>>>>> main
                 return;
               }
 
@@ -262,62 +215,45 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
 
               // Show loading indicator
               setIsLoading(true);
-<<<<<<< HEAD
-
-=======
->>>>>>> main
               try {
                 // Make API call to login endpoint
-                const response = await fetch('http://192.168.0.107:3000/auth/login', {
+                const response = await fetch('http://192.168.1.9:3000/auth/login', {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-<<<<<<< HEAD
-                  },
-                  body: JSON.stringify({
-                    phone: phoneNumber.trim(),
-                    password: password.trim()
-=======
 
                   },
                   body: JSON.stringify({
                     email: email.trim(),
                     password: password.trim(),
                     platform: Platform.OS === 'ios' || Platform.OS === 'android' ? 'mobile' : 'web'
->>>>>>> main
                   })
                 });
 
-                const data: AuthResponse = await response.json();
-
-                if (data.accessToken && data.refreshToken && data.user) {
-                  // Store token in global object for now since AsyncStorage isn't installed
-                  // In production you should use AsyncStorage:
-                  // await AsyncStorage.setItem('accessToken', data.accessToken);
-                  // await AsyncStorage.setItem('refreshToken', data.refreshToken);
-<<<<<<< HEAD
-                  
-                  // For now, store in global variable
+                const data: AuthResponse = await response.json();       
+                         if (data.accessToken && data.refreshToken && data.user) {
+                  // Store token in global object for backward compatibility
                   global.accessToken = data.accessToken;
-                  
+                       
+                  // Lưu trữ tokens trong AuthService để sử dụng trong toàn bộ ứng dụng
+                  const authService = AuthService.getInstance();
+                  await authService.setTokens(data.accessToken, data.refreshToken);
+
                   console.log('Login successful:', data.message);
                   console.log('User:', data.user);
-
-                  // Navigate to HomeScreen on successful login
-                  navigation?.navigate('HomeScreen', { 
-                    user: data.user,
-                    accessToken: data.accessToken,
-                    refreshToken: data.refreshToken
-                  });
-=======
-
-                  // For now, store in global variable
-                  global.accessToken = data.accessToken;
-
-                  console.log('Login successful:', data.message);
-                  console.log('User:', data.user);                  // Check if user is verified
+                  
+                  // Check if user is verified
                   if (data.user.isVerified) {
-                    // User is verified, navigate to HomeScreen
+                    // User is verified
+                    // Store user data in SocketService for persistent connection
+                    const socketService = SocketService.getInstance();
+                    await socketService.setUserData({
+                      id: data.user.id,
+                      fullname: data.user.fullname,
+                      email: data.user.email
+                    });
+                    
+                    // Navigate to HomeScreen
                     navigation?.navigate('HomeScreen', {
                       user: data.user,
                       accessToken: data.accessToken,
@@ -334,7 +270,7 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
                     setTimeout(async () => {
                       try {
                         // Send registration info to API
-                        const registerResponse = await fetch('http://192.168.0.107:3000/auth/register-phone',
+                        const registerResponse = await fetch('http://192.168.1.9:3000/auth/register-phone',
                           {
                           method: 'POST',
                           headers: {
@@ -370,7 +306,6 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
                       }
                     }, 5000);
                   }
->>>>>>> main
                 } else {
                   // Show error message
                   setError(data.message);
@@ -526,8 +461,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter',
     fontWeight: '400',
-<<<<<<< HEAD
-=======
   }, verificationNotification: {
     backgroundColor: '#1FAEEB',
     paddingVertical: 12,
@@ -569,7 +502,6 @@ const styles = StyleSheet.create({
   modalMessage: {
     fontSize: 14,
     textAlign: 'center',
->>>>>>> main
   },
 });
 

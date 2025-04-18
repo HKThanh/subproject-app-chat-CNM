@@ -2,12 +2,9 @@ const dynamoose = require("../config/connectDynamodb");
 const { v4: uuidv4 } = require("uuid");
 const moment = require("moment-timezone");
 const MessageDetailModel = require("../models/MessageDetailModel");
-const Conversation = require("../models/ConversationModel");
-const UserModel = require("../models/UserModel");
-
-const messageDetailController = require("./messageDetailController");
 const MessageController = require("./messageController");
-const BucketMessageController = require("./BucketMessageController");
+const Conversation = require("../models/ConversationModel");
+const User = require("../models/UserModel");
 
 const getConversation = async (IDUser, lastEvaluatedKey) => {
   try {
@@ -54,6 +51,16 @@ const createNewSignleConversation = async (
   IDReceiver,
   IDConversation
 ) => {
+  const user = await User.findOne({ idUser: IDSender });
+
+  if (!user) {
+    throw new Error("Không tìm thấy người gửi");
+  }
+
+  if (user.blockList && user.blockList.includes(IDReceiver)) {
+    throw new Error("Không thể tạo cuộc trò chuyện với người đã chặn");
+  }
+
   const conversation = new Conversation({
     idConversation: IDConversation || uuidv4(),
     idSender: IDSender,
@@ -94,19 +101,11 @@ const createNewGroupConversation = async (
       dataConversation.idConversation
     );
 
-    // 3. Tạo bản ghi conversation cho từng thành viên
-    const conversationsPromises = groupMembers.map(async (member) => {
-      const conversationDoc = new Conversation({
-        ...dataConversation,
-        idSender: member,
-        lastChange: moment.tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DDTHH:mm:ss.SSS')
-      });
-      return conversationDoc.save();
-    });
+    // 3. Tạo bản ghi conversation
+    const conversation = new Conversation(dataConversation);
+    await conversation.save();
 
-    const results = await Promise.all(conversationsPromises);
-    return results;
-
+    return conversation;
   } catch (error) {
     console.error('Error creating group conversation:', error);
     throw error;
@@ -120,6 +119,7 @@ const createNewInfoConversationGroup = async (
   groupMembers
 ) => {
   try {
+    let urlavatar = null;
     if (groupAvatar) {
       // 1. Upload ảnh lên S3
       const params = {
@@ -130,16 +130,15 @@ const createNewInfoConversationGroup = async (
       };
 
       const s3Data = await s3.upload(params).promise();
-      const urlavatar = s3Data.Location;
+      urlavatar = s3Data.Location;
     } else {
       urlavatar = "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp";
     }
 
-    groupMembers.push(IDOwner); // Thêm IDOwner vào danh sách thành viên
-
     // 2. Tạo conversation data theo MongoDB Schema
     const conversationData = {
       idConversation: uuidv4(),
+      idSender: IDOwner,
       isGroup: true,
       groupName: groupName,
       groupAvatar: urlavatar,
@@ -355,7 +354,6 @@ const getMemberInfoByIDConversation = async (req, res) => {
     // Tìm conversation
     const conversation = await Conversation.findOne({
       idConversation: IDConversation,
-      idSender: IDSender
     });
 
     if (!conversation || !conversation.groupMembers?.length) {
@@ -370,7 +368,7 @@ const getMemberInfoByIDConversation = async (req, res) => {
     // Lấy thông tin members
     const membersInfo = await Promise.all(
       conversation.groupMembers.map(async (memberID) => {
-        const member = await UserModel.findOne({ id: memberID });
+        const member = await User.findOne({ id: memberID });
         
         if (!member) return null;
 
@@ -379,11 +377,13 @@ const getMemberInfoByIDConversation = async (req, res) => {
           fullname: member.fullname,
           urlavatar: member.urlavatar,
           email: member.email,
+          phone: member.phone,
+          bio: member.bio,
+          coverPhoto: member.coverPhoto,
           roles: {
             isOwner: memberID === conversationRules.IDOwner,
             isCoOwner: conversationRules.listIDCoOwner.includes(memberID)
           },
-          status: member.status || 'active'
         };
       })
     );
