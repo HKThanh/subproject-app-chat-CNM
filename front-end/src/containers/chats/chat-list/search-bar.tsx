@@ -26,8 +26,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   const [loading, setLoading] = useState(false);
   const { socket } = useSocketContext();
 
-  const END_POINT_URL =
-    process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:3000";
+  const END_POINT_URL = process.env.NEXT_PUBLIC_API_URL || "localhost:3000";
 
   // Thêm useEffect để lắng nghe các sự kiện socket liên quan đến friend request
   useEffect(() => {
@@ -84,7 +83,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
     try {
       const token = await getAuthToken();
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/user/send`,
+        `${END_POINT_URL}/user/send`,
         {
           method: "POST",
           headers: {
@@ -94,7 +93,8 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
           body: JSON.stringify({ receiverId: userId }),
         }
       );
-
+      console.log("check response is add fr>> ", response);
+      
       const data = await response.json();
 
       if (data.code === 1) {
@@ -124,7 +124,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
 
         // Fetch lại danh sách lời mời đã gửi để đảm bảo dữ liệu đồng bộ
         const sentResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/user/get-sended-friend-requests`,
+          `${END_POINT_URL}/user/get-sended-friend-requests`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }

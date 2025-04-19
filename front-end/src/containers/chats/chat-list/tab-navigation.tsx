@@ -40,7 +40,7 @@ export default function TabNavigation({
   const { conversations, loading, createGroupConversation } = useChatContext(); // Add createGroupConversation
   
   // Use a ref for API_URL to keep it stable between renders
-  const API_URL = useRef(process.env.NODE_PUBLIC_API_URL || "http://localhost:3000").current;
+  const API_URL = useRef(process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000").current;
   
   // State for friends list
   const [friends, setFriends] = useState<
