@@ -1,0 +1,307 @@
+// Đăng nhập với user001
+// lưu ý ở các api get sended-friend-requests, get-received-friend-requests, cancel, send đều cần có accessToken của người gửi yêu cầu kết bạn và chỉ lấy các yêu cầu có type=PENDING
+// api handle thì phải dùng accessToken của người nhận yêu cầu để xử lý
+
+*localhost:3000/user/send test Socket.io
+Listen: newFriendRequest
+Emit: joinFriendRequest
+Data:
+	user004
+{
+    "message": "Bạn có yêu cầu kết bạn mới",
+    "requestId": "22fbefd3-a580-4c9a-8043-302bc3a2f886", //id của yêu cầu kết bạn
+    "sender": {
+        "id": "user001",
+        "fullname": "John Doe",
+        "urlavatar": "https://example.com/avatars/john.jpg"
+    }
+}
+
+*localhost:3000/user/send
+input : accessToken
+{
+    "receiverId": "user004"
+}
+{
+    "code": 1,
+    "message": "Request sent",
+    "data": {
+        "senderId": "user001",
+        "receiverId": "user004"
+    }
+}
+
+*localhost:3000/user/send
+input accessToken
+{
+    "receiverId": "user001"
+}
+output
+{
+    "code": -2,
+    "message": "Gửi cho bản thân làm gì"
+}
+
+*localhost:3000/user/send
+input accessToken
+{
+    "receiverId": "user007"
+}
+output
+{
+    "code": -1,
+    "message": "Không tìm thấy người nhận"
+}
+
+*localhost:3000/user/send (nếu đã tồn tại trong friendList của người gửi)
+input accessToken
+{
+    "receiverId": "user003"
+}
+output
+{
+    "code": 3,
+    "message": "Hai bạn đã kết bạn"
+}
+
+*localhost:3000/user/send (nếu tìm thấy một yêu cầu kết bạn với trạng thái ACCEPTED)
+input accessToken
+{
+    "receiverId": "user002"
+}
+output
+{
+    "code": 2,
+    "message": "Hai bạn đã kết bạn"
+}
+
+*localhost:3000/user/get-received-friend-requests (danh sách nhận yêu cầu kết bạn từ người khác)
+input: accessToken
+output
+{
+    "success": true,
+    "message": "Lấy danh sách nhận yêu cầu kết bạn thành công",
+    "data": [
+        {
+            "_id": "67f90c87112a449ad0caecb6",
+            "senderId": "user003",
+            "receiverId": "user002",
+            "status": "PENDING",
+            "id": "bc150690-e694-4144-85ad-11531b765d77", //id của yêu cầu kết bạn
+            "createdAt": "2025-04-11T12:35:19.885Z",
+            "updatedAt": "2025-04-11T12:35:19.885Z",
+            "__v": 0,
+            "sender": { //thông tin người gửi yêu cầu kết bạn
+                "id": "user003",
+                "fullname": "Alice Johnson",
+                "urlavatar": "https://example.com/avatars/alice.jpg"
+            }
+        }
+    ],
+    "error": null
+}
+
+*localhost:3000/user/get-received-friend-requests (danh sách nhận trường hợp không có yêu cầu)
+input: accessToken
+output
+{
+    "success": true,
+    "message": "Lấy danh sách nhận yêu cầu kết bạn thành công",
+    "data": [],
+    "error": null
+}
+
+*localhost:3000/user/get-sended-friend-requests (danh sách gửi trường hợp có yêu cầu)
+input: accessToken
+output
+{
+    "success": true,
+    "message": "Lấy danh sách gửi yêu cầu kết bạn thành công",
+    "data": [
+        {
+            "_id": "67fa370263a2d2ea89fe6915",
+            "id": "request001",
+            "senderId": "user001",
+            "receiverId": "user002",
+            "status": "PENDING",
+            "createdAt": "2025-04-02T10:00:00.000Z",
+            "updatedAt": "2025-04-02T10:00:00.000Z",
+            "receiver": {
+                "id": "user002",
+                "fullname": "Jane Smith",
+                "urlavatar": "https://example.com/avatars/jane.jpg"
+            }
+        },
+        {
+            "_id": "67fa3c5ed02355372634cbea",
+            "senderId": "user001",
+            "receiverId": "user004",
+            "status": "PENDING",
+            "id": "22fbefd3-a580-4c9a-8043-302bc3a2f886",
+            "createdAt": "2025-04-12T10:11:42.279Z",
+            "updatedAt": "2025-04-12T10:11:42.279Z",
+            "__v": 0,
+            "receiver": {
+                "id": "user004",
+                "fullname": "Alice Johnson",
+                "urlavatar": "https://example.com/avatars/alice.jpg"
+            }
+        }
+    ],
+    "error": null
+}
+
+*localhost:3000/user/get-sended-friend-requests (danh sách gửi trường hợp không có yêu cầu)
+input: accessToken
+output
+{
+    "success": true,
+    "message": "Lấy danh sách gửi yêu cầu kết bạn thành công",
+    "data": [],
+    "error": null
+}
+
+*localhost:3000/user/handle (socket) (trường hợp ACCEPTED)
+Listen: friendRequestAccepted
+Listen: friendRequestDeclined
+Emit: joinFriendRequest (ở cả người gửi và người nhận) sau khi emit joinFriendRequest thì login ở người nhận để gọi api xử lý handle
+
+input (accessToken của người nhận):
+    user002 //người nhận
+output
+{
+    "success": true,
+    "message": "Bạn đã chấp nhận yêu cầu kết bạn",
+    "data": {
+        "requestId": "request001",
+        "userId": "user001"
+    },
+    "error": null
+}
+
+input (accessToken của người nhận):
+    user001 //người gửi
+output
+{
+    "success": true,
+    "message": "Yêu cầu kết bạn đã được chấp nhận",
+    "data": {
+        "requestId": "request001",
+        "userId": "user002"
+    },
+    "error": null
+}
+
+*localhost:3000/user/handle (yêu cầu accessToken của người nhận)
+input
+{
+    "id": "request001", // id của yêu cầu kết bạn
+    "type": "ACCEPTED"
+}
+output
+{
+    "success": true,
+    "message": "Yêu cầu đã được chấp nhận",
+    "data": {
+        "id": "request001",
+        "senderId": "user001",
+        "receiverId": "user002",
+        "status": "ACCEPTED"
+    },
+    "error": null,
+    "code": 2
+}
+
+*localhost:3000/user/handle
+input
+{
+    "id": "request0014",
+    "type": "ACCEPTED"
+}
+output
+{
+    "code": 0,
+    "message": "Không tìm thấy yêu cầu kết bạn"
+}
+
+*localhost:3000/user/handle
+input
+{
+    "id": "fdaf9d17-29a9-4537-b213-5ca44ae7d991", //id của yêu cầu kết bạn
+    "type": "DECLINED"
+}
+output
+{
+    "success": true,
+    "message": "Yêu cầu đã bị từ chối",
+    "data": {
+        "id": "fdaf9d17-29a9-4537-b213-5ca44ae7d991",
+        "senderId": "user003",
+        "receiverId": "user002",
+        "status": "DECLINED"
+    },
+    "error": null,
+    "code": 1
+}
+
+*localhost:3000/user/handle (nếu type không thuộc [ACCEPTED, DECLINED])
+input
+{
+    "id": "request0014",
+    "type": "abc"
+}
+
+output
+{
+    "success": false,
+    "message": "Loại yêu cầu không hợp lệ",
+    "data": null,
+    "error": "Invalid type, must be ACCEPTED or DECLINED",
+    "code": -2
+}
+
+*localhost:3000/user/cancel/47adf6e6-02a9-4446-9ea0-31ff3031020d //id của yêu cầu kết bạn
+input: accessToken (Người gửi yêu cầu)
+output
+{
+    "success": true,
+    "message": "Đã hủy yêu cầu kết bạn",
+    "data": {
+        "requestId": "47adf6e6-02a9-4446-9ea0-31ff3031020d",
+        "senderId": "user001",
+        "receiverId": "user004"
+    },
+    "error": null,
+    "code": 1
+}
+
+*localhost:3000/user/cancel/47adf6e6-02a9-4446-9ea0-31ff3031020d
+input: accessToken
+output
+{
+    "success": false,
+    "message": "Không tìm thấy yêu cầu kết bạn",
+    "data": null,
+    "error": "Friend request not found or not authorized",
+    "code": 0
+}
+
+//Lấy danh sách bạn bè
+*localhost:3000/user/friend/get-friends
+input: accessToken
+output
+{
+    "code": 0,
+    "message": "Lấy danh sách bạn bè thành công",
+    "data": [
+        {
+            "_id": "67fe6588f640dd369dfe6913",
+            "id": "user003",
+            "fullname": "Alice Johnson",
+            "email": "alice.johnson@example.com",
+            "coverPhoto": "https://example.com/covers/alice.jpg",
+            "phone": "0933445566",
+            "urlavatar": "https://example.com/avatars/alice.jpg"
+        }
+    ]
+}

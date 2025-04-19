@@ -1,24 +1,30 @@
-require('dotenv').config();
 const jwt = require('jsonwebtoken');
+const UserModel = require('../models/UserModel');
 
-const JWT_SECRET = process.env.JWT_SECRET;
-
-const authenticateToken = (req, res, next) => {
+const authenticateToken = async (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = authHeader && authHeader.split(' ')[1];    
 
     if (!token) {
         return res.status(401).json({ message: 'Bạn đã hết phiên đăng nhập' });
     }
 
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) {
-            return res.status(403).json({ message: 'Invalid access token' });
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await UserModel.get(decoded.id);
+
+        // console.log('Decoded token:', decoded);
+        
+        if (!user) {
+            return res.status(404).json({ message: 'Không tìm thấy người dùng' });
         }
 
         req.user = user;
         next();
-    });
+    } catch (err) {
+        console.error('Auth error:', err);
+        res.status(403).json({ message: 'Token đã hết hạn' });
+    }
 };
 
 module.exports = authenticateToken;
