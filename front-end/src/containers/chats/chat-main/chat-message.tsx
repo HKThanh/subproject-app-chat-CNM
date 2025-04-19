@@ -14,7 +14,9 @@ import {
 } from "lucide-react"
 import { useState } from "react"
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import Image from "next/image"
 
+// Add senderName and isGroup props to the interface
 interface ChatMessageProps {
   message: string
   timestamp: string
@@ -24,6 +26,10 @@ interface ChatMessageProps {
   messageId?: string
   isRemove: boolean
   isRecall?: boolean
+  isGroup?: boolean
+  senderName?: string  
+  senderAvatar?: string; // Add this prop
+  showSenderInfo?: boolean;
   onReply?: (messageId: string, content: string, type: string) => void
   onForward?: (messageId: string) => void
   onDelete?: (messageId: string) => void
@@ -39,6 +45,10 @@ export default function ChatMessage({
   isRemove,
   isRecall,
   messageId = "",
+  isGroup = false,
+  senderName = "",
+  senderAvatar = "",
+  showSenderInfo = false,
   onReply,
   onForward,
   onDelete,
@@ -64,8 +74,8 @@ export default function ChatMessage({
                 />
               </a>
               <div className="mt-2 flex items-center">
-                <ImageIcon className="w-4 h-4 mr-1" />
-                <span className="text-sm">{message}</span>
+                <ImageIcon className="w-4 h-4 mr-1 text-gray-800" />
+                <span className="text-sm text-gray-800">{message}</span>
               </div>
             </div>
           )
@@ -219,17 +229,41 @@ export default function ChatMessage({
       onMouseLeave={() => setIsHovered(false)}
     >
       <div className={`relative ${isOwn ? "pr-2" : "pl-2"}`}>
+        {/* Display sender name for group chats when not own message */}
+        {showSenderInfo && (
+          <div className="flex items-center mb-1">
+            {senderAvatar ? (
+              <div className="w-6 h-6 rounded-full overflow-hidden mr-1">
+                <Image
+                  src={senderAvatar}
+                  alt={senderName || "User"}
+                  width={24}
+                  height={24}
+                  className="object-cover"
+                />
+              </div>
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center mr-1">
+                <span className="text-xs text-gray-600">
+                  {senderName?.charAt(0) || "U"}
+                </span>
+              </div>
+            )}
+            <span className="text-xs font-medium text-gray-700">{senderName}</span>
+          </div>
+        )}
+        
         {/* Container cho nội dung tin nhắn */}
         <div
           className={`rounded-lg p-3 ${
             type !== "text"
               ? "bg-transparent"
               : isOwn
-                ? "bg-[#4285F4] text-white max-w-xs md:max-w-md lg:max-w-lg"
+                ? "bg-[#8A56FF] text-white max-w-xs md:max-w-md lg:max-w-lg"
                 : "bg-gray-100 text-gray-800 inline-block"
           }`}
           style={{
-            backgroundColor: type !== "text" ? "transparent" : isOwn ? "#4285F4" : "",
+            backgroundColor: type !== "text" ? "transparent" : isOwn ? "#8A56FF" : "",
             color: type !== "text" ? (isOwn ? "white" : "black") : isOwn ? "white" : "",
             maxWidth: !isOwn ? "80%" : "",
           }}

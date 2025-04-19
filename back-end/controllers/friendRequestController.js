@@ -76,7 +76,6 @@ FriendRequestController.getAllRequests = async (req, res) => {
 
 FriendRequestController.getAllFriendsById = async (req, res) => {
     const userId = req.user.id;
-
     if (!userId) {
         return res.status(400).json({
             code: 1,
@@ -108,7 +107,6 @@ FriendRequestController.getAllFriendsById = async (req, res) => {
                 message: "Không tìm thấy bạn bè",
             });
         }
-
         return res.status(200).json({
             code: 0,
             message: "Lấy danh sách bạn bè thành công",

@@ -1,14 +1,19 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { useSession, signOut } from "next-auth/react"
-import { toast } from "sonner"
-import ProfileModalWrapper from "@/components/user/profile-modal-wrapper"
-import { logoutUser } from "@/actions/authActions"
-import { getAuthToken } from "@/utils/auth-utils"
-import { Avatar, AvatarImage } from "@/components/ui/avatar"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
+import { toast } from "sonner";
+import ProfileModalWrapper from "@/components/user/profile-modal-wrapper";
+import { logoutUser } from "@/actions/authActions";
+import { getAuthToken } from "@/utils/auth-utils";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   MessageSquare,
   Users,
@@ -18,32 +23,35 @@ import {
   Settings,
   User,
   LogOut,
-} from "lucide-react"
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import useUserStore from "@/stores/useUserStoree"
+} from "@/components/ui/dropdown-menu";
+import useUserStore from "@/stores/useUserStoree";
 
 export default function NavigationSidebar() {
-  const router = useRouter()
-  const { data: session } = useSession()
-  const [activeItem, setActiveItem] = useState('messages')
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
-  const [isLoggingOut, setIsLoggingOut] = useState(false)
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const router = useRouter();
+  const pathname = usePathname();
+  const { data: session } = useSession();
+  const [activeItem, setActiveItem] = useState("messages");
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Lấy thông tin người dùng từ Zustand store
-  const user = useUserStore((state) => state.user)
-  const clearUser = useUserStore((state) => state.clearUser)
+  const user = useUserStore((state) => state.user);
+  const clearUser = useUserStore((state) => state.clearUser);
 
   // Fallback values nếu chưa có thông tin người dùng
-  const userName = user?.fullname || session?.user?.fullname || 'User'
-  const userEmail = user?.email || session?.user?.email || ''
-  const userAvatar = (user?.urlavatar?.toString() || session?.user?.urlavatar?.toString() || `https://ui-avatars.com/api/?name=${userName}`) as string
+  const userName = user?.fullname || session?.user?.fullname || "User";
+  const userEmail = user?.email || session?.user?.email || "";
+  const userAvatar = (user?.urlavatar?.toString() ||
+    session?.user?.urlavatar?.toString() ||
+    `https://ui-avatars.com/api/?name=${userName}`) as string;
 
   // Hàm xử lý đăng xuất
   const handleLogout = async () => {
@@ -54,7 +62,7 @@ export default function NavigationSidebar() {
       const token = await getAuthToken();
 
       if (!token) {
-        throw new Error('Không tìm thấy token xác thực');
+        throw new Error("Không tìm thấy token xác thực");
       }
 
       // Gọi API đăng xuất
@@ -68,28 +76,40 @@ export default function NavigationSidebar() {
         await signOut({ redirect: false });
 
         // Thông báo thành công
-        toast.success(result.message || 'Đăng xuất thành công!');
+        toast.success(result.message || "Đăng xuất thành công!");
 
         // Chuyển hướng về trang đăng nhập
-        router.push('/auth/login');
+        router.push("/auth/login");
       } else {
-        throw new Error(result.message || 'Đăng xuất thất bại');
+        throw new Error(result.message || "Đăng xuất thất bại");
       }
     } catch (error) {
-      console.error('Lỗi đăng xuất:', error);
-      toast.error(error instanceof Error ? error.message : 'Đã xảy ra lỗi khi đăng xuất');
+      console.error("Lỗi đăng xuất:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Đã xảy ra lỗi khi đăng xuất"
+      );
     } finally {
       setIsLoggingOut(false);
     }
   };
 
+  const handleNavigation = (id: string) => {
+    setActiveItem(id);
+    if (id === "contacts") {
+      router.push("/contacts");
+    } else if (id === "messages") {
+      router.push("/chat");
+    }
+    // Add other navigation cases as needed
+  };
+
   const navigationItems = [
-    { id: 'messages', icon: MessageSquare, label: 'Tin nhắn', badge: 5 },
-    { id: 'contacts', icon: Users, label: 'Danh bạ' },
-    { id: 'tasks', icon: CheckSquare, label: 'Công việc' },
-    { id: 'cloud', icon: Cloud, label: 'Cloud' },
-    { id: 'documents', icon: FolderOpen, label: 'Tài liệu' },
-  ]
+    { id: "messages", icon: MessageSquare, label: "Tin nhắn", badge: 5 },
+    { id: "contacts", icon: Users, label: "Danh bạ" },
+    { id: "tasks", icon: CheckSquare, label: "Công việc" },
+    { id: "cloud", icon: Cloud, label: "Cloud" },
+    { id: "documents", icon: FolderOpen, label: "Tài liệu" },
+  ];
 
   // Xử lý đóng modal profile
   const handleCloseModal = () => {
@@ -106,6 +126,14 @@ export default function NavigationSidebar() {
     }, 100);
   };
 
+  useEffect(() => {
+    if (pathname === "/contacts") {
+      setActiveItem("contacts");
+    } else if (pathname === "/chat") {
+      setActiveItem("messages");
+    }
+  }, [pathname]);
+
   return (
     <>
       <div className="fixed left-0 top-0 h-screen w-[70px] bg-[#2563eb] flex flex-col items-center py-4">
@@ -114,10 +142,7 @@ export default function NavigationSidebar() {
           <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
             <DropdownMenuTrigger asChild>
               <Avatar className="h-10 w-10 border-2 border-white hover:opacity-90 transition-opacity cursor-pointer">
-                <AvatarImage
-                  src={userAvatar}
-                  alt={`${userName}'s avatar`}
-                />
+                <AvatarImage src={userAvatar} alt={`${userName}'s avatar`} />
               </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="start">
@@ -141,7 +166,7 @@ export default function NavigationSidebar() {
                 disabled={isLoggingOut}
               >
                 <LogOut className="mr-2 h-4 w-4" />
-                {isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
+                {isLoggingOut ? "Đang đăng xuất..." : "Đăng xuất"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -155,9 +180,9 @@ export default function NavigationSidebar() {
                 <TooltipTrigger asChild>
                   <button
                     className={`relative p-3 rounded-lg hover:bg-[#1d4ed8] transition-colors ${
-                      activeItem === item.id ? 'bg-[#1d4ed8]' : ''
+                      activeItem === item.id ? "bg-[#1d4ed8]" : ""
                     }`}
-                    onClick={() => setActiveItem(item.id)}
+                    onClick={() => handleNavigation(item.id)}
                   >
                     <item.icon className="h-6 w-6 text-white" />
                     {item.badge && (
@@ -182,5 +207,5 @@ export default function NavigationSidebar() {
         onClose={handleCloseModal}
       />
     </>
-  )
+  );
 }

@@ -9,7 +9,7 @@ import { auth, signIn } from "@/auth";
 // actions/login.ts
 
 // actions/login.ts
-const API_URL = process.env.NODE_PUBLIC_API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export async function loginUser(email: string, password: string) {
   try {
@@ -29,7 +29,6 @@ export async function loginUser(email: string, password: string) {
       status: 200,
     };
   } catch (error: any) {
-
     // Handle specific error types
     if (error.name === "AccountNotActivatedError") {
       // Try to get user ID from error or response
@@ -43,15 +42,13 @@ export async function loginUser(email: string, password: string) {
         redirectTo: `/verify/${userId}`,
       };
     } else if (error.name === "InvalidPhonePasswordError") {
-
       return {
         error: true,
         success: false,
         message: "Email hoặc mật khẩu không chính xác.",
         status: 400,
       };
-    }
-    else if(error.name ==="AccountIsLoggedError"){
+    } else if (error.name === "AccountIsLoggedError") {
       return {
         error: true,
         success: false,
@@ -73,34 +70,34 @@ export async function signUpUser(
   email: string,
   password: string,
   fullname: string,
-  otp: string,
+  otp: string
 ) {
   try {
     const result = await fetch(`${API_URL}/auth/register-web`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ email, password, fullname, otp }),
-    }).then(res => res.json());
+    }).then((res) => res.json());
     console.log("check result in register>>> ", result);
 
     // Nếu thành công, trả về thông tin để FE xử lý chuyển hướng
     if (result.message === "Người dùng đã tồn tại") {
-        return {
-          error: true,
-          success: false,
-          message: result.message,
-          status: 400,
-        };
-    }
-    if(result.message === 'OTP đã hết hạn'){
       return {
         error: true,
         success: false,
         message: result.message,
         status: 400,
-      }
+      };
+    }
+    if (result.message === "OTP đã hết hạn") {
+      return {
+        error: true,
+        success: false,
+        message: result.message,
+        status: 400,
+      };
     }
     if (result.message === "OTP không hợp lệ") {
       return {
@@ -120,7 +117,7 @@ export async function signUpUser(
       status: 200,
     };
   } catch (error) {
-    console.error("Sign up error:", error)
+    console.error("Sign up error:", error);
     return {
       error: true,
       success: false,
@@ -132,14 +129,14 @@ export async function signUpUser(
 export async function sendOtp(email: string) {
   try {
     const result = await fetch(`${API_URL}/auth/request-otp-web`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ email }),
-    }).then(res => res.json());
+    }).then((res) => res.json());
     console.log("check result in send otp>>> ", result);
-    if (result.message === 'Người dùng đã tồn tại'){
+    if (result.message === "Người dùng đã tồn tại") {
       return {
         error: true,
         success: false,
@@ -270,15 +267,15 @@ export async function sendOtp(email: string) {
 export async function logoutUser(accessToken: string) {
   try {
     const response = await fetch(`${API_URL}/auth/logout/web`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`
-      }
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
     });
 
     if (!response.ok) {
-      throw new Error('Đăng xuất thất bại');
+      throw new Error("Đăng xuất thất bại");
     }
 
     const result = await response.json();
@@ -305,15 +302,15 @@ export async function logoutUser(accessToken: string) {
 export async function requestPasswordReset(email: string) {
   try {
     const result = await fetch(`${API_URL}/auth/reset-password-request`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ email }),
-    }).then(res => res.json());
-    
+    }).then((res) => res.json());
+
     console.log("Password reset request result:", result);
-    
+
     if (result.message === "Không tìm thấy người dùng") {
       return {
         error: true,
@@ -322,7 +319,7 @@ export async function requestPasswordReset(email: string) {
         status: 404,
       };
     }
-    
+
     return {
       error: false,
       success: true,
@@ -345,15 +342,15 @@ export async function requestPasswordReset(email: string) {
 export async function resetPassword(id: string, otp: string, password: string) {
   try {
     const result = await fetch(`${API_URL}/auth/reset-password/${id}`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ otp, password }),
-    }).then(res => res.json());
-    
+    }).then((res) => res.json());
+
     console.log("Password reset result:", result);
-    
+
     if (result.message === "OTP đã hết hạn") {
       return {
         error: true,
@@ -362,7 +359,7 @@ export async function resetPassword(id: string, otp: string, password: string) {
         status: 400,
       };
     }
-    
+
     if (result.message === "Sai mã OTP") {
       return {
         error: true,
@@ -371,7 +368,7 @@ export async function resetPassword(id: string, otp: string, password: string) {
         status: 400,
       };
     }
-    
+
     return {
       error: false,
       success: true,

@@ -14,12 +14,14 @@ const imageFileFilter = (req, file, cb) => {
 
 const chatFileFilter = (req, file, cb) => {
   const allowedTypes = {
-    'image': ['image/jpeg','image/jpg', 'image/png', 'image/gif'],
+    'image': ['image/jpeg','image/jpg', 'image/png', 'image/gif','image/avif'],
     'video': ['video/mp4', 'video/quicktime'],
     'document': ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
   };
 
   // Check if file type is in any of the allowed categories
+  console.log("check filetype", file.mimetype);
+  
   const isAllowed = Object.values(allowedTypes).some(types => 
     types.includes(file.mimetype)
   );
