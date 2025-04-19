@@ -1,20 +1,21 @@
 "use client";
 
-import { MoreHorizontal, Search, ChevronDown, Filter } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-import { Input } from "@heroui/input";
+import { useState, useEffect } from "react";
+import { MoreHorizontal, Search } from "lucide-react";
+import { getAuthToken } from "@/utils/auth-utils";
+import { toast } from "sonner";
 
 interface Contact {
   id: string;
-  name: string;
-  avatar: string;
-  initials: string;
+  fullname: string;
+  urlavatar: string;
+  email?: string;
+  phone?: string;
+}
+
+interface ContactGroup {
+  letter: string;
+  contacts: Contact[];
 }
 
 interface ContactListProps {
@@ -26,46 +27,99 @@ export default function ContactList({
   searchQuery,
   onSearchChange,
 }: ContactListProps) {
-  // Mock data - replace with real data later
-  const contacts = [
-    {
-      letter: "A",
-      contacts: [
+  const [contacts, setContacts] = useState<ContactGroup[]>([]);
+  const [totalFriends, setTotalFriends] = useState(0);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+
+  const fetchFriendList = async () => {
+    try {
+      const token = await getAuthToken();
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/user/friend/get-friends`,
         {
-          id: "1",
-          name: "Anh thư",
-          avatar: "https://example.com/avatar1.jpg",
-          initials: "AT",
-        },
-        {
-          id: "2",
-          name: "An Nhiên",
-          avatar: "https://example.com/avatar2.jpg",
-          initials: "AN",
-        },
-      ],
-    },
-    {
-      letter: "B",
-      contacts: [
-        {
-          id: "3",
-          name: "Bảo Nam",
-          avatar: "https://example.com/avatar3.jpg",
-          initials: "BN",
-        },
-      ],
-    },
-  ];
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const result = await response.json();
+
+      // Kiểm tra response format theo API docs
+      if (result.code === 0 && Array.isArray(result.data)) {
+        console.log("Friend list response:", result); // Debug log
+
+        const friendList = result.data;
+        // Nhóm bạn bè theo chữ cái đầu tiên
+        const groupedContacts: { [key: string]: Contact[] } = {};
+
+        friendList.forEach((friend: Contact) => {
+          const firstLetter = friend.fullname.charAt(0).toUpperCase();
+          if (!groupedContacts[firstLetter]) {
+            groupedContacts[firstLetter] = [];
+          }
+          groupedContacts[firstLetter].push(friend);
+        });
+
+        // Chuyển đổi object thành mảng và sắp xếp theo alphabet
+        const sortedGroups = Object.entries(groupedContacts)
+          .map(([letter, contacts]) => ({
+            letter,
+            contacts: contacts.sort((a, b) =>
+              a.fullname.localeCompare(b.fullname)
+            ),
+          }))
+          .sort((a, b) => a.letter.localeCompare(b.letter));
+
+        setContacts(sortedGroups);
+        setTotalFriends(friendList.length);
+      } else {
+        console.error("Invalid response format:", result);
+        toast.error("Không thể tải danh sách bạn bè");
+      }
+    } catch (error) {
+      console.error("Error fetching friend list:", error);
+      toast.error("Không thể tải danh sách bạn bè");
+    }
+  };
+
+  // Thêm useEffect để lắng nghe sự kiện cập nhật danh sách bạn bè
+  useEffect(() => {
+    fetchFriendList();
+
+    // Lắng nghe sự kiện friendRequestAccepted để cập nhật danh sách
+    const handleFriendRequestAccepted = () => {
+      fetchFriendList();
+    };
+
+    window.addEventListener(
+      "friendRequestAccepted",
+      handleFriendRequestAccepted
+    );
+
+    return () => {
+      window.removeEventListener(
+        "friendRequestAccepted",
+        handleFriendRequestAccepted
+      );
+    };
+  }, []);
+
+  // Lọc danh sách theo searchQuery
+  const filteredContacts = contacts
+    .map((group) => ({
+      ...group,
+      contacts: group.contacts.filter((contact) =>
+        contact.fullname.toLowerCase().includes(searchQuery.toLowerCase())
+      ),
+    }))
+    .filter((group) => group.contacts.length > 0);
 
   return (
     <div className="flex flex-col h-full p-4">
-      {/* Friend count */}
+      {/* Header with total friends count */}
       <div className="mb-4">
-        <h2 className="text-xl font-semibold">Bạn bè (379)</h2>
+        <h2 className="text-xl font-semibold">Bạn bè ({totalFriends})</h2>
       </div>
 
-      {/* Search bar */}
+      {/* Search and Filter Controls */}
       <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 mb-6">
         <div className="flex items-center flex-1">
           <Search className="w-4 h-4 text-gray-400 mr-2" />
@@ -129,31 +183,47 @@ export default function ContactList({
         </div>
       </div>
 
-      {/* Contact list */}
+      {/* Contact List */}
       <div className="flex-1 overflow-y-auto">
-        {contacts.map((section) => (
-          <div key={section.letter} className="mb-6">
-            <div className="text-sm mb-2">{section.letter}</div>
-            <div className="space-y-1">
-              {section.contacts.map((contact) => (
-                <div
-                  key={contact.id}
-                  className="flex items-center justify-between py-2 px-2 hover:bg-gray-100 rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center text-sm">
-                      {contact.initials}
-                    </div>
-                    <span>{contact.name}</span>
-                  </div>
-                  <button className="p-2 hover:bg-gray-200 rounded-full">
-                    <MoreHorizontal className="w-5 h-5 text-gray-500" />
-                  </button>
-                </div>
-              ))}
-            </div>
+        {filteredContacts.length === 0 ? (
+          <div className="text-center text-gray-500 mt-4">
+            {searchQuery ? "Không tìm thấy bạn bè" : "Chưa có bạn bè nào"}
           </div>
-        ))}
+        ) : (
+          filteredContacts.map((section) => (
+            <div key={section.letter} className="mb-6">
+              <div className="text-sm font-medium mb-2">{section.letter}</div>
+              <div className="space-y-1">
+                {section.contacts.map((contact) => (
+                  <div
+                    key={contact.id}
+                    className="flex items-center justify-between py-2 px-3 hover:bg-gray-100 rounded-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden">
+                        {contact.urlavatar ? (
+                          <img
+                            src={contact.urlavatar}
+                            alt={contact.fullname}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-500">
+                            {contact.fullname[0]}
+                          </div>
+                        )}
+                      </div>
+                      <div className="font-medium">{contact.fullname}</div>
+                    </div>
+                    <button className="p-2 hover:bg-gray-200 rounded-full">
+                      <MoreHorizontal className="w-5 h-5 text-gray-500" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
