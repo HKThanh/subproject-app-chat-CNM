@@ -1,10 +1,10 @@
 "use client";
 
-import ChatInfo from "@/containers/chat-info/chat-info";
-import MessageList from "@/containers/chat-list/message-list";
-import SearchBar from "@/containers/chat-list/search-bar";
-import TabNavigation from "@/containers/chat-list/tab-navigation";
-import ChatDetail from "@/containers/chat-main/chat-detail";
+import ChatInfo from "@/containers/chats/chat-info/chat-info";
+import MessageList from "@/containers/chats/chat-list/message-list";
+import SearchBar from "@/containers/chats/chat-list/search-bar";
+import TabNavigation from "@/containers/chats/chat-list/tab-navigation";
+import ChatDetail from "@/containers/chats/chat-main/chat-detail";
 import { useChatContext } from "@/socket/ChatContext";
 import { useSocketContext } from "@/socket/SocketContext";
 import { useEffect, useState } from "react";

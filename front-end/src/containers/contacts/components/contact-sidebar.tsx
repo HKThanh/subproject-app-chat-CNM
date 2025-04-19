@@ -1,5 +1,5 @@
 import { Users, UserPlus, UsersRound } from "lucide-react";
-import SearchBar from "@/containers/chat-list/search-bar";
+import SearchBar from "@/containers/chats/chat-list/search-bar";
 
 interface ContactSidebarProps {
   activeSection: string;

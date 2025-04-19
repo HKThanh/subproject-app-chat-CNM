@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { toast } from "sonner";
 import ProfileModalWrapper from "@/components/user/profile-modal-wrapper";
@@ -35,6 +35,7 @@ import useUserStore from "@/stores/useUserStoree";
 
 export default function NavigationSidebar() {
   const router = useRouter();
+  const pathname = usePathname();
   const { data: session } = useSession();
   const [activeItem, setActiveItem] = useState("messages");
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -124,6 +125,14 @@ export default function NavigationSidebar() {
       setIsProfileModalOpen(true);
     }, 100);
   };
+
+  useEffect(() => {
+    if (pathname === "/contacts") {
+      setActiveItem("contacts");
+    } else if (pathname === "/chat") {
+      setActiveItem("messages");
+    }
+  }, [pathname]);
 
   return (
     <>
