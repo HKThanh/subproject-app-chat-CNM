@@ -510,29 +510,58 @@ const handleRecallMessage = async (io, socket) => {
       }
       console.log("Conversation của tin nhắn bị thu hồi: ", conversation);
 
-      // Xác định người nhận
-      const idReceiver =
-        conversation.idSender === message.idSender
-          ? conversation.idReceiver
-          : conversation.idSender;
+      // Xử lý khác nhau cho nhóm và cuộc trò chuyện 1-1
+      if (conversation.isGroup) {
+        // Đối với nhóm, gửi thông báo đến tất cả thành viên trong nhóm
+        console.log("Sending recall notification to group conversation:", idConversation);
+        
+        // Gửi thông báo đến tất cả thành viên trong room của cuộc trò chuyện
+        io.to(idConversation).emit("message_recalled", {
+          messageId: idMessage,
+          updatedMessage: updatedMessage,
+          conversationId: idConversation
+        });
+        
+        // Nếu có danh sách thành viên nhóm, gửi thông báo trực tiếp đến từng thành viên online
+        if (conversation.groupMembers && Array.isArray(conversation.groupMembers)) {
+          conversation.groupMembers.forEach(memberId => {
+            if (memberId !== message.idSender) { // Không gửi lại cho người gửi
+              const memberSocket = getUser(memberId);
+              if (memberSocket) {
+                io.to(memberSocket.socketId).emit("message_recalled", {
+                  messageId: idMessage,
+                  updatedMessage: updatedMessage,
+                  conversationId: idConversation
+                });
+              }
+            }
+          });
+        }
+      } else {
+        // Đối với cuộc trò chuyện 1-1, xác định người nhận
+        const idReceiver =
+          conversation.idSender === message.idSender
+            ? conversation.idReceiver
+            : conversation.idSender;
 
-      console.log("Sending recall notification to receiver:", idReceiver);
+        console.log("Sending recall notification to receiver:", idReceiver);
 
-            // Gửi thông báo cho người nhận
-            io.to(idReceiver).emit("message_recalled", {
-                messageId: idMessage,
-                updatedMessage: updatedMessage
-            });
-
-            io.to(idConversation).emit("receive_message", {
-                messageId: idMessage,
-                updatedMessage: updatedMessage
-            });
+        // Gửi thông báo cho người nhận
+        const receiverSocket = getUser(idReceiver);
+        if (receiverSocket) {
+          io.to(receiverSocket.socketId).emit("message_recalled", {
+            messageId: idMessage,
+            updatedMessage: updatedMessage,
+            conversationId: idConversation
+          });
+        }
+      }
 
       // Gửi thông báo thành công cho người gửi
       socket.emit("recall_message_success", {
         messageId: idMessage,
         success: true,
+        conversationId: idConversation
       });
 
       console.log("Recall message notification sent");
