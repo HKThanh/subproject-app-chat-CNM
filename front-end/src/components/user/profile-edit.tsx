@@ -37,7 +37,7 @@ export default function ProfileEdit({
   const [birthDay, setBirthDay] = useState(profile.birthDay || '');
   const [birthMonth, setBirthMonth] = useState(profile.birthMonth || '');
   const [birthYear, setBirthYear] = useState(profile.birthYear || '');
-  const [phone, setPhone] = useState(profile.phone || '');
+  // const [phone, setPhone] = useState(profile.phone || '');
 
   // Memoize these arrays to prevent unnecessary recalculations
   const days = useMemo(() => 
@@ -65,9 +65,9 @@ export default function ProfileEdit({
       birthDay,
       birthMonth,
       birthYear,
-      phone,
+      // phone,
     });
-  }, [fullname, bio, gender, birthDay, birthMonth, birthYear, phone, onUpdate]);
+  }, [fullname, bio, gender, birthDay, birthMonth, birthYear, onUpdate]);
 
   return (
     <div className="relative">
@@ -185,7 +185,7 @@ export default function ProfileEdit({
           </div>
         </div>
 
-        <div className="space-y-2">
+        {/* <div className="space-y-2">
           <Label htmlFor="phone">Điện thoại</Label>
           <Input
             id="phone"
@@ -193,7 +193,7 @@ export default function ProfileEdit({
             onChange={(e) => setPhone(e.target.value)}
             autoComplete="off"
           />
-        </div>
+        </div> */}
 
         <div className="flex justify-end gap-2 pt-4 border-t mt-6">
           <Button type="button" variant="outline" onClick={onCancel}>

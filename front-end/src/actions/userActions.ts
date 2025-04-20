@@ -81,13 +81,13 @@ export async function updateAvatar(avatarFile: File, token?: string) {
       },
       body: formData,
     });
+    const data = await response.json();
+    console.log("check data in update avatar>>> ", data);
 
     if (!response.ok) {
       throw new Error('Failed to update avatar');
     }
 
-    const data = await response.json();
-    console.log("check data in update avatar>>> ", data);
 
     if (data.message === "Cập nhật avatar thành công") {
       return {
@@ -121,8 +121,8 @@ export async function updateCoverPhoto(coverFile: File, token?: string) {
     }
 
     // Tạo FormData để gửi file
-    const cover = new FormData();
-    cover.append('cover', coverFile);
+    const coverPhoto = new FormData();
+    coverPhoto.append('coverPhoto', coverFile);
 
     console.log('Sending cover with token:', token);
 
@@ -131,7 +131,7 @@ export async function updateCoverPhoto(coverFile: File, token?: string) {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
-      body: cover,
+      body: coverPhoto,
     });
 
     if (!response.ok) {
