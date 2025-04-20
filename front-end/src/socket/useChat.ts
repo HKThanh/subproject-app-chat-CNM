@@ -115,7 +115,9 @@ type ChatAction =
   | { type: 'UPDATE_CONVERSATION', payload: { conversationId: string, updates: Partial<Conversation> } }
   | { type: 'FORWARD_MESSAGE_SUCCESS', payload: { results: Array<{ conversationId: string, message: Message }> } }
   | { type: 'UPDATE_CONVERSATION_LATEST_MESSAGE', payload: { conversationId: string, latestMessage: Message } }
-  | { type: 'ADD_GROUP_CONVERSATION', payload: Conversation };
+  | { type: 'ADD_GROUP_CONVERSATION', payload: Conversation }
+  | { type: 'UPDATE_GROUP_MEMBERS', payload: { conversationId: string, members: Array<any> } };
+  ;
 
 ;
 const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
@@ -280,6 +282,22 @@ const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
         };
       }
     }
+    case 'UPDATE_GROUP_MEMBERS': {
+      const { conversationId, members } = action.payload;
+      
+      return {
+        ...state,
+        conversations: state.conversations.map(conv => 
+          conv.idConversation === conversationId 
+            ? { 
+                ...conv, 
+                regularMembers: members,
+                groupMembers: members.map(member => member.id)
+              } 
+            : conv
+        )
+      };
+    }
     default:
       return state;
   }
@@ -432,6 +450,51 @@ export const useChat = (userId: string) => {
       groupAvatar: groupAvatar || ""
     });
   }, [socket, userId]);
+  //xử lý phản hồi thêm thành viên vào nhóm
+  const addMembersToGroup = useCallback((
+    conversationId: string,
+    newMembers: string[]
+  ) => {
+    if (!socket || !userId) {
+      console.error("Cannot add members: Socket not connected or user not authenticated");
+      return;
+    }
+    
+    socket.emit("add_member_to_group", {
+      IDConversation: conversationId,
+      IDUser: userId,
+      newGroupMembers: newMembers
+    });
+  }, [socket, userId]);
+  //xử lý phản hồi thêm thành viên vào nhóm
+  const handleAddMemberToGroupResponse = useCallback((data: any) => {
+    console.log("Add member to group response:", data);
+    
+    if (data.success && data.conversation) {
+      // Update the conversation with new members
+      const updatedMembers = data.members || [];
+      
+      dispatch({
+        type: 'UPDATE_GROUP_MEMBERS',
+        payload: {
+          conversationId: data.conversation.idConversation,
+          members: updatedMembers
+        }
+      });
+      
+      // Update the conversation object
+      dispatch({
+        type: 'UPDATE_CONVERSATION',
+        payload: {
+          conversationId: data.conversation.idConversation,
+          updates: {
+            groupMembers: updatedMembers.map((member: any) => member.id),
+            regularMembers: updatedMembers
+          }
+        }
+      });
+    }
+  }, [dispatch]);
   // Gộp các useEffect đăng ký sự kiện socket
   useEffect(() => {
     if (!socket) return;
@@ -439,6 +502,7 @@ export const useChat = (userId: string) => {
     // Đăng ký lắng nghe các sự kiện
     socket.on("load_conversations_response", handleLoadConversationsResponse);
     socket.on("load_group_conversations_response", handleLoadGroupConversationsResponse);
+    socket.on("add_member_to_group_response", handleAddMemberToGroupResponse);
     socket.on("error", handleError);
     const handleGroupConversationCreated = (data: any) => {
       console.log("Group conversation creation response:", data);
@@ -879,6 +943,7 @@ export const useChat = (userId: string) => {
       socket.off("create_group_conversation_response", handleGroupConversationCreated);
       socket.off("group_message_response", handleGroupMessageResponse);
       socket.off("receive_group_message", handleGroupMessageResponse);
+      socket.off("add_member_to_group_response", handleAddMemberToGroupResponse);
       socket.offAny();
     };
   }, [socket, userId, messages, conversations, loadConversations]);
@@ -1312,7 +1377,10 @@ export const useChat = (userId: string) => {
     // Xử lý thông báo tin nhắn bị thu hồi từ người khác
     const handleMessageRecalled = (data: any) => {
       console.log("Nhận thông báo tin nhắn bị thu hồi:", data);
-
+      if (!data.messageId || !data.conversationId) {
+        console.error("Invalid message recall data:", data);
+        return;
+      }
       if (data.updatedMessage && data.updatedMessage.idConversation) {
         dispatch({
           type: 'UPDATE_MESSAGE',
@@ -1398,6 +1466,7 @@ export const useChat = (userId: string) => {
     markMessagesAsRead,
     deleteMessage,
     forwardMessage,
-    createGroupConversation
+    createGroupConversation,
+    addMembersToGroup
   };
 };

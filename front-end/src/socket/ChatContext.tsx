@@ -19,6 +19,7 @@ interface ChatContextType {
   forwardMessage: (messageId: string, targetConversations: string[]) => void;
   recallMessage: (messageId: string, conversationId: string) => void;
 createGroupConversation: (groupName: string, groupMembers: string[], groupAvatar?: string) => void;
+addMembersToGroup: (conversationId: string, membersToAdd: string[]) => void;
 }
 
 // Tạo context với giá trị mặc định
@@ -36,6 +37,7 @@ const ChatContext = createContext<ChatContextType>({
   forwardMessage: () => {},
   recallMessage: () => {},
   createGroupConversation: () => {},
+  addMembersToGroup: () => {}
 });
 
 // Hook để sử dụng chat context
@@ -61,7 +63,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children, userId }) 
     deleteMessage,
     forwardMessage,
     recallMessage,
-    createGroupConversation
+    createGroupConversation,
+    addMembersToGroup
   } = useChat(userId);
 
   return (
@@ -79,7 +82,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children, userId }) 
         deleteMessage,
         forwardMessage,
         recallMessage,
-        createGroupConversation
+        createGroupConversation,
+        addMembersToGroup
       }}
     >
       {children}
