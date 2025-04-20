@@ -285,7 +285,7 @@ const addCoOwnerToGroup = async (IDOwner, IDConversation, IDCoOwner) => {
 };
 
 const removeConversationByID = async (IDConversation, IDSender) => {
-  const data = await Conversation.delete({ idConversation: IDConversation, idSender: IDSender });
+  const data = await Conversation.deleteOne({ idConversation: IDConversation, idSender: IDSender });
   return data;
 };
 

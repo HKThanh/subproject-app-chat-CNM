@@ -61,7 +61,7 @@ const FormRegisterScreen = ({ navigation, route }: FormRegisterScreenProps) => {
     setErrorMessage('');
 
     try {
-      const response = await fetch('http://192.168.1.9:3000/auth/register-phone', {
+      const response = await fetch('http://192.168.0.103:3000/auth/register-phone', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

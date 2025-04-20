@@ -7,7 +7,7 @@ const REFRESH_TOKEN_KEY = 'refresh_token';
 const USER_DATA_KEY = 'user_data';
 
 // Đường dẫn API
-const API_URL = 'http://192.168.1.9:3000';
+const API_URL = 'http://192.168.0.103:3000';
 
 // Interface cho response từ API refresh token
 interface TokenResponse {

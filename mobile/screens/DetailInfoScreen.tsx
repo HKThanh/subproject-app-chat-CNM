@@ -25,7 +25,7 @@ const avatarDefaulturi = 'https://static.vecteezy.com/system/resources/previews/
 const backgroundImageDefaulturi = 'https://cellphones.com.vn/sforum/wp-content/uploads/2023/07/hinh-nen-zalo-23-1.jpg';
 
 // API endpoint
-const API_URL = 'http://192.168.1.9:3000/user';
+const API_URL = 'http://192.168.0.103:3000/user';
 
 type DetailInfoScreenProps = {
     navigation?: any;
@@ -97,7 +97,7 @@ const DetailInfoScreen = ({ navigation, route }: DetailInfoScreenProps) => {
             formData.append('id', apiUserData.id);
 
             // Gửi request
-            const response = await fetch('http://192.168.1.9:3000/user/cover/upload', {
+            const response = await fetch('http://192.168.0.103:3000/user/cover/upload', {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -168,7 +168,7 @@ const DetailInfoScreen = ({ navigation, route }: DetailInfoScreenProps) => {
             formData.append('id', apiUserData.id);
 
             // Gửi request
-            const response = await fetch('http://192.168.1.9:3000/user/avatar/upload', {
+            const response = await fetch('http://192.168.0.103:3000/user/avatar/upload', {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -1165,7 +1165,7 @@ const DetailInfoScreen = ({ navigation, route }: DetailInfoScreenProps) => {
                                                 };
 
                                                 // Make API call
-                                                const response = await fetch('http://192.168.1.9:3000/user/profile', {
+                                                const response = await fetch('http://192.168.0.103:3000/user/profile', {
                                                     method: 'PUT',
                                                     headers: {
                                                         'Authorization': `Bearer ${accessToken}`,

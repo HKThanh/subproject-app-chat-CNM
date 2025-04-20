@@ -30,4 +30,18 @@ router.use((error, req, res, next) => {
     });
 });
 
+
+router.post("/avatar-group",
+    authMiddleware,
+    fileService.uploadAvatar.single("avatar-group"),
+    fileService.processGroupAvatar,
+    (req, res) => {
+        res.json({
+            success: true,
+            fileUrl: req.fileUrl,
+            fileName: req.file.originalname
+        });
+    }
+);
+
 module.exports = router;

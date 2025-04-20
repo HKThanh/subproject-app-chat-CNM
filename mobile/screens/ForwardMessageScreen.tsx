@@ -25,6 +25,9 @@ interface Conversation {
   unreadCount?: number;
   isOnline?: boolean;
   selected?: boolean; // For selection state
+  isGroup?: boolean; // Identify if it's a group conversation
+  groupName?: string; // Name of the group if it's a group conversation
+  groupAvatar?: string; // Avatar of the group if it's a group conversation
 }
 
 // Define message type interface
@@ -92,17 +95,16 @@ const ForwardMessageScreen: React.FC<ForwardMessageScreenProps> = ({ navigation,
       console.error('User data not available. Cannot load conversations.');
       setIsLoading(false);
       return;
-    }
-
-    // First remove any existing listener to avoid duplicates
+    }    // First remove any existing listeners to avoid duplicates
     socket.off('load_conversations_response');
+    socket.off('load_group_conversations_response');
 
-    // Setup listener for conversations response
+    // Setup listener for individual conversations response
     socket.on('load_conversations_response', (data) => {
-      console.log('Conversations received:', data);
+      console.log('Individual conversations received:', data);
       
       if (data && data.Items && Array.isArray(data.Items)) {
-        // Process the conversation data from Items array
+        // Process the individual conversation data from Items array
         const processedConversations = data.Items.map(item => {
           // Extract the relevant information
           return {
@@ -113,19 +115,59 @@ const ForwardMessageScreen: React.FC<ForwardMessageScreenProps> = ({ navigation,
             lastMessage: item.latestMessage?.content,
             lastMessageTime: item.latestMessage?.dateTime,
             unreadCount: item.unreadCount || 0,
-            isOnline: false // This will be updated by user status events
+            isOnline: false, // This will be updated by user status events
+            isGroup: false
           };
         });
         
         setConversations(processedConversations);
+        
+        // After loading individual conversations, also load group conversations
+        socket.emit('load_group_conversations', {
+          IDUser: userData.id
+        });
       } else {
-        setConversations([]);
+        // Even if no individual conversations are found, still load group conversations
+        socket.emit('load_group_conversations', {
+          IDUser: userData.id
+        });
+      }
+    });
+    
+    // Setup listener for group conversations response
+    socket.on('load_group_conversations_response', (data) => {
+      console.log('Group conversations received:', data);
+      
+      if (data && data.Items && Array.isArray(data.Items)) {
+        // Process the group conversation data
+        const groupConversations = data.Items.map(item => {
+          return {
+            _id: item._id,
+            idConversation: item.idConversation,
+            name: item.groupName || `Group ${item.idConversation.substring(0, 8)}`,
+            avatar: item.groupAvatar,
+            lastMessage: item.latestMessage?.content,
+            lastMessageTime: item.latestMessage?.dateTime,
+            unreadCount: item.unreadCount || 0,
+            isGroup: true,
+            groupName: item.groupName,
+            groupAvatar: item.groupAvatar
+          };
+        });
+        
+        // Merge group conversations with existing individual conversations
+        setConversations(prevConversations => {
+          const allConversations = [...prevConversations, ...groupConversations];
+          // Sort by lastChange or lastMessageTime if needed
+          return allConversations;
+        });
       }
       
+      // Finish loading after group conversations are processed
       setIsLoading(false);
     });
 
-    // Emit event to load conversations with user ID
+    // Emit event to load individual conversations first
     socket.emit('load_conversations', {
       IDUser: userData.id
     });
