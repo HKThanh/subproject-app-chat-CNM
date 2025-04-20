@@ -1,5 +1,6 @@
 import useUserStore from "@/stores/useUserStoree";
 import { getAuthToken } from "@/utils/auth-utils";
+
 import {
   Smile,
   ImageIcon,
@@ -9,12 +10,15 @@ import {
   ThumbsUp,
   Send,
   X,
+  Loader2,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { toast } from "sonner";
 
 interface ChatInputProps {
   onSendMessage: (text: string, type?: string, fileUrl?: string) => void;
   replyingTo?: {
+    name: string;
     messageId: string;
     content: string;
     type: string;
@@ -41,7 +45,8 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
-
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   // Focus on input when replying
   useEffect(() => {
     if (replyingTo && messageInputRef.current) {
@@ -65,12 +70,34 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
     }
   };
 
+  // Add new function to handle thumbs up click
+  const handleThumbsUpClick = () => {
+    // Send thumbs up emoji as a message
+    onSendMessage("👍", "text");
+    
+    // Clear reply state if exists
+    if (replyingTo && onCancelReply) {
+      onCancelReply();
+    }
+  };
+
   const handleFileUpload = async () => {
     if (selectedFiles.length === 0) return;
+    if (isUploading) {
+      toast.info("Đang tải lên tệp, vui lòng đợi...");
+      return;
+    }
 
+    setIsUploading(true);
+    setUploadProgress(0);
+    
     try {
+      // Calculate total files for progress tracking
+      const totalFiles = selectedFiles.length;
+      let completedFiles = 0;
+      
       // Upload each file and collect URLs
-      const uploadPromises = selectedFiles.map(async (file) => {
+      const uploadPromises = selectedFiles.map(async (file, index) => {
         const formData = new FormData();
         formData.append("file", file);
 
@@ -87,6 +114,11 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
         }
 
         const data = await response.json();
+        
+        // Update progress after each file completes
+        completedFiles++;
+        setUploadProgress(Math.round((completedFiles / totalFiles) * 100));
+        
         return data;
       });
 
@@ -114,9 +146,13 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
       setSelectedFiles([]);
       setFilePreviews([]);
       setFileType(null);
+      toast.success("Tải lên tệp thành công!");
     } catch (error) {
       console.error("Lỗi khi upload file:", error);
-      alert("Không thể upload file. Vui lòng thử lại sau.");
+      toast.error("Không thể upload file. Vui lòng thử lại sau.");
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -175,12 +211,12 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
   };
 
   return (
-    <div className="p-3 border-t border-gray-200 bg-gray-50">
+    <div className="p-3 border-t border-gray-200 bg-white">
       {/* Reply bar */}
       {replyingTo && (
-        <div className="mb-3 bg-blue-50 p-2 rounded-lg border-l-4 border-blue-500 flex items-center justify-between">
+        <div className="mb-3 bg-purple-50 p-2 rounded-lg border-l-4 border-purple-500 flex items-center justify-between">
           <div className="flex flex-col">
-            <span className="text-xs text-blue-600 font-medium">Trả lời Thơ</span>
+            <span className="text-xs text-purple-600 font-medium">{replyingTo.name}</span>
             <p className="text-sm text-gray-700 truncate">{replyingTo.content}</p>
           </div>
           <button
@@ -192,8 +228,25 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
         </div>
       )}
 
+      {/* Upload Progress Indicator */}
+      {isUploading && (
+        <div className="mb-3 bg-white p-2 rounded-lg shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm font-medium text-gray-700">
+              Đang tải lên tệp... {uploadProgress}%
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div 
+              className="bg-purple-500 h-2.5 rounded-full transition-all duration-300 ease-in-out" 
+              style={{ width: `${uploadProgress}%` }}
+            ></div>
+          </div>
+        </div>
+      )}
+
       {/* File previews */}
-      {filePreviews.length > 0 && (
+      {filePreviews.length > 0 && !isUploading && (
         <div className="mb-3 relative bg-gray-100 p-2 rounded-lg">
           {/* Clear all button */}
           <button
@@ -313,17 +366,27 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
+          disabled={isUploading}
         />
         {message.trim() || selectedFiles.length > 0 ? (
           <button
-            className="p-2 ml-2 rounded-full bg-blue-500 hover:bg-blue-600 text-white"
+            className={`p-2 ml-2 rounded-full ${isUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#8A56FF] hover:bg-[#7442FF]'} text-white`}
             onClick={handleSendMessage}
+            disabled={isUploading}
           >
-            <Send className="w-5 h-5" />
+            {isUploading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Send className="w-5 h-5" />
+            )}
           </button>
         ) : (
-          <button className="p-2 ml-2 rounded-full hover:bg-gray-200">
-            <ThumbsUp className="w-5 h-5 text-gray-500" />
+          <button 
+            className="p-2 ml-2 rounded-full hover:bg-gray-200" 
+            disabled={isUploading}
+            onClick={handleThumbsUpClick}
+          >
+            <ThumbsUp className="w-5 h-5 text-gray-500" width={30} color="#f6ca51"/>
           </button>
         )}
       </div>

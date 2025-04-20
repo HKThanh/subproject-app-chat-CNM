@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import { getAuthToken } from "@/utils/auth-utils";
 import UserAddIcon from "@/assets/common/icon-user-add";
 import { useSocketContext } from "@/socket/SocketContext";
+import { UserIcon, UsersIcon } from "lucide-react";
+import { toast } from "sonner";
 
 interface SearchBarProps {
   onSelectConversation: (id: string) => void;
@@ -24,8 +26,29 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   const [loading, setLoading] = useState(false);
   const { socket } = useSocketContext();
 
-  const END_POINT_URL =
-    process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:3000";
+  const END_POINT_URL = process.env.NEXT_PUBLIC_API_URL || "localhost:3000";
+
+  // Thêm useEffect để lắng nghe các sự kiện socket liên quan đến friend request
+  useEffect(() => {
+    if (!socket) return;
+
+    // Lắng nghe khi yêu cầu kết bạn được chấp nhận
+    socket.on("friendRequestAccepted", (data) => {
+      toast.success("Yêu cầu kết bạn đã được chấp nhận", {
+        description: "Các bạn đã trở thành bạn bè",
+      });
+    });
+
+    // Lắng nghe khi yêu cầu kết bạn bị từ chối
+    socket.on("friendRequestDeclined", (data) => {
+      toast.error("Yêu cầu kết bạn đã bị từ chối");
+    });
+
+    return () => {
+      socket.off("friendRequestAccepted");
+      socket.off("friendRequestDeclined");
+    };
+  }, [socket]);
 
   const handleSearch = async (value: string) => {
     setSearchText(value);
@@ -56,9 +79,77 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
     }
   };
 
-  const handleAddFriend = (id: string) => {
-    // Logic for adding friend (you can call an API or update state here)
-    console.log(`Add friend with id: ${id}`);
+  const handleAddFriend = async (userId: string, userData: SearchResult) => {
+    try {
+      const token = await getAuthToken();
+      const response = await fetch(
+        `${END_POINT_URL}/user/send`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ receiverId: userId }),
+        }
+      );
+      console.log("check response is add fr>> ", response);
+      
+      const data = await response.json();
+
+      if (data.code === 1) {
+        // Tạo object mới cho lời mời vừa gửi
+        const newRequest = {
+          id: data.data.requestId,
+          receiver: {
+            id: userId,
+            fullname: userData.fullname,
+            urlavatar: userData.urlavatar,
+          },
+          createdAt: new Date().toISOString(),
+        };
+
+        // Emit socket event
+        socket?.emit("send_friend_request", {
+          senderId: JSON.parse(sessionStorage.getItem("user-session") || "{}")
+            ?.state?.user?.id,
+          receiverId: userId,
+        });
+
+        // Dispatch event để cập nhật UI ngay lập tức
+        const updateEvent = new CustomEvent("updateSentRequests", {
+          detail: newRequest,
+        });
+        window.dispatchEvent(updateEvent);
+
+        // Fetch lại danh sách lời mời đã gửi để đảm bảo dữ liệu đồng bộ
+        const sentResponse = await fetch(
+          `${END_POINT_URL}/user/get-sended-friend-requests`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        const sentData = await sentResponse.json();
+        if (sentData.success) {
+          // Dispatch event để cập nhật UI với dữ liệu mới nhất
+          const refreshEvent = new CustomEvent("refreshSentRequests", {
+            detail: sentData.data,
+          });
+          window.dispatchEvent(refreshEvent);
+        }
+
+        toast.success("Đã gửi lời mời kết bạn");
+      } else if (data.code === 0) {
+        toast.info("Yêu cầu đã được gửi trước đó");
+      } else if (data.code === 2 || data.code === 3) {
+        toast.info("Hai bạn đã là bạn bè");
+      } else if (data.code === -2) {
+        toast.error("Không thể gửi lời mời kết bạn cho chính mình");
+      }
+    } catch (error) {
+      console.error("Error sending friend request:", error);
+      toast.error("Không thể gửi lời mời kết bạn");
+    }
   };
 
   const handleSelectUser = (userId: string) => {
@@ -98,15 +189,32 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   };
 
   return (
-    <div className="relative flex-1 mr-4">
-      <input
-        type="text"
-        value={searchText}
-        onChange={(e) => handleSearch(e.target.value)}
-        onFocus={() => setShowResults(true)}
-        className="w-full py-2 pl-10 pr-4 bg-gray-100 rounded-md text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-300"
-        placeholder="Tìm kiếm"
-      />
+    <div className="relative flex-1">
+      <div className="flex items-center gap-2">
+        <div
+          className={`flex-1 flex items-center rounded-lg px-3 py-2 ${
+            searchText ? "border border-[#0866FF]" : "bg-[#F3F3F5]"
+          }`}
+        >
+          <Search className="w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchText}
+            onChange={(e) => handleSearch(e.target.value)}
+            onFocus={() => setShowResults(true)}
+            className="flex-1 bg-transparent border-none text-sm focus:outline-none placeholder:text-gray-400 ml-2"
+            placeholder="Tìm kiếm"
+          />
+          <div className="flex items-center gap-2">
+            <button className="p-1">
+              <UserIcon className="w-4 h-4 text-gray-500" />
+            </button>
+            <button className="p-1">
+              <UsersIcon className="w-4 h-4 text-gray-500" />
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Search Results Overlay */}
       {showResults && (
@@ -138,7 +246,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
                     <button
                       onClick={(e) => {
                         e.stopPropagation(); // Prevent the li click event
-                        handleAddFriend(result.id);
+                        handleAddFriend(result.id, result);
                       }}
                       className="ml-auto text-blue-500 text-sm hover:text-blue-700"
                     >

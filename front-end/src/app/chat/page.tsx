@@ -1,10 +1,10 @@
 "use client";
 
-import ChatInfo from "@/containers/chat-info/chat-info";
-import MessageList from "@/containers/chat-list/message-list";
-import SearchBar from "@/containers/chat-list/search-bar";
-import TabNavigation from "@/containers/chat-list/tab-navigation";
-import ChatDetail from "@/containers/chat-main/chat-detail";
+import ChatInfo from "@/containers/chats/chat-info/chat-info";
+import MessageList from "@/containers/chats/chat-list/message-list";
+import SearchBar from "@/containers/chats/chat-list/search-bar";
+import TabNavigation from "@/containers/chats/chat-list/tab-navigation";
+import ChatDetail from "@/containers/chats/chat-main/chat-detail";
 import { useChatContext } from "@/socket/ChatContext";
 import { useSocketContext } from "@/socket/SocketContext";
 import { useEffect, useState } from "react";
@@ -168,16 +168,10 @@ export default function Home() {
           showChatInfo ? "w-1/5" : "w-1/4"
         } flex flex-col border-r border-gray-200 transition-all duration-300`}
       >
-        <div className="p-4">
-          <SearchBar onSelectConversation={handleSelectConversation} />
-        </div>
         <div className="flex-1 overflow-hidden flex flex-col">
-          <TabNavigation />
-          <MessageList
-            conversations={conversations}
-            activeConversationId={activeConversation}
+          <TabNavigation
             onSelectConversation={handleSelectConversation}
-            loading={loading}
+            activeConversationId={activeConversation}
           />
         </div>
       </div>
