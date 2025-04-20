@@ -184,34 +184,33 @@ const handleLoadConversation = (io, socket) => {
 
           let messagePreview = latestMessage
             ? {
-                ...latestMessage.toObject(),
-                preview:
-                  latestMessage.type !== "text"
-                    ? `Đã gửi một ${
-                        latestMessage.type === "image"
-                          ? "hình ảnh"
-                          : latestMessage.type === "video"
-                          ? "video"
-                          : "tệp đính kèm"
-                      }`
-                    : latestMessage.content,
-              }
+              ...latestMessage.toObject(),
+              preview:
+                latestMessage.type !== "text"
+                  ? `Đã gửi một ${latestMessage.type === "image"
+                    ? "hình ảnh"
+                    : latestMessage.type === "video"
+                      ? "video"
+                      : "tệp đính kèm"
+                  }`
+                  : latestMessage.content,
+            }
             : null;
 
-                    // Đếm số tin nhắn chưa đọc
-                    const unreadCount = await MessageDetail.countDocuments({
-                        idConversation: conv.idConversation,
-                        idReceiver: IDUser,
-                        isRead: false
-                    });
-                    return {
-                        ...conv.toObject(),
-                        otherUser,
-                        latestMessage: messagePreview,
-                        unreadCount
-                    };
-                })
-            );
+          // Đếm số tin nhắn chưa đọc
+          const unreadCount = await MessageDetail.countDocuments({
+            idConversation: conv.idConversation,
+            idReceiver: IDUser,
+            isRead: false
+          });
+          return {
+            ...conv.toObject(),
+            otherUser,
+            latestMessage: messagePreview,
+            unreadCount
+          };
+        })
+      );
 
       // Tính tổng số conversation
       const total = await Conversation.countDocuments({
@@ -514,14 +513,14 @@ const handleRecallMessage = async (io, socket) => {
       if (conversation.isGroup) {
         // Đối với nhóm, gửi thông báo đến tất cả thành viên trong nhóm
         console.log("Sending recall notification to group conversation:", idConversation);
-        
+
         // Gửi thông báo đến tất cả thành viên trong room của cuộc trò chuyện
         io.to(idConversation).emit("message_recalled", {
           messageId: idMessage,
           updatedMessage: updatedMessage,
           conversationId: idConversation
         });
-        
+
         // Nếu có danh sách thành viên nhóm, gửi thông báo trực tiếp đến từng thành viên online
         if (conversation.groupMembers && Array.isArray(conversation.groupMembers)) {
           conversation.groupMembers.forEach(memberId => {
@@ -630,13 +629,13 @@ const handleForwardMessage = async (io, socket) => {
           senderInfo,
         };
 
-                // Gửi tin nhắn tới receiver nếu online
-                const receiverOnline = getUser(IDReceiver);
-                if (receiverOnline) {
-                    io.to(receiverOnline.socketId).emit("receive_message", messageWithUser);
-                }
+        // Gửi tin nhắn tới receiver nếu online
+        const receiverOnline = getUser(IDReceiver);
+        if (receiverOnline) {
+          io.to(receiverOnline.socketId).emit("receive_message", messageWithUser);
+        }
 
-                io.to(IDConversation).emit("receive_message", messageWithUser);
+        io.to(IDConversation).emit("receive_message", messageWithUser);
 
         results.push({
           conversationId: IDConversation,
@@ -675,18 +674,18 @@ const handleMarkMessageRead = (socket) => {
 
 // Handler để đánh dấu tin nhắn đã đọc khi user click vào conversation hoặc tin nhắn
 const handleMarkMessagesRead = (socket) => {
-    socket.on("mark_messages_read", async (payload) => {
-        try {
-            const { conversationId, receiverId } = payload;
-            // Query để tìm và update tin nhắn chưa đọc
-            const result = await MessageDetail.updateMany(
-                {
-                    idConversation: conversationId,
-                    idReceiver: receiverId,
-                    isRead: false
-                },
-                { isRead: true }
-            );
+  socket.on("mark_messages_read", async (payload) => {
+    try {
+      const { conversationId, receiverId } = payload;
+      // Query để tìm và update tin nhắn chưa đọc
+      const result = await MessageDetail.updateMany(
+        {
+          idConversation: conversationId,
+          idReceiver: receiverId,
+          isRead: false
+        },
+        { isRead: true }
+      );
 
 
       // Emit kết quả
@@ -1057,19 +1056,19 @@ const handleLeaveConversation = (io, socket) => {
 };
 
 const handleCreatGroupConversation = (io, socket) => {
-    socket.on("create_group_conversation", async (payload) => {
-        // groupMembers phải có cả IDOwner
-        console.log("create_group_conversation payload:>>> ",payload);
-        const { IDOwner, groupName, groupMembers } = payload;
-        const groupAvatar = payload.groupAvatar;
-        
-        if (groupMembers.length < 2) {
-            socket.emit("create_group_conversation_response", {
-                success: false,
-                message: "Cần thêm ít nhất 2 thành viên để tạo nhóm"
-            });
-            return;
-        }
+  socket.on("create_group_conversation", async (payload) => {
+    // groupMembers phải có cả IDOwner
+    console.log("create_group_conversation payload:>>> ", payload);
+    const { IDOwner, groupName, groupMembers } = payload;
+    const groupAvatar = payload.groupAvatar;
+
+    if (groupMembers.length < 2) {
+      socket.emit("create_group_conversation_response", {
+        success: false,
+        message: "Cần thêm ít nhất 2 thành viên để tạo nhóm"
+      });
+      return;
+    }
 
     // kiểm tra groupMembers có nằm trong danh sách bạn của người tạo không
     // Check if all group members are in the owner's friend list
@@ -1115,58 +1114,58 @@ const handleCreatGroupConversation = (io, socket) => {
       groupMembers
     );
 
-        const groupMembersInfos = await Promise.all(
-            groupMembers.map(async (member) => {
-                const userInfo = await User.findOne({ id: member })
-                    .select('id fullname urlavatar phone email bio birthday coverPhoto');
-                return {
-                    id: member,
-                    fullname: userInfo ? userInfo.fullname : 'Unknown User',
-                    urlavatar: userInfo ? userInfo.urlavatar : null,
-                    phone: userInfo ? userInfo.phone : null,
-                    email: userInfo ? userInfo.email : null,
-                    bio: userInfo ? userInfo.bio : null,
-                    birthday: userInfo ? userInfo.birthday : null,
-                    coverPhoto: userInfo ? userInfo.coverPhoto : null,
-                };
-            })
-        );
-
-        // Lấy thông tin người tạo nhóm
-        const ownerData = {
-            id: IDOwner,
-            fullname: owner ? owner.fullname : 'Unknown User',
-            urlavatar: owner ? owner.urlavatar : null,
-            phone: owner ? owner.phone : null,
-            email: owner ? owner.email : null,
-            bio: owner ? owner.bio : null,
-            birthday: owner ? owner.birthday : null,
-            coverPhoto: owner ? owner.coverPhoto : null,
+    const groupMembersInfos = await Promise.all(
+      groupMembers.map(async (member) => {
+        const userInfo = await User.findOne({ id: member })
+          .select('id fullname urlavatar phone email bio birthday coverPhoto');
+        return {
+          id: member,
+          fullname: userInfo ? userInfo.fullname : 'Unknown User',
+          urlavatar: userInfo ? userInfo.urlavatar : null,
+          phone: userInfo ? userInfo.phone : null,
+          email: userInfo ? userInfo.email : null,
+          bio: userInfo ? userInfo.bio : null,
+          birthday: userInfo ? userInfo.birthday : null,
+          coverPhoto: userInfo ? userInfo.coverPhoto : null,
         };
-        socket.emit("create_group_conversation_response", {
+      })
+    );
+
+    // Lấy thông tin người tạo nhóm
+    const ownerData = {
+      id: IDOwner,
+      fullname: owner ? owner.fullname : 'Unknown User',
+      urlavatar: owner ? owner.urlavatar : null,
+      phone: owner ? owner.phone : null,
+      email: owner ? owner.email : null,
+      bio: owner ? owner.bio : null,
+      birthday: owner ? owner.birthday : null,
+      coverPhoto: owner ? owner.coverPhoto : null,
+    };
+    socket.emit("create_group_conversation_response", {
+      success: true,
+      conversation: data,
+      owner: ownerData,
+      members: groupMembersInfos,
+      message: "Tạo nhóm thành công",
+    });
+
+    groupMembers.forEach(async (member) => {
+      const user = getUser(member);
+      if (user?.socketId) {
+        io.to(user.socketId).emit(
+          "new_group_conversation",
+          {
             success: true,
             conversation: data,
             owner: ownerData,
             members: groupMembersInfos,
-            message: "Tạo nhóm thành công",
-        });
-
-        groupMembers.forEach(async (member) => {
-            const user = getUser(member);
-            if (user?.socketId) {
-                io.to(user.socketId).emit(
-                    "new_group_conversation",
-                    {
-                        success: true,
-                        conversation: data,
-                        owner: ownerData,
-                        members: groupMembersInfos,
-                        message: "Group conversation created successfully"
-                    }
-                );
-            }
-        });
+            message: "Group conversation created successfully"
+          }
+        );
+      }
     });
+  });
 };
 
 const handleAddMemberToGroup = async (io, socket) => {
@@ -1216,7 +1215,7 @@ const handleAddMemberToGroup = async (io, socket) => {
     const updatedConversation = await conversationController.updateConversation(
       conversation
     );
-    
+
     // Tạo thông báo hệ thống
     const currentUser = await User.findOne({ id: IDUser }).select("fullname");
     const newMembersInfo = await Promise.all(
@@ -1225,7 +1224,7 @@ const handleAddMemberToGroup = async (io, socket) => {
         return userInfo ? userInfo.fullname : "Unknown User";
       })
     );
-    
+
     const systemMessage = await MessageDetail.create({
       idMessage: uuidv4(),
       idSender: "system",
@@ -1235,7 +1234,7 @@ const handleAddMemberToGroup = async (io, socket) => {
       dateTime: new Date().toISOString(),
       isRead: false,
     });
-    
+
     // Cập nhật lastChange và idNewestMessage
     await updateLastChangeConversation(IDConversation, systemMessage.idMessage);
 
@@ -1291,7 +1290,7 @@ const handleAddMemberToGroup = async (io, socket) => {
         }
       }
     });
-    
+
     // Gửi thông báo cho người thêm thành viên
     socket.emit("message_from_server", {
       success: true,
@@ -1589,9 +1588,8 @@ const handleChangeOwnerGroup = async (io, socket) => {
       idSender: "system",
       idConversation: IDConversation,
       type: "system",
-      content: `${user?.fullname || IDUser} đã chuyển quyền chủ nhóm cho ${
-        newOwner?.fullname || IDNewOwner
-      }`,
+      content: `${user?.fullname || IDUser} đã chuyển quyền chủ nhóm cho ${newOwner?.fullname || IDNewOwner
+        }`,
       dateTime: new Date().toISOString(),
       isRead: false,
     });
@@ -1603,6 +1601,8 @@ const handleChangeOwnerGroup = async (io, socket) => {
       success: true,
       message: "Thay đổi chủ nhóm thành công",
       conversation: updatedConversation,
+      status: "changedOwner",
+      systemMessage: systemMessage
     });
 
     // Thông báo cho người mới
@@ -1612,6 +1612,8 @@ const handleChangeOwnerGroup = async (io, socket) => {
         success: true,
         conversation: updatedConversation,
         message: `Bạn đã trở thành chủ nhóm ${conversation.groupName}`,
+        systemMessage: systemMessage,
+        newOwner: newOwner,
       });
     }
 
@@ -1624,9 +1626,9 @@ const handleChangeOwnerGroup = async (io, socket) => {
             success: true,
             conversationId: IDConversation,
             systemMessage,
-            message: `${
-              user?.fullname || IDUser
-            } đã chuyển quyền chủ nhóm cho ${newOwner?.fullname || IDNewOwner}`,
+            newOwner: newOwner,
+            message: `${user?.fullname || IDUser
+              } đã chuyển quyền chủ nhóm cho ${newOwner?.fullname || IDNewOwner}`,
           });
         }
       }
@@ -1954,9 +1956,8 @@ const handlePromoteMemberToAdmin = (io, socket) => {
         idSender: "system",
         idConversation: IDConversation,
         type: "system",
-        content: `${promoter.fullname || IDUser} đã thăng cấp ${
-          promoted.fullname || IDMemberToPromote
-        } làm quản trị viên`,
+        content: `${promoter.fullname || IDUser} đã thăng cấp ${promoted.fullname || IDMemberToPromote
+          } làm quản trị viên`,
         dateTime: new Date().toISOString(),
         isRead: false,
       });
@@ -2070,11 +2071,9 @@ const handleDemoteMember = (io, socket) => {
         idSender: "system",
         idConversation: IDConversation,
         type: "system",
-        content: `${
-          demoter.fullname || IDUser
-        } đã thu hồi quyền quản trị viên của ${
-          demoted.fullname || IDMemberToDemote
-        }`,
+        content: `${demoter.fullname || IDUser
+          } đã thu hồi quyền quản trị viên của ${demoted.fullname || IDMemberToDemote
+          }`,
         dateTime: new Date().toISOString(),
         isRead: false,
       });
@@ -2289,9 +2288,8 @@ const handlePinGroupMessage = (io, socket) => {
         idSender: "system",
         idConversation: IDConversation,
         type: "system",
-        content: `${user.fullname || IDUser} ${action} một tin nhắn của ${
-          sender.fullname || message.idSender
-        }`,
+        content: `${user.fullname || IDUser} ${action} một tin nhắn của ${sender.fullname || message.idSender
+          }`,
         dateTime: new Date().toISOString(),
         isRead: false,
       });
@@ -2512,18 +2510,17 @@ const handleLoadGroupConversation = (io, socket) => {
 
           let messagePreview = latestMessage
             ? {
-                ...latestMessage.toObject(),
-                preview:
-                  latestMessage.type !== "text"
-                    ? `Đã gửi một ${
-                        latestMessage.type === "image"
-                          ? "hình ảnh"
-                          : latestMessage.type === "video"
-                          ? "video"
-                          : "tệp đính kèm"
-                      }`
-                    : latestMessage.content,
-              }
+              ...latestMessage.toObject(),
+              preview:
+                latestMessage.type !== "text"
+                  ? `Đã gửi một ${latestMessage.type === "image"
+                    ? "hình ảnh"
+                    : latestMessage.type === "video"
+                      ? "video"
+                      : "tệp đính kèm"
+                  }`
+                  : latestMessage.content,
+            }
             : null;
 
           // Count unread messages for this user
