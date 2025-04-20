@@ -1297,7 +1297,8 @@ const handleAddMemberToGroup = async (io, socket) => {
       success: true,
       message: "Thêm thành viên thành công",
       conversation: updatedConversation,
-      systemMessage
+      systemMessage,
+      members: dataNewMembers,
     });
   });
 };
