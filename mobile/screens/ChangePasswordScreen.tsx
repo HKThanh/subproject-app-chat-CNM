@@ -60,7 +60,7 @@ const ChangePasswordScreen = ({ navigation, route }: ChangePasswordScreenProps) 
 
     setIsLoading(true);
     try {
-      const response = await fetch('http://192.168.1.9:3000/auth/update-password', {
+      const response = await fetch('http://192.168.0.103:3000/auth/update-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

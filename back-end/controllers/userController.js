@@ -468,6 +468,8 @@ userController.getAllReceivedFriendRequests = async (req, res, io) => {
             id: sender.id,
             fullname: sender.fullname,
             urlavatar: sender.urlavatar,
+            phone: sender.phone,
+            email: sender.email,
           },
         };
       })
@@ -509,6 +511,8 @@ userController.getAllSendedFriendRequest = async (req, res) => {
             id: receiver.id,
             fullname: receiver.fullname,
             urlavatar: receiver.urlavatar,
+            phone:receiver.phone,
+            email: receiver.email,
           },
         };
       })

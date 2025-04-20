@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthService, { UserData } from './AuthService';
 
 // Socket.IO server URL
-const SOCKET_URL = 'http://192.168.1.9:3000';
+const SOCKET_URL = 'http://192.168.0.103:3000';
 
 // Keys for AsyncStorage
 const USER_DATA_KEY = 'user_data';

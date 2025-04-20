@@ -39,7 +39,7 @@ const API_URL = 'http://192.168.0.103:3000';
 
 // Define allowed file types
 const allowedTypes = {
-  'image': ['image/jpeg','image/jpg', 'image/png', 'image/gif'],
+  'image': ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'],
   'video': ['video/mp4', 'video/quicktime'],
   'document': ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
 };
@@ -67,7 +67,6 @@ interface Message {
   _id: string;
   idMessage: string;
   idSender: string;
-  idReceiver: string;
   idConversation: string;
   type: string;
   content: string;
@@ -82,6 +81,34 @@ interface Message {
   updatedAt: string;
   __v: number;
   sentByMe?: boolean;
+  // Add sender information fields
+  senderInfo?: {
+    _id?: string;
+    id?: string;
+    fullname?: string;
+    urlavatar?: string;
+    phone?: string;
+  };
+}
+
+// Group user information
+interface GroupUserInfo {
+  id: string;
+  fullname: string;
+  urlavatar?: string;
+  phone?: string;
+  email?: string;
+}
+
+// Group info from params
+interface GroupInfo {
+  name: string;
+  avatar?: string;
+  members: string[];
+  rules: {
+    listIDCoOwner: string[];
+    IDOwner?: string;
+  };
 }
 
 // Message Action Menu component
@@ -93,47 +120,47 @@ interface MessageActionMenuProps {
   onDelete: (message: Message) => void;
 }
 
-const MessageActionMenu: React.FC<MessageActionMenuProps> = ({ 
-  message, 
-  onClose, 
-  onForward, 
-  onRecall, 
-  onDelete 
+const MessageActionMenu: React.FC<MessageActionMenuProps> = ({
+  message,
+  onClose,
+  onForward,
+  onRecall,
+  onDelete
 }) => {
   const isSentByMe = message.sentByMe;
-  
+
   return (
-    <TouchableOpacity 
-      style={styles.messageMenuOverlay} 
+    <TouchableOpacity
+      style={styles.messageMenuOverlay}
       activeOpacity={1}
       onPress={onClose}
     >
-      <View 
+      <View
         style={[
-          styles.messageMenu, 
+          styles.messageMenu,
           message.sentByMe ? styles.myMessageMenu : styles.theirMessageMenu
         ]}
       >
-        <TouchableOpacity 
-          style={styles.menuItem} 
+        <TouchableOpacity
+          style={styles.menuItem}
           onPress={() => onForward(message)}
         >
           <Ionicons name="arrow-redo" size={22} color="#1FAEEB" />
           <Text style={styles.menuItemText}>Chuyển tiếp</Text>
         </TouchableOpacity>
-        
+
         {isSentByMe && (
           <>
-            <TouchableOpacity 
-              style={styles.menuItem} 
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => onRecall(message)}
             >
               <Ionicons name="refresh" size={22} color="#FF9500" />
               <Text style={styles.menuItemText}>Thu hồi</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.menuItem} 
+
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => onDelete(message)}
             >
               <Ionicons name="trash" size={22} color="#FF3B30" />
@@ -146,15 +173,42 @@ const MessageActionMenu: React.FC<MessageActionMenuProps> = ({
   );
 };
 
-const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
+// Hàm tạo màu sắc nhất quán cho mỗi người dùng dựa trên ID
+const getUserColor = (userId: string) => {
+  // Danh sách các màu sắc sẽ được sử dụng cho tên người dùng
+  const colors = [
+    '#FF5733', // Đỏ cam
+    '#33A8FF', // Xanh dương
+    '#33FF57', // Xanh lá
+    '#FF33A8', // Hồng
+    '#A833FF', // Tím
+    '#FFB233', // Cam
+    '#33FFE0', // Xanh ngọc
+    '#FF5733', // Đỏ
+    '#8033FF', // Tím đậm
+    '#33FFA8', // Xanh mint
+    '#FF3380', // Hồng đậm
+    '#33FFD1', // Xanh biển nhạt
+  ];
+
+  // Tính tổng giá trị các ký tự trong userId để tạo số duy nhất
+  let sum = 0;
+  for (let i = 0; i < userId.length; i++) {
+    sum += userId.charCodeAt(i);
+  }
+
+  // Lấy màu từ danh sách dựa trên tổng
+  return colors[sum % colors.length];
+};
+
+const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
   // Sử dụng hook để đảm bảo xác thực sẵn sàng
   const { isLoading: isAuthLoading, isAuthenticated } = useAuthInit();
-  
+
   // Get conversation data from route params
   const conversationId = route?.params?.conversationId;
-  const receiverId = route?.params?.receiverId;
-  const chatItem = route?.params?.chatItem || {};
-  
+  const groupInfo = route?.params?.groupInfo || {}; // Get group info from params
+
   // State for UI
   const [messageText, setMessageText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -162,13 +216,86 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
   const [hasMoreOldMessages, setHasMoreOldMessages] = useState(true); // Kiểm tra xem còn tin nhắn cũ hơn không
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [dataView, setDataView] = useState<Message[]>([]);
-  const [receiverIsOnline, setReceiverIsOnline] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false); // State for emoji picker visibility
-  
+  // Group-specific state
+  const [groupMembers, setGroupMembers] = useState<{ [key: string]: GroupUserInfo }>({});
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+
   // Message action menu state
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showMessageActionMenu, setShowMessageActionMenu] = useState(false);
-  
+
+  // Function to fetch member info for group chat
+  const fetchMemberInfo = async (memberId: string) => {
+    try {
+      // Don't fetch if already loading this member or we already have this member's data
+      if (groupMembers[memberId]) return;
+
+      console.log('Fetching info for group member:', memberId);
+      setIsLoadingMembers(true);
+
+      // Get authentication token
+      const authService = require('../services/AuthService').default.getInstance();
+      const token = await authService.getAccessToken();
+
+      if (!token) {
+        console.error('No access token available');
+        setIsLoadingMembers(false);
+        return;
+      }
+
+      // Call API to get user information
+      const response = await fetch(`${API_URL}/user/${memberId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const result = await response.json();
+      if (result && result.id) {
+        // API trả về kết quả trực tiếp, không có code và data
+        console.log('Received info for group member:', result.fullname);
+
+        // Save member info to state
+        setGroupMembers(prev => ({
+          ...prev,
+          [memberId]: {
+            id: memberId,
+            fullname: result.fullname || 'Unknown User',
+            urlavatar: result.urlavatar || '',
+            phone: result.phone || '',
+            email: result.email || ''
+          }
+        }));
+
+        // Update message display with new sender info
+        setDataView(prevMessages =>
+          prevMessages.map(msg => {
+            if (msg.idSender === memberId && !msg.senderInfo) {
+              return {
+                ...msg,
+                senderInfo: {
+                  id: memberId,
+                  fullname: result.fullname || 'Unknown User',
+                  urlavatar: result.urlavatar || ''
+                }
+              };
+            }
+            return msg;
+          })
+        );
+      } else {
+        console.log('Failed to get info for group member:', result.message);
+      }
+    } catch (error) {
+      console.error('Error fetching group member info:', error);
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  };
+
   // File handling state
   const [selectedFiles, setSelectedFiles] = useState<FileInfo[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
@@ -192,7 +319,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
   const handleRecallMessage = (message: Message) => {
     handleCloseMessageMenu();
     const socket = socketService.getSocket();
-    
+
     if (!socket) {
       Alert.alert('Lỗi kết nối', 'Không thể kết nối với máy chủ. Vui lòng thử lại sau.');
       return;
@@ -205,26 +332,26 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
     };
 
     // Optimistically update UI for better user experience before server response
-    setDataView(prevMessages => 
-      prevMessages.map(msg => 
-        msg.idMessage === message.idMessage 
-          ? { 
-              ...msg, 
-              isRecall: true, 
-              content: 'Tin nhắn đã được thu hồi',
-              type: msg.type // Preserve the original message type
-            } 
+    setDataView(prevMessages =>
+      prevMessages.map(msg =>
+        msg.idMessage === message.idMessage
+          ? {
+            ...msg,
+            isRecall: true,
+            content: 'Tin nhắn đã được thu hồi',
+            type: msg.type // Preserve the original message type
+          }
           : msg
       )
     );
-    
+
     console.log('Emitting recall_message:', recallData);
     socket.emit('recall_message', recallData);
   };
   const handleDeleteMessage = (message: Message) => {
     handleCloseMessageMenu();
     const socket = socketService.getSocket();
-    
+
     if (!socket) {
       Alert.alert('Lỗi kết nối', 'Không thể kết nối với máy chủ. Vui lòng thử lại sau.');
       return;
@@ -244,10 +371,10 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
 
     // Optimistically update UI for sender only
     // For sender: hide the message immediately
-    setDataView(prevMessages => 
-      prevMessages.map(msg => 
-        msg.idMessage === message.idMessage 
-          ? { ...msg, isRemove: true, hiddenForSender: true } 
+    setDataView(prevMessages =>
+      prevMessages.map(msg =>
+        msg.idMessage === message.idMessage
+          ? { ...msg, isRemove: true, hiddenForSender: true }
           : msg
       )
     );
@@ -256,12 +383,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
     console.log('Emitting delete_message:', deleteData);
     socket.emit('delete_message', deleteData);
   };
-  
+
   // Popular emoji list for the emoji picker
   const emojiList = [
-    "😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃", 
-    "😉", "😊", "😇", "😍", "🥰", "😘", "😗", "😚", "😙", "😋", 
-    "😛", "😜", "😝", "🤑", "🤗", "🤭", "🤫", "🤔", "🤐", "🤨", 
+    "😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃",
+    "😉", "😊", "😇", "😍", "🥰", "😘", "😗", "😚", "😙", "😋",
+    "😛", "😜", "😝", "🤑", "🤗", "🤭", "🤫", "🤔", "🤐", "🤨",
     "😐", "😑", "😶", "😏", "😒", "🙄", "😬", "🤥", "😌", "😔",
     "❤️", "💙", "💚", "💛", "💜", "🖤", "💔", "❣️", "💕", "💞",
     "👍", "👎", "👌", "✌️", "🤞", "🤟", "🤘", "👊", "👏", "🙏"
@@ -271,10 +398,10 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
     setMessageText(prevText => prevText + emoji);
     // No longer closing the emoji picker after selection
   };
-  
+
   // Get socket service instance
   const socketService = SocketService.getInstance();
-  
+
   // References
   const flatListRef = useRef<FlatList>(null);
   const textInputRef = useRef<TextInput>(null);
@@ -288,13 +415,178 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       flatListRef.current.scrollToEnd({ animated: true });
     }
   };
-    // Auto scroll to bottom when view is ready or messages change
+  // Auto scroll to bottom when view is ready or messages change
   useEffect(() => {
     if (dataView.length > 0) {
       setTimeout(scrollToBottom, 100);
     }
   }, [dataView.length]);
-  
+
+  // Thêm useEffect để cập nhật khi người dùng quay lại màn hình
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('GroupChatScreen is focused - updating messages and members');
+
+      // Đảm bảo chúng ta có conversationId hợp lệ
+      const idConversationParam = route.params?.idConversation || conversationId;
+      if (!idConversationParam) return;
+
+      // Tải lại tin nhắn để đảm bảo hiển thị thông báo hệ thống mới nhất
+      loadMessages(idConversationParam);
+
+      // Lấy thông tin nhóm mới nhất nếu có
+      const socket = socketService.getSocket();
+      if (socket && socket.connected) {
+        const userData = socketService.getUserData();
+        if (userData && userData.id) {
+          // Yêu cầu thông tin nhóm cập nhật từ server
+          socket.emit('get_group_info', {
+            IDUser: userData.id,
+            IDConversation: idConversationParam
+          });
+
+          // Lắng nghe phản hồi một lần
+          socket.once('group_info_response', (response) => {
+            console.log('Received updated group info:', response);
+            if (response && response.success && response.conversation) {
+              // Cập nhật thông tin nhóm với thông tin mới nhất từ server
+              const updatedInfo = {
+                name: response.conversation.groupName || groupInfo.name,
+                avatar: response.conversation.groupAvatar || groupInfo.avatar,
+                members: response.conversation.groupMembers || groupInfo.members,
+                rules: response.conversation.rules || groupInfo.rules
+              };
+
+              // Cập nhật params cho màn hình
+              navigation.setParams({ groupInfo: updatedInfo });
+            }
+          });
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, conversationId]);
+  // Load group members info
+  useEffect(() => {
+    // Check if we're in a group chat
+    if (groupInfo && groupInfo.members && groupInfo.members.length > 0) {
+      console.log('Loading group members info:', groupInfo.members.length, 'members');
+
+      // Sử dụng Promise.all để tải song song thông tin các thành viên
+      const loadAllMembersInfo = async () => {
+        try {
+          console.log('Bắt đầu tải thông tin tất cả thành viên nhóm');
+          setIsLoadingMembers(true);
+
+          // Lấy token xác thực một lần cho tất cả request
+          const authService = require('../services/AuthService').default.getInstance();
+          const token = await authService.getAccessToken();
+
+          if (!token) {
+            console.error('No access token available');
+            setIsLoadingMembers(false);
+            return;
+          }
+
+          // Tạo mảng promise cho tất cả các thành viên
+          const memberPromises = groupInfo.members.map(async (memberId) => {
+            // Bỏ qua các thành viên đã có thông tin
+            if (groupMembers[memberId]) return null;
+
+            try {
+              console.log('Fetching info for group member:', memberId);
+              const response = await fetch(`${API_URL}/user/${memberId}`, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+
+              // Kiểm tra response trước khi parse JSON
+              if (!response.ok) {
+                console.log(`Error fetching member ${memberId}: Status ${response.status}`);
+                return null;
+              }
+
+              // Kiểm tra Content-Type
+              const contentType = response.headers.get('content-type');
+              if (!contentType || !contentType.includes('application/json')) {
+                console.log(`Invalid content type for member ${memberId}: ${contentType}`);
+                return null;
+              }
+
+              try {
+                const result = await response.json();
+                return { id: memberId, data: result };
+              } catch (error) {
+                console.error(`Error parsing JSON for member ${memberId}:`, error);
+                return null;
+              }
+            } catch (error) {
+              console.error(`Error fetching info for member ${memberId}:`, error);
+              return null;
+            }
+          });
+
+          // Chờ tất cả các request hoàn thành
+          const results = await Promise.all(memberPromises);
+
+          // Xử lý kết quả trả về
+          const newMembers = {};
+          results.forEach(result => {
+            if (result && result.data) {
+              const { id, data } = result;
+              newMembers[id] = {
+                id: id,
+                fullname: data.fullname || 'Unknown User',
+                urlavatar: data.urlavatar || '',
+                phone: data.phone || '',
+                email: data.email || ''
+              };
+            }
+          });
+
+          // Cập nhật state một lần duy nhất với tất cả thông tin thành viên
+          if (Object.keys(newMembers).length > 0) {
+            setGroupMembers(prev => ({
+              ...prev,
+              ...newMembers
+            }));
+
+            // Cập nhật thông tin sender cho tất cả tin nhắn
+            setDataView(prevMessages =>
+              prevMessages.map(msg => {
+                const memberInfo = newMembers[msg.idSender];
+                if (memberInfo && !msg.senderInfo) {
+                  return {
+                    ...msg,
+                    senderInfo: {
+                      id: memberInfo.id,
+                      fullname: memberInfo.fullname,
+                      urlavatar: memberInfo.urlavatar
+                    }
+                  };
+                }
+                return msg;
+              })
+            );
+          }
+
+          console.log('Hoàn thành tải thông tin tất cả thành viên nhóm');
+        } catch (error) {
+          console.error('Error loading all members info:', error);
+        } finally {
+          setIsLoadingMembers(false);
+        }
+      };
+
+      // Gọi hàm tải thông tin tất cả thành viên
+      loadAllMembersInfo();
+    }
+  }, [groupInfo]);
+
   // Connect to socket and load messages
   useEffect(() => {
     // Ensure socket service is connected
@@ -305,7 +597,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
         const socketAfterInit = socketService.getSocket();
         if (socketAfterInit) {
           continueWithSocketSetup(socketAfterInit);
-          
+
           // Đăng ký sự kiện tái kết nối để đảm bảo tin nhắn luôn được gửi đi
           socketAfterInit.on('reconnect', () => {
             console.log('Socket reconnected - re-establishing chat connection');
@@ -326,7 +618,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       const socket = socketService.getSocket();
       if (socket) {
         continueWithSocketSetup(socket);
-        
+
         // Đăng ký sự kiện tái kết nối cho socket đã kết nối
         socket.on('reconnect', () => {
           console.log('Socket reconnected - re-establishing chat connection');
@@ -342,7 +634,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
         setIsLoading(false);
       }
     }
-    
+
     // Function to continue with socket setup after ensuring connection
     function continueWithSocketSetup(socket) {
       // Check parameters used to load messages
@@ -351,19 +643,19 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
         'route.params.conversationId': conversationId,
         'route.params.idConversation': idConversationParam
       });
-      
+
       // Use the correct parameter for loading messages
       const conversationIdToUse = idConversationParam || conversationId;
-      
+
       if (!conversationIdToUse) {
         console.error("No conversation ID available to load messages");
         setIsLoading(false);
         return;
       }
-      
+
       // Setup socket event handlers for this screen
       setupSocketListeners(socket);
-      
+
       // Load messages for this conversation
       console.log("Loading messages for conversation:", conversationIdToUse);
       loadMessages(conversationIdToUse);
@@ -380,7 +672,14 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
         cleanupSocket.off('message_recalled');
         cleanupSocket.off('delete_message_success');
         cleanupSocket.off('forward_message_success');
-        cleanupSocket.off('reconnect');
+        // Remove additional listeners for group updates
+        cleanupSocket.off('group_info_updated');
+        cleanupSocket.off('member_added_to_group');
+        cleanupSocket.off('member_removed_from_group');
+        cleanupSocket.off('group_owner_changed');
+        cleanupSocket.off('member_promoted_to_admin');
+        cleanupSocket.off('member_demoted_from_admin');
+        cleanupSocket.off('group_deleted');
       }
     };
   }, []);  // Setup socket listeners specific to this screen
@@ -389,31 +688,75 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
     socket.off('load_messages_response');
     socket.off('receive_message');
     socket.off('send_message_success');
-    socket.off('users_status'); 
+    socket.off('users_status');
     socket.off('recall_message_success');
     socket.off('message_recalled');
     socket.off('delete_message_success');
-    socket.off('forward_message_success');    // Load messages response handler
+    socket.off('forward_message_success');
+    socket.off('group_info_updated');
+    socket.off('member_added_to_group');
+    socket.off('member_removed_from_group');
+    socket.off('group_owner_changed');
+    socket.off('member_promoted_to_admin');
+    socket.off('member_demoted_from_admin');
+    socket.off('group_deleted');
+
+    // Load messages response handler
     socket.on('load_messages_response', (data) => {
       console.log('Messages received:', data);
       setIsLoading(false);
       setIsLoadingOlder(false);
-      
-      if (data && data.messages && data.messages.length > 0) {
+
+      console.log('Debug - hasMessages:', data && data.messages && data.messages.length > 0);
+      console.log('Debug - messages count:', data?.messages?.length || 0);
+
+      if (data && data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
         // Process messages
         const userData = socketService.getUserData();
-        const userId = userData?.id || 'user001'; // Fallback if not available
-        
-        // First map to add sentByMe flag
+        const userId = userData?.id || ''; // Fallback if not available
+
+        console.log('Processing messages, current user ID:', userId);
+        console.log('First message in response:', data.messages[0]);          // First map to add sentByMe flag and handle senderInfo
         const processedMessages = data.messages.map((msg: Message) => {
+          // Xác định lại idSender của tin nhắn có trùng với userId hiện tại không
+          // Đảm bảo rằng khi đăng nhập tài khoản khác, tin nhắn sẽ được phân loại đúng
           const sentByMe = msg.idSender === userId;
+
+          console.log(`Processing message ${msg.idMessage}, sentByMe: ${sentByMe}, sender: ${msg.idSender}, current user: ${userId}`);
+
+          // If this is a group chat and the message doesn't have senderInfo
+          if (!msg.senderInfo && msg.idSender) {
+            // Check if we already have this sender's info in our groupMembers state
+            const senderInfo = groupMembers[msg.idSender];
+            if (senderInfo) {
+              return {
+                ...msg,
+                sentByMe,
+                senderInfo: {
+                  id: senderInfo.id,
+                  fullname: senderInfo.fullname,
+                  urlavatar: senderInfo.urlavatar
+                }
+              };
+            } else {
+              // Fetch this user's info if we don't have it yet
+              fetchMemberInfo(msg.idSender);
+
+              // Return message with sentByMe flag even if we don't have sender info yet
+              return {
+                ...msg,
+                sentByMe
+              };
+            }
+          }
+
           return {
             ...msg,
             sentByMe
           };
         });
-        
-        // Then filter out messages that should be hidden for the sender (deleted messages)
+
+        // Filter out messages that should be hidden for the sender (deleted messages)
         const filteredMessages = processedMessages.filter(msg => {
           // If message is marked as removed AND was sent by current user, hide it
           if (msg.isRemove && msg.idSender === userId) {
@@ -421,165 +764,176 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
           }
           return true; // Keep all other messages
         });
-        
-        // Cập nhật hasMoreOldMessages dựa trên phản hồi từ server
+
+        console.log(`After filtering, have ${filteredMessages.length} messages to display`);
+
+        // Update hasMoreOldMessages based on server response
         if (data.hasMore !== undefined) {
           setHasMoreOldMessages(data.hasMore);
         } else {
-          // Nếu server không trả về hasMore, default là false
+          // If server doesn't return hasMore, default to false
           setHasMoreOldMessages(false);
         }
 
-        // Xác định xem đây có phải là tin nhắn cũ hay không
+        // Determine if these are older messages
         const isOlderMessages = data.direction === 'older';
-        
+
         if (isOlderMessages) {
-          console.log(`Nhận được ${filteredMessages.length} tin nhắn cũ`);
-          
-          // Đảo ngược thứ tự để tin nhắn cũ hơn nằm trên cùng
+          console.log(`Received ${filteredMessages.length} older messages`);
+
+          // Reverse order so older messages are at the top
           const reversedMessages = [...filteredMessages].reverse();
-          
+
           setDataView(prevMessages => {
-            // Tạo Set các ID tin nhắn đã có để kiểm tra trùng lặp nhanh hơn
-            const existingIds = new Set(prevMessages.map(msg => 
+            // Create Set of existing message IDs to check for duplicates faster
+            const existingIds = new Set(prevMessages.map(msg =>
               msg._id || msg.idMessage
             ));
-            
-            // Lọc tin nhắn để tránh trùng lặp
-            const uniqueNewMessages = reversedMessages.filter(msg => 
+
+            // Filter messages to avoid duplicates
+            const uniqueNewMessages = reversedMessages.filter(msg =>
               !existingIds.has(msg._id || msg.idMessage)
             );
-            
-            console.log(`Thêm ${uniqueNewMessages.length} tin nhắn cũ vào đầu danh sách`);
-            
-            // Gộp tin nhắn theo đúng thứ tự: tin cũ ở trên, tin mới ở dưới
+
+            console.log(`Adding ${uniqueNewMessages.length} unique older messages to the list`);
+
+            // Combine messages in correct order: older messages on top, newer below
             return [...uniqueNewMessages, ...prevMessages];
           });
         } else {
-          // Đây là tải tin nhắn ban đầu, thay thế toàn bộ danh sách
+          // Initial message load, replace the entire list
           const sortedMessages = [...filteredMessages].reverse();
-          setDataView(sortedMessages);
-          
-          // Cuộn xuống dưới cùng sau khi tải tin nhắn mới ban đầu
+
+          // Debug log message count before setting state
+          console.log(`Setting dataView with ${sortedMessages.length} messages`);
+
+          // Force update with new messages - this is critical
+          setDataView([...sortedMessages]);
+
+          // Scroll to bottom after loading initial new messages
           setTimeout(() => {
             scrollToBottom();
           }, 100);
         }
-
-        // Kiểm tra trạng thái online của người nhận sau khi nhận tin nhắn
-        checkReceiverOnlineStatus();
       } else {
-        // Nếu không phải là tải tin nhắn cũ, thì đặt danh sách rỗng
+        // Log if no messages were found
+        console.log('No messages found in response or invalid messages format');
+
+        // If not loading older messages, set empty list
         if (!isLoadingOlder) {
           setDataView([]);
         }
-        // Không còn tin nhắn cũ nữa
+        // No more older messages
         setHasMoreOldMessages(false);
       }
     });
-    
+
     // Listen for user status update
     socket.on('users_status', (data) => {
       console.log('Received users status:', data);
       if (data && data.statuses) {
-        const userData = socketService.getUserData();
-        const currentUserId = userData?.id;
-        
-        if (currentUserId) {
-          // Xác định ID người nhận
-          const idSenderParam = route.params?.idSender;
-          const idReceiverParam = route.params?.idReceiver;
-          const actualReceiverId = idSenderParam === currentUserId ? idReceiverParam : idSenderParam;
-          
-          // Cập nhật trạng thái online của người nhận
-          if (actualReceiverId && data.statuses[actualReceiverId] !== undefined) {
-            setReceiverIsOnline(data.statuses[actualReceiverId]);
-            console.log(`Receiver ${actualReceiverId} is ${data.statuses[actualReceiverId] ? 'online' : 'offline'}`);
-          }
+        // In group chat, we can update online status for all group members
+        if (groupInfo?.members && groupInfo.members.length > 0) {
+          // Filter statuses to only include group members
+          const groupMemberStatuses = {};
+          groupInfo.members.forEach(memberId => {
+            if (data.statuses[memberId] !== undefined) {
+              groupMemberStatuses[memberId] = data.statuses[memberId];
+            }
+          });
+
+          console.log('Group member statuses:', groupMemberStatuses);
         }
       }
     });
-    
+
     // Listen for receive message event (real-time message receiving)
     socket.on('receive_message', (newMessage) => {
       console.log('New message received (real-time):', newMessage);
-      
+
       // Add the new message to the chat immediately
       if (newMessage) {
         // Get user ID from the socket service
         const userData = socketService.getUserData();
-        const userId = userData?.id || 'user001'; // Fallback if not available
+        const userId = userData?.id || ''; // Fallback if not available
         const sentByMe = newMessage.idSender === userId;
-        
+
         // Check if the message belongs to current conversation
         const idConversationParam = route.params?.idConversation || conversationId;
         if (newMessage.idConversation !== idConversationParam) {
           console.log('Message is for another conversation, ignoring');
           return;
         }
-        
-        // Gửi phản hồi để xác nhận đã nhận được tin nhắn ngay lập tức
-        socket.emit('message_received', { 
+
+        // Acknowledge message receipt immediately
+        socket.emit('message_received', {
           messageId: newMessage._id || newMessage.idMessage,
           userId: userId
         });
-        
-        // Cập nhật trạng thái online của người gửi
-        if (!sentByMe) {
-          setReceiverIsOnline(true);
+
+        // For group chat, ensure we have sender info
+        if (!sentByMe && !newMessage.senderInfo && newMessage.idSender) {
+          // Check if we have this sender's info in our state
+          const senderInfo = groupMembers[newMessage.idSender];
+          if (!senderInfo) {
+            // If not, fetch it
+            fetchMemberInfo(newMessage.idSender);
+          }
         }
-        
-        // Thêm tin nhắn mới vào state ngay lập tức, không đợi kiểm tra trùng lặp
+
+        // Add new message to state immediately without waiting for duplicate check
         setDataView(prevMessages => {
-          // Kiểm tra nhanh xem tin nhắn đã tồn tại chưa
-          const messageExists = prevMessages.some(msg => msg._id === newMessage._id);
+          // Quick check if message already exists
+          const messageExists = prevMessages.some(msg =>
+            msg._id === newMessage._id || msg.idMessage === newMessage.idMessage
+          );
+
           if (messageExists) return prevMessages;
-          
-          // Nếu không tồn tại, thêm vào ngay lập tức
+
+          // If doesn't exist, add immediately
           const updatedMessages = [...prevMessages, {
             ...newMessage,
             sentByMe
           }];
-          
-          // Đảm bảo cuộn xuống ngay sau khi thêm tin nhắn
+
+          // Ensure we scroll down after adding message
           setTimeout(scrollToBottom, 10);
-          
+
           return updatedMessages;
         });
       }
     });
-    
+
     // Listen for send message success
     socket.on('send_message_success', (response) => {
-      // Hiển thị đúng trạng thái dựa trên việc người nhận có đang online không
-      const statusText = receiverIsOnline ? 'recipient online' : 'recipient offline';
-      console.log(`Message sent successfully (${statusText}):`, response);
-      
+      console.log('Group message sent successfully:', response);
+
       // Add the message to the chat
       if (response && response.message) {
         const message = response.message;
-        
+
         // Check if the message belongs to current conversation
         const idConversationParam = route.params?.idConversation || conversationId;
         if (message.idConversation !== idConversationParam) {
           console.log('Message success is for another conversation, ignoring');
           return;
         }
-        
+
         // Get user ID from the socket service
         const userData = socketService.getUserData();
-        const userId = userData?.id || 'user001'; // Fallback if not available
+        const userId = userData?.id || ''; // Fallback if not available
         const sentByMe = message.idSender === userId;
-        
-        // Nếu là tin nhắn từ người dùng hiện tại
+
+        // Handle message from current user
         if (sentByMe) {
           setDataView(prevMessages => {
-            // Tìm tin nhắn tạm thời tương ứng
-            const tempIndex = prevMessages.findIndex(msg => 
-              msg._id && msg._id.startsWith('temp-') && msg.content === message.content
+            // Find temporary message with matching ID
+            const tempIndex = prevMessages.findIndex(msg =>
+              (msg._id && msg._id.startsWith('temp-') && msg.content === message.content) ||
+              (msg.tempId === response.tempId)
             );
-            
-            // Nếu tìm thấy tin nhắn tạm thời, thay thế bằng tin nhắn chính thức
+
+            // If found temporary message, replace with official message
             if (tempIndex !== -1) {
               const updatedMessages = [...prevMessages];
               updatedMessages[tempIndex] = {
@@ -588,84 +942,67 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
               };
               return updatedMessages;
             }
-            
-            // Nếu không tìm thấy tin nhắn tạm thời, thêm tin nhắn mới (tránh trùng lặp)
-            const existingMessage = prevMessages.find(msg => msg._id === message._id);
+
+            // If not found temp message, add new message (avoid duplicates)
+            const existingMessage = prevMessages.find(msg => msg._id === message._id || msg.idMessage === message.idMessage);
             if (!existingMessage) {
               return [...prevMessages, {
                 ...message,
                 sentByMe
               }];
             }
-            
-            return prevMessages; // Không thay đổi nếu tin nhắn đã tồn tại
-          });
-        } else {
-          // Nếu là tin nhắn từ người khác
-          setDataView(prevMessages => {
-            const existingMessage = prevMessages.find(msg => msg._id === message._id);
-            if (!existingMessage) {
-              return [...prevMessages, {
-                ...message,
-                sentByMe
-              }];
-            }
-            return prevMessages;
+
+            return prevMessages; // No changes if message already exists
           });
         }
-        
-        // Cuộn xuống ngay lập tức
+
+        // Scroll down immediately
         scrollToBottom();
-        
-        // Kiểm tra lại trạng thái online của người nhận sau khi gửi tin nhắn
-        checkReceiverOnlineStatus();
       }
     });
-    
+
     // Listen for message recall events
     socket.on('recall_message_success', (data) => {
       console.log('Recall message success (sender):', data);
       if (data && data.messageId && data.success) {
         // Update the UI to show recalled message for the sender
-        setDataView(prevMessages => 
-          prevMessages.map(msg => 
-            msg.idMessage === data.messageId 
-              ? { ...msg, isRecall: true, content: 'Tin nhắn đã được thu hồi' } 
-              : msg
-          )
-        );
-      }
-    });
-    
-    // Listen for message recalled (for receiver)
-    socket.on('message_recalled', (data) => {
-      console.log('Message recalled (receiver):', data);
-      if (data && data.messageId && data.updatedMessage) {
-        // Update the UI with the recalled message data from server
-        setDataView(prevMessages => 
-          prevMessages.map(msg => 
-            msg.idMessage === data.messageId 
-              ? { 
-                  ...data.updatedMessage,
-                  sentByMe: msg.sentByMe // Preserve the sentByMe flag
-                } 
+        setDataView(prevMessages =>
+          prevMessages.map(msg =>
+            msg.idMessage === data.messageId
+              ? { ...msg, isRecall: true, content: 'Tin nhắn đã được thu hồi' }
               : msg
           )
         );
       }
     });
 
-    // Listen for message delete events
+    // Listen for message recalled (for receiver)
+    socket.on('message_recalled', (data) => {
+      console.log('Message recalled (receiver):', data);
+      if (data && data.messageId && data.updatedMessage) {
+        // Update the UI with the recalled message data from server
+        setDataView(prevMessages =>
+          prevMessages.map(msg =>
+            msg.idMessage === data.messageId
+              ? {
+                ...data.updatedMessage,
+                sentByMe: msg.sentByMe // Preserve the sentByMe flag
+              }
+              : msg
+          )
+        );
+      }
+    });    // Listen for message delete events
     socket.on('delete_message_success', (data) => {
       console.log('Message deleted:', data);
       if (data && data.messageId && data.updatedMessage) {
         // Get user data to determine if current user is the sender
         const userData = socketService.getUserData();
         const currentUserId = userData?.id;
-        
+
         // For the sender: remove the message completely
         // For the receiver: keep the message as is (no changes)
-        setDataView(prevMessages => 
+        setDataView(prevMessages =>
           prevMessages.filter(msg => {
             // If this is the deleted message
             if (msg.idMessage === data.messageId) {
@@ -693,26 +1030,399 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
         );
       }
     });
-  };// Function to load messages
-  const loadMessages = (idConversation: string) => {
-    setIsLoading(true);
+    // Listener for group info updates (name, avatar, etc.) - consolidated with better messaging
+    socket.on('group_info_updated', (data) => {
+      console.log('Group info updated:', data);
+      if (data && data.success && data.conversation) {
+        // Update group info in UI
+        const updatedInfo = {
+          name: data.conversation.groupName || groupInfo.name,
+          avatar: data.conversation.groupAvatar || groupInfo.avatar,
+          members: groupInfo.members // Keep existing members for now
+        };
+
+        // Tạo thông báo chi tiết hơn dựa trên loại cập nhật
+        let updateMessage = `${data.updatedBy ? data.updatedBy.fullname : 'Ai đó'} đã cập nhật thông tin nhóm`;
+
+        // Xác định cụ thể đã thay đổi gì
+        if (data.conversation.groupName !== groupInfo.name) {
+          updateMessage = `${data.updatedBy ? data.updatedBy.fullname : 'Ai đó'} đã đổi tên nhóm thành "${data.conversation.groupName}"`;
+        } else if (data.conversation.groupAvatar !== groupInfo.avatar) {
+          updateMessage = `${data.updatedBy ? data.updatedBy.fullname : 'Ai đó'} đã thay đổi ảnh nhóm`;
+        }
+
+        // Thêm thông báo hệ thống vào tin nhắn
+        const systemMessage: Message = {
+          _id: `system-${Date.now()}`,
+          idMessage: `system-${Date.now()}`,
+          idSender: 'system',
+          idConversation: conversationId,
+          type: 'system',
+          content: updateMessage,
+          dateTime: new Date().toISOString(),
+          isRead: true,
+          isRecall: false,
+          isReply: false,
+          isForward: false,
+          isRemove: false,
+          idMessageReply: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          __v: 0
+        };
+
+        // Cập nhật thông tin nhóm
+        navigation.setParams({ groupInfo: updatedInfo });
+
+        // Thêm tin nhắn hệ thống vào danh sách tin nhắn
+        setDataView(prevMessages => [...prevMessages, systemMessage]);
+        setTimeout(scrollToBottom, 100);
+      }
+    });
+    // New listener: New member added to group
+    socket.on('member_added_to_group', (data) => {
+      console.log('Member added to group:', data);
+      if (data && data.success && data.newMembers && data.newMembers.length > 0) {
+        // Update group members in UI
+        const updatedMembers = [...(groupInfo.members || []), ...data.newMembers.map((m: any) => m.id)];
+        const updatedInfo = {
+          ...groupInfo,
+          members: updatedMembers
+        };
+
+        navigation.setParams({ groupInfo: updatedInfo });
+
+        // Get new members names
+        const newMembersNames = data.newMembers.map((m: any) => m.fullname || 'Unknown User').join(', ');
+
+        // Tạo tin nhắn hệ thống chi tiết - hiển thị ai đã thêm ai vào nhóm
+        const systemMessage: Message = {
+          _id: `system-${Date.now()}`,
+          idMessage: `system-${Date.now()}`,
+          idSender: 'system',
+          idConversation: conversationId,
+          type: 'system',
+          content: `${data.addedBy ? data.addedBy.fullname : 'Ai đó'} đã thêm ${newMembersNames} vào nhóm`,
+          dateTime: new Date().toISOString(),
+          isRead: true,
+          isRecall: false,
+          isReply: false,
+          isForward: false,
+          isRemove: false,
+          idMessageReply: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          __v: 0
+        };
+
+        // Thêm tin nhắn hệ thống vào danh sách tin nhắn
+        setDataView(prevMessages => [...prevMessages, systemMessage]);
+        setTimeout(scrollToBottom, 100);
+
+        // Fetch info for new members
+        data.newMembers.forEach((member: any) => {
+          if (member && member.id) {
+            fetchMemberInfo(member.id);
+          }
+        });
+      }
+    });
+    // New listener: Member removed from group
+    socket.on('member_removed_from_group', (data) => {
+      console.log('Member removed from group:', data);
+      if (data && data.removedMember) {
+        // Check if current user was removed
+        const userData = socketService.getUserData();
+        const currentUserId = userData?.id;
+
+        if (data.removedMember.id === currentUserId) {
+          // Current user was removed from the group - navigate immediately
+          Alert.alert('Thông báo', `${data.message || 'Bạn đã bị xóa khỏi nhóm'}`, [
+            { text: 'OK', onPress: () => navigation.navigate('HomeScreen') }
+          ]);
+          return;
+        }
+
+        // Update group members in UI (remove the member)
+        const updatedMembers = (groupInfo.members || []).filter(m => m !== data.removedMember.id);
+        const updatedInfo = {
+          ...groupInfo,
+          members: updatedMembers
+        };
+
+        // Cập nhật dữ liệu nhóm trong route params
+        navigation.setParams({ groupInfo: updatedInfo });
+
+        // Thêm thông báo hệ thống vào tin nhắn với thông tin người xóa
+        const systemMessageId = `system-remove-${Date.now()}`;
+        const systemMessage: Message = {
+          _id: systemMessageId,
+          idMessage: systemMessageId,
+          idSender: 'system',
+          idConversation: conversationId,
+          type: 'system',
+          // Hiển thị ai đã xóa ai khỏi nhóm hoặc ai đã rời nhóm
+          content: data.leftGroup
+            ? `${data.removedMember.fullname || 'Ai đó'} đã rời khỏi nhóm`
+            : `${data.removedBy?.fullname || 'Ai đó'} đã xóa ${data.removedMember.fullname || 'một thành viên'} khỏi nhóm`,
+          dateTime: new Date().toISOString(),
+          isRead: true,
+          isRecall: false,
+          isReply: false,
+          isForward: false,
+          isRemove: false,
+          idMessageReply: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          __v: 0
+        };
+
+        // Kiểm tra xem đã có tin nhắn tương tự chưa để tránh trùng lặp
+        setDataView(prevMessages => {
+          const isDuplicate = prevMessages.some(msg =>
+            msg.type === 'system' &&
+            msg.content === systemMessage.content &&
+            new Date(msg.dateTime).getTime() > Date.now() - 60000 // Trong khoảng 1 phút
+          );
+
+          if (isDuplicate) return prevMessages;
+          return [...prevMessages, systemMessage];
+        });
+
+        // Đảm bảo cuộn đến tin nhắn mới
+        setTimeout(scrollToBottom, 100);
+      }
+    });
+
+    // Đăng ký các sự kiện khác liên quan đến xóa thành viên
+    socket.on('remove_member_response', (data) => {
+      console.log('Remove member response:', data);
+      if (data && data.success && data.conversation) {
+        // Cập nhật thông tin nhóm với danh sách thành viên mới
+        const updatedInfo = {
+          ...groupInfo,
+          members: data.conversation.groupMembers || groupInfo.members
+        };
+        navigation.setParams({ groupInfo: updatedInfo });
+      }
+    });
+
+    socket.on('member_removed_notification', (data) => {
+      console.log('Member removed notification:', data);
+      if (data && data.removedMembers && data.removedMembers.length > 0) {
+        // Xử lý tương tự như member_removed_from_group
+        const removedNames = data.removedMembers.map(m => m.fullname).join(', ');
+
+        const systemMessageId = `system-remove-notif-${Date.now()}`;
+        const systemMessage: Message = {
+          _id: systemMessageId,
+          idMessage: systemMessageId,
+          idSender: 'system',
+          idConversation: conversationId,
+          type: 'system',
+          content: `${data.removedBy?.fullname || 'Ai đó'} đã xóa ${removedNames} khỏi nhóm`,
+          dateTime: new Date().toISOString(),
+          isRead: true,
+          isRecall: false,
+          isReply: false,
+          isForward: false,
+          isRemove: false,
+          idMessageReply: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          __v: 0
+        };
+
+        setDataView(prevMessages => [...prevMessages, systemMessage]);
+        setTimeout(scrollToBottom, 100);
+      }
+    });
+    // New listener: Group owner changed
+    socket.on('group_owner_changed', (data) => {
+      console.log('Group owner changed:', data);
+      if (data && data.success && data.newOwner && data.oldOwner) {
+        // Thêm thông báo hệ thống vào tin nhắn
+        const systemMessage: Message = {
+          _id: `system-${Date.now()}`,
+          idMessage: `system-${Date.now()}`,
+          idSender: 'system',
+          idConversation: conversationId,
+          type: 'system',
+          content: `${data.newOwner.fullname || 'Unknown User'} đã trở thành trưởng nhóm mới`,
+          dateTime: new Date().toISOString(),
+          isRead: true,
+          isRecall: false,
+          isReply: false,
+          isForward: false,
+          isRemove: false,
+          idMessageReply: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          __v: 0
+        };
+
+        // Thêm tin nhắn hệ thống vào danh sách tin nhắn
+        setDataView(prevMessages => [...prevMessages, systemMessage]);
+        setTimeout(scrollToBottom, 100);
+
+        // Cập nhật rules cho nhóm
+        const updatedRules = {
+          ...groupInfo.rules,
+          IDOwner: data.newOwner.id
+        };
+
+        // Cập nhật thông tin nhóm
+        const updatedInfo = {
+          ...groupInfo,
+          rules: updatedRules
+        };
+
+        navigation.setParams({ groupInfo: updatedInfo });
+      }
+    });
+
+    // New listener: Member promoted to admin (co-owner)
+    socket.on('member_promoted_to_admin', (data) => {
+      console.log('Member promoted to admin:', data);
+      if (data && data.success && data.promotedMember) {
+        // Thêm thông báo hệ thống vào tin nhắn
+        const systemMessage: Message = {
+          _id: `system-${Date.now()}`,
+          idMessage: `system-${Date.now()}`,
+          idSender: 'system',
+          idConversation: conversationId,
+          type: 'system',
+          content: `${data.promotedMember.fullname || 'Unknown User'} đã được bổ nhiệm làm phó nhóm`,
+          dateTime: new Date().toISOString(),
+          isRead: true,
+          isRecall: false,
+          isReply: false,
+          isForward: false,
+          isRemove: false,
+          idMessageReply: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          __v: 0
+        };
+
+        // Thêm tin nhắn hệ thống vào danh sách tin nhắn
+        setDataView(prevMessages => [...prevMessages, systemMessage]);
+        setTimeout(scrollToBottom, 100);
+
+        // Cập nhật danh sách co-owners
+        const updatedCoOwners = [...(groupInfo.rules.listIDCoOwner || []), data.promotedMember.id];
+
+        // Cập nhật rules cho nhóm
+        const updatedRules = {
+          ...groupInfo.rules,
+          listIDCoOwner: updatedCoOwners
+        };
+
+        // Cập nhật thông tin nhóm
+        const updatedInfo = {
+          ...groupInfo,
+          rules: updatedRules
+        };
+
+        navigation.setParams({ groupInfo: updatedInfo });
+      }
+    });
+
+    // New listener: Member demoted from admin (co-owner)
+    socket.on('member_demoted_from_admin', (data) => {
+      console.log('Member demoted from admin:', data);
+      if (data && data.success && data.demotedMember) {
+        // Thêm thông báo hệ thống vào tin nhắn
+        const systemMessage: Message = {
+          _id: `system-${Date.now()}`,
+          idMessage: `system-${Date.now()}`,
+          idSender: 'system',
+          idConversation: conversationId,
+          type: 'system',
+          content: `${data.demotedMember.fullname || 'Unknown User'} đã bị thu hồi quyền phó nhóm`,
+          dateTime: new Date().toISOString(),
+          isRead: true,
+          isRecall: false,
+          isReply: false,
+          isForward: false,
+          isRemove: false,
+          idMessageReply: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          __v: 0
+        };
+
+        // Thêm tin nhắn hệ thống vào danh sách tin nhắn
+        setDataView(prevMessages => [...prevMessages, systemMessage]);
+        setTimeout(scrollToBottom, 100);
+
+        // Cập nhật danh sách co-owners
+        const updatedCoOwners = (groupInfo.rules.listIDCoOwner || []).filter(
+          id => id !== data.demotedMember.id
+        );
+
+        // Cập nhật rules cho nhóm
+        const updatedRules = {
+          ...groupInfo.rules,
+          listIDCoOwner: updatedCoOwners
+        };
+
+        // Cập nhật thông tin nhóm
+        const updatedInfo = {
+          ...groupInfo,
+          rules: updatedRules
+        };
+
+        navigation.setParams({ groupInfo: updatedInfo });
+      }
+    });
+
+    // New listener: Group deleted
+    socket.on('group_deleted', (data) => {
+      console.log('Group deleted:', data);
+      if (data && data.success && data.conversationId === conversationId) {
+        // Hiển thị thông báo và chuyển về màn hình Home
+        Alert.alert('Thông báo', 'Nhóm đã bị xóa bởi trưởng nhóm', [
+          { text: 'OK', onPress: () => navigation.navigate('HomeScreen') }
+        ]);
+      }
+    });
+  };
+
+  // Function to load messages
+  const loadMessages = (idConversation: string, lastMessageId?: string) => {
+    // Set appropriate loading state based on whether we're loading older messages
+    if (lastMessageId) {
+      setIsLoadingOlder(true);
+    } else {
+      setIsLoading(true);
+    }
+
     const socket = socketService.getSocket();
     if (socket) {
       console.log('Emitting load_messages with IDConversation:', idConversation);
-      
+
+      // Prepare message request data based on whether we're loading older messages
+      const messageRequestData = lastMessageId
+        ? { IDConversation: idConversation, lastMessageId }
+        : { IDConversation: idConversation };
+
       // Đảm bảo socket đã sẵn sàng trước khi gửi yêu cầu
       if (socket.connected) {
-        socket.emit('load_messages', { IDConversation: idConversation });
+        socket.emit('load_messages', messageRequestData);
       } else {
         // Nếu socket chưa kết nối, đợi kết nối rồi mới gửi yêu cầu
         socket.on('connect', () => {
-          socket.emit('load_messages', { IDConversation: idConversation });
+          socket.emit('load_messages', messageRequestData);
         });
       }
-      
+
       // Set a timeout to prevent infinite loading if server doesn't respond
       setTimeout(() => {
-        if (isLoading) {
+        if (lastMessageId && isLoadingOlder) {
+          console.warn('Load older messages timeout - no response from server after 5 seconds');
+          setIsLoadingOlder(false);
+        } else if (isLoading) {
           console.warn('Load messages timeout - no response from server after 5 seconds');
           setIsLoading(false);
         }
@@ -720,21 +1430,21 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
     } else {
       console.error('Socket not available to load messages');
       setIsLoading(false);
+      setIsLoadingOlder(false);
     }
-    
+
     // Hiện thị trạng thái online của người nhận khi load tin nhắn
     setTimeout(() => {
       checkReceiverOnlineStatus();
     }, 1000);
-  };
-  // Function to load older messages
+  };  // Function to load older messages
   const loadOlderMessages = () => {
-    // Nếu đang tải hoặc đã tải hết tin nhắn cũ thì không làm gì
+    // Nếu đang tải hoặc đã tải hết tin nhắn cũ hơn thì không làm gì
     if (isLoadingOlder || !hasMoreOldMessages || dataView.length === 0) {
-      console.log('Skip loading older messages:', { 
-        isLoadingOlder, 
-        hasMoreOldMessages, 
-        messagesCount: dataView.length 
+      console.log('Skip loading older messages:', {
+        isLoadingOlder,
+        hasMoreOldMessages,
+        messagesCount: dataView.length
       });
       return;
     }
@@ -748,34 +1458,15 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       return;
     }
 
-    setIsLoadingOlder(true);
-    const socket = socketService.getSocket();
-    
-    if (socket) {
-      const idConversationParam = route.params?.idConversation || conversationId;
-      
-      console.log('Loading older messages for conversation:', idConversationParam);
-      console.log('Oldest message ID:', oldestMessageId);
-      
-      // Gửi yêu cầu tải tin nhắn cũ hơn với ID của tin nhắn cũ nhất hiện tại
-      socket.emit('load_messages', { 
-        IDConversation: idConversationParam,
-        lastMessageId: oldestMessageId
-      });
-      
-      // Đặt timeout để tránh tình trạng loading vô tận nếu server không phản hồi
-      setTimeout(() => {
-        if (isLoadingOlder) {
-          console.warn('Load older messages timeout - no response from server after 5 seconds');
-          setIsLoadingOlder(false);
-        }
-      }, 5000);
-    } else {
-      console.error('Socket not available to load older messages');
-      setIsLoadingOlder(false);
-    }
+    const idConversationParam = route.params?.idConversation || conversationId;
+
+    console.log('Loading older messages for conversation:', idConversationParam);
+    console.log('Oldest message ID:', oldestMessageId);
+
+    // Use the enhanced loadMessages function with lastMessageId parameter
+    loadMessages(idConversationParam, oldestMessageId);
   };
-  
+
   // Listen to keyboard events
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
@@ -795,12 +1486,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       keyboardDidShowListener.remove();
       keyboardDidHideListener.remove();
     };
-  }, []);  
-  
+  }, []);
+
   // Handle sending a message  
   const handleSendMessage = () => {
     if (!messageText.trim()) return;
-    
+
     const socket = socketService.getSocket();
     if (!socket) {
       console.error('Socket not connected. Cannot send message.');
@@ -813,45 +1504,31 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       console.error('User data not available. Cannot send message.');
       return;
     }
-    
-    // Get conversation parameters from route
-    const idConversationParam = route.params?.idConversation;
-    const idSenderParam = route.params?.idSender;
-    const idReceiverParam = route.params?.idReceiver;
-    
-    // Validate required parameters
-    if (!idConversationParam || !idSenderParam || !idReceiverParam) {
-      console.log('Route params:', route.params);
-      console.error('Conversation ID, Sender ID or Receiver ID not available in route params. Cannot send message.');
+
+    // Get conversation ID from route params
+    const idConversationParam = route.params?.idConversation || conversationId;
+
+    // Validate required parameter
+    if (!idConversationParam) {
+      console.error('Conversation ID not available. Cannot send message.');
       return;
     }
-    
+
     // Get current user ID
     const currentUserId = userData.id;
-    
-    // Người gửi luôn là người dùng hiện tại
-    const actualSenderId = currentUserId;
-    
-    // Người nhận là bên còn lại trong cuộc trò chuyện
-    const actualReceiverId = idSenderParam === currentUserId ? idReceiverParam : idSenderParam;
-    
-    // Ensure we're not trying to send a message to ourselves
-    if (actualSenderId === actualReceiverId) {
-      console.error('Cannot send message to self. Sender ID and Receiver ID are the same.');
-      return;
-    }
-    
+
+    // Message content
     const messageContent = messageText.trim();
-    
-    // Tạo một ID tạm thời để theo dõi tin nhắn
+
+    // Create a temporary ID to track the message
     const tempId = `temp-${Date.now()}`;
-    
-    // Tạo tin nhắn tạm thời để hiển thị ngay lập tức
+
+    // Create a temporary message to display immediately
     const tempMessage: Message = {
       _id: tempId,
       idMessage: tempId,
-      idSender: actualSenderId,
-      idReceiver: actualReceiverId,
+      idSender: currentUserId,
+      idReceiver: "", // Not needed for group messages
       idConversation: idConversationParam,
       type: 'text',
       content: messageContent,
@@ -865,85 +1542,92 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       __v: 0,
-      sentByMe: true
+      sentByMe: true,
+      tempId: tempId, // Add tempId for easy matching later
+      // Add sender info if available
+      senderInfo: {
+        id: currentUserId,
+        fullname: userData.fullname || "Me",
+        urlavatar: userData.urlavatar
+      }
     };
-    
-    // Thêm tin nhắn tạm thời vào state để hiển thị tức thì
-    setDataView(prevMessages => [ ...prevMessages,tempMessage]);
-    
-    // Cuộn xuống để xem tin nhắn mới ngay lập tức
+
+    // Add temporary message to state for immediate display
+    setDataView(prevMessages => [...prevMessages, tempMessage]);
+
+    // Scroll down to see the new message immediately
     setTimeout(scrollToBottom, 10);
-    
-    // Chuẩn bị dữ liệu tin nhắn theo định dạng yêu cầu của server
+
+    // Prepare message data for the server in the required format
     const messageData = {
-      IDSender: actualSenderId,
-      IDReceiver: actualReceiverId,
+      IDSender: currentUserId,
+      IDConversation: idConversationParam,
       textMessage: messageContent,
       type: 'text',
       fileUrl: '',
-      tempId: tempId // Gửi ID tạm thời để có thể theo dõi tin nhắn này
+      tempId: tempId
     };
-    
-    // Kiểm tra trạng thái socket trước khi gửi
+
+    // Check socket connection before sending
     if (!socket.connected) {
       console.warn('Socket disconnected. Attempting to reconnect before sending message...');
       socket.connect();
-      
-      // Đăng ký sự kiện connect để gửi tin nhắn sau khi kết nối lại
+
+      // Register connect event to send message after reconnection
       socket.once('connect', () => {
-        console.log('Socket reconnected. Sending message...');
-        socket.emit('send_message', messageData);
-        console.log('Message sent after reconnection:', messageData);
+        console.log('Socket reconnected. Sending group message...');
+        socket.emit('send_group_message', messageData);
+        console.log('Group message sent after reconnection:', messageData);
       });
     } else {
-      // Gửi tin nhắn qua socket nếu kết nối đã sẵn sàng
-      console.log('Sending message in real-time:', messageData);
-      socket.emit('send_message', messageData);
+      // Send message via socket if connection is ready
+      console.log('Sending group message in real-time:', messageData);
+      socket.emit('send_group_message', messageData);
     }
-    
-    // Xóa nội dung tin nhắn trong input
+
+    // Clear message input
     setMessageText('');
   };
-  
+
   // Function to check online status of receiver
   const checkReceiverOnlineStatus = () => {
     const socket = socketService.getSocket();
     if (!socket) return;
-    
+
     // Get the ID of receiver to check their status
     const userData = socketService.getUserData();
     const currentUserId = userData?.id;
-    
+
     if (!currentUserId) return;
-    
+
     // Determine actual receiver ID based on route params
     const idSenderParam = route.params?.idSender;
     const idReceiverParam = route.params?.idReceiver;
     const actualReceiverId = idSenderParam === currentUserId ? idReceiverParam : idSenderParam;
-    
+
     if (!actualReceiverId) return;
-    
+
     console.log('Checking online status for user:', actualReceiverId);
     // Emit event to check user status
     socket.emit('check_users_status', { userIds: [actualReceiverId] });
   };
-  
+
   // Kiểm tra trạng thái online của người nhận khi component mount và cứ mỗi 30 giây
   useEffect(() => {
     // Kiểm tra ngay khi component mount
     checkReceiverOnlineStatus();
-    
+
     // Thiết lập kiểm tra định kỳ mỗi 30 giây
     const intervalId = setInterval(() => {
       checkReceiverOnlineStatus();
     }, 30000);
-    
+
     // Cleanup khi component unmount
     return () => {
       clearInterval(intervalId);
     };
   }, []);
-  
+
   // File handling functions
   // Determine file type category based on MIME type
   const getFileTypeCategory = (mimeType: string): 'image' | 'video' | 'document' => {
@@ -979,7 +1663,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
           fileType: 'image',
           size: asset.fileSize || 0
         };
-        
+
         setSelectedFiles(prev => [...prev, fileInfo]);
       }
     } catch (error) {
@@ -1009,7 +1693,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
         const newFiles: FileInfo[] = result.assets.map(asset => {
           const fileType = asset.type === 'video' ? 'video' : 'image';
           const mimeType = asset.type === 'video' ? 'video/mp4' : `image/${asset.uri.split('.').pop()?.toLowerCase() || 'jpeg'}`;
-          
+
           return {
             uri: asset.uri,
             name: asset.fileName || `${fileType}_${Date.now()}.${asset.uri.split('.').pop() || 'jpg'}`,
@@ -1018,7 +1702,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
             size: asset.fileSize || 0
           };
         });
-        
+
         setSelectedFiles(prev => [...prev, ...newFiles]);
       }
     } catch (error) {
@@ -1029,10 +1713,10 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
   const handlePickDocument = async () => {
     try {
       console.log('Starting enhanced document picker...');
-      
+
       // Use our improved document picker that handles PDF, DOC, DOCX files correctly
       const newFiles = await pickDocument();
-      
+
       if (newFiles.length > 0) {
         console.log(`Selected ${newFiles.length} document(s)`);
         setSelectedFiles(prev => [...prev, ...newFiles]);
@@ -1050,44 +1734,44 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
   // Upload files to server with improved handling
   const uploadFiles = async () => {
     if (selectedFiles.length === 0) return;
-    
+
     try {
       setIsUploading(true);
       setUploadProgress(0);
-      
+
       // Get authentication token directly
       const authService = AuthService.getInstance();
       const accessToken = await authService.getAccessToken();
-      
+
       if (!accessToken) {
         Alert.alert('Authentication Error', 'You need to be logged in to upload files.');
         setIsUploading(false);
         return;
       }
-      
+
       console.log('Starting file upload with token available:', !!accessToken);
-      
+
       // Process one file at a time
       for (const file of selectedFiles) {
         console.log('Uploading file:', file.name, 'Type:', file.fileType);
-        
+
         // Create FormData - using very explicit typing for React Native
         const formData = new FormData();
-        
+
         // Handle file URI format differences between iOS and Android
         const fileUri = Platform.OS === 'android' ? file.uri : file.uri.replace('file://', '');
-        
+
         const fileData = {
           uri: fileUri,
           name: file.name,
           type: file.type
         };
-        
+
         formData.append('file', fileData as any);
         formData.append('fileType', file.fileType);
-        
+
         console.log('FormData created for file:', file.name);
-        
+
         try {
           // Upload file with explicit authentication token in header
           const response = await axios.post(`${API_URL}/upload/chat-file`, formData, {
@@ -1103,9 +1787,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
               }
             }
           });
-          
+
           console.log('Upload response:', response.data);
-          
+
           if (response.data && response.data.success) {
             // Send message with file via socket
             const { fileUrl, fileType, fileName } = response.data;
@@ -1117,16 +1801,16 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
           }
         } catch (uploadError) {
           console.error('Error in axios upload:', uploadError);
-          
+
           if (axios.isAxiosError(uploadError) && uploadError.response) {
             console.error('Error status:', uploadError.response.status);
             console.error('Error data:', uploadError.response.data);
           }
-          
+
           Alert.alert('Upload Failed', 'Failed to upload file. Please try again.');
         }
       }
-      
+
       // Clear selected files after upload completes
       setSelectedFiles([]);
       setIsUploading(false);
@@ -1151,31 +1835,27 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       console.error('User data not available. Cannot send message.');
       return;
     }
-    
-    // Get conversation parameters
-    const idConversationParam = route.params?.idConversation;
-    const idSenderParam = route.params?.idSender;
-    const idReceiverParam = route.params?.idReceiver;
-    
-    if (!idConversationParam || !idSenderParam || !idReceiverParam) {
-      console.error('Conversation ID, Sender ID or Receiver ID not available. Cannot send message.');
+
+    // Get conversation ID for group
+    const idConversationParam = route.params?.idConversation || conversationId;
+
+    if (!idConversationParam) {
+      console.error('Conversation ID not available. Cannot send message.');
       return;
     }
-    
-    // Current user is always the sender
+
+    // Current user is the sender
     const currentUserId = userData.id;
-    const actualSenderId = currentUserId;
-    const actualReceiverId = idSenderParam === currentUserId ? idReceiverParam : idSenderParam;
-    
+
     // Create temp ID for tracking
     const tempId = `temp-${Date.now()}`;
-    
+
     // Create temp message for instant display
     const tempMessage: Message = {
       _id: tempId,
       idMessage: tempId,
-      idSender: actualSenderId,
-      idReceiver: actualReceiverId,
+      idSender: currentUserId,
+      idReceiver: "", // Not needed for group messages
       idConversation: idConversationParam,
       type: fileType,
       content: fileUrl,
@@ -1189,41 +1869,47 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       __v: 0,
-      sentByMe: true
+      sentByMe: true,
+      // Add sender info
+      senderInfo: {
+        id: currentUserId,
+        fullname: userData.fullname || "Me",
+        urlavatar: userData.urlavatar
+      }
     };
-    
+
     // Add temp message to chat
     setDataView(prevMessages => [...prevMessages, tempMessage]);
-    
+
     // Scroll to see new message
     setTimeout(scrollToBottom, 10);
-    
-    // Create socket message payload
+
+    // Create socket message payload for group message
     const messageData = {
-      IDSender: actualSenderId,
-      IDReceiver: actualReceiverId,
+      IDSender: currentUserId,
+      IDConversation: idConversationParam,
       type: fileType,
       fileUrl: fileUrl,
       tempId: tempId
     };
-    
-    // Send message via socket
+
+    // Send message via socket using group message event
     if (!socket.connected) {
       console.warn('Socket disconnected. Attempting to reconnect...');
       socket.connect();
-      
+
       socket.once('connect', () => {
-        socket.emit('send_message', messageData);
+        socket.emit('send_group_message', messageData);
       });
     } else {
-      socket.emit('send_message', messageData);
+      socket.emit('send_group_message', messageData);
     }
   };
 
   // Render file preview component
   const renderFilePreview = () => {
     if (selectedFiles.length === 0) return null;
-    
+
     return (
       <View style={styles.filePreviewContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -1246,7 +1932,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
                   </Text>
                 </View>
               )}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.removeFileButton}
                 onPress={() => handleRemoveFile(index)}
               >
@@ -1255,14 +1941,14 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
             </View>
           ))}
         </ScrollView>
-        
+
         {isUploading ? (
           <View style={styles.uploadProgressContainer}>
             <Progress.Bar progress={uploadProgress / 100} width={width - 40} />
             <Text style={styles.uploadProgressText}>{`Uploading... ${uploadProgress}%`}</Text>
           </View>
         ) : (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.sendFilesButton}
             onPress={uploadFiles}
           >
@@ -1273,19 +1959,23 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       </View>
     );
   };
-  
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1FAEEB" />
-      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation?.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#FDF8F8" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {chatItem?.name || "Bảo Ngọc"}
-        </Text>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {groupInfo?.name || "Nhóm chat"}
+          </Text>
+          <Text style={styles.headerSubtitle}>
+            {groupInfo?.members ? `${groupInfo.members.length} thành viên` : ''}
+          </Text>
+        </View>
         <View style={styles.headerIcons}>
           <TouchableOpacity style={styles.headerIconButton}>
             <Ionicons name="call" size={24} color="#FDF8F8" />
@@ -1293,24 +1983,31 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
           <TouchableOpacity style={styles.headerIconButton}>
             <Ionicons name="videocam" size={24} color="#FDF8F8" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerIconButton}>
+          <TouchableOpacity
+            style={styles.headerIconButton}
+            onPress={() => navigation.navigate('DetailGroupChatScreen', {
+              conversationId: conversationId,
+              groupInfo: groupInfo
+            })}
+          >
             <Ionicons name="ellipsis-vertical" size={20} color="#FDF8F8" />
           </TouchableOpacity>
         </View>
       </View>
-      
+
       {/* Messages */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1FAEEB" />
           <Text style={styles.loadingText}>Đang tải tin nhắn...</Text>
-        </View>      ) : (     
-             <KeyboardAvoidingView
+        </View>
+      ) : (
+        <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.keyboardAvoidContainer}
           keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
-        >    
-              <FlatList
+        >
+          <FlatList
             ref={flatListRef}
             style={styles.messagesContainer}
             contentContainerStyle={
@@ -1342,72 +2039,150 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
                 <Ionicons name="chatbubbles-outline" size={80} color="#CCCCCC" />
                 <Text style={styles.emptyStateText}>Chưa có tin nhắn nào</Text>
                 <Text style={styles.emptyStateSubtext}>
-                  Hãy bắt đầu cuộc trò chuyện!
+                  Hãy bắt đầu cuộc trò chuyện nhóm!
                 </Text>
               </View>
-            }renderItem={({ item: message }) => (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                delayLongPress={200}
-                onLongPress={() => handleLongPressMessage(message)}
-              >
-                <View
-                  style={[
-                    styles.messageBubble,
-                    message.sentByMe ? styles.myMessage : styles.theirMessage,
-                    message.type !== 'text' ? styles.fileMessageBubble : null,
-                    (message.isRecall || message.isRemove) && styles.recalledMessage
-                  ]}
-                >            
+            } renderItem={({ item: message }) => {
+              // Check if this is a system message
+              if (message.idSender === "system") {
+                // Render system message centered in chat
+                return (
+                  <View style={{
+                    flexDirection: 'row',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingVertical: 5,
+                    marginVertical: 10,
+                    width: '100%',
+                  }}>
+                    <Text style={{
+                      backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                      color: '#666',
+                      fontSize: 12,
+                      padding: 8,
+                      borderRadius: 10,
+                      overflow: 'hidden',
+                      textAlign: 'center',
+                    }}>
+                      {message.content}
+                    </Text>
+                  </View>
+                );
+              }
+
+              // For regular messages, continue with normal rendering
+              // Find sender information either from message.senderInfo or groupMembers state
+              const senderInfo = message.senderInfo || groupMembers[message.idSender] || { fullname: "Unknown", urlavatar: "" };
+              const showSenderInfo = !message.sentByMe && !message.isRecall;
+
+              return (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  delayLongPress={200}
+                  onLongPress={() => handleLongPressMessage(message)}
+                >
+                  <View style={showSenderInfo && styles.messageBubbleWithSender}>
+                    {/* Show sender info for others' messages in group chat */}
+                    {showSenderInfo && (
+                      <View style={styles.senderInfoContainer}>
+                        <View style={styles.senderAvatarContainer}>
+                          <Image
+                            source={
+                              senderInfo.urlavatar
+                                ? { uri: senderInfo.urlavatar }
+                                : require('../assets/Welo_image.png')
+                            }
+                            style={styles.senderAvatar}
+                          />
+                          {/* Display gold key for group owner */}
+                          {groupInfo?.rules?.IDOwner === message.idSender && (
+                            <Ionicons
+                              name="key"
+                              size={12}
+                              color="#FFD700"
+                              style={styles.keyIcon}
+                            />
+                          )}
+                          {/* Display silver key for co-owners */}
+                          {groupInfo?.rules?.listIDCoOwner?.includes(message.idSender) && (
+                            <Ionicons
+                              name="key"
+                              size={12}
+                              color="#C0C0C0"
+                              style={styles.keyIcon}
+                            />
+                          )}
+                        </View>
+                        <View style={styles.senderNameContainer}>
+                          <Text style={[
+                            styles.senderName,
+                            { color: getUserColor(message.idSender) }
+                          ]}>
+                            {senderInfo.fullname}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    <View
+                      style={[
+                        styles.messageBubble,
+                        message.sentByMe ? styles.myMessage : styles.theirMessage,
+                        message.type !== 'text' ? styles.fileMessageBubble : null,
+                        (message.isRecall || message.isRemove) && styles.recalledMessage
+                      ]}
+                    >
                       {message.isRecall ? (
-                    // Recalled message style
-                    <Text style={styles.recalledMessageText}>Tin nhắn đã được thu hồi</Text>
-                  ) : message.type === 'image' ? (
-                    <View>
-                      <Image 
-                        source={{ uri: message.content }} 
-                        style={styles.messageImage}
-                        resizeMode="cover"
-                      />
-                      <Text style={styles.messageTime}>
-                        {formatMessageTime(message.dateTime)}
-                      </Text>
+                        // Recalled message style
+                        <Text style={styles.recalledMessageText}>Tin nhắn đã được thu hồi</Text>
+                      ) : message.type === 'image' ? (
+                        <View>
+                          <Image
+                            source={{ uri: message.content }}
+                            style={styles.messageImage}
+                            resizeMode="cover"
+                          />
+                          <Text style={styles.messageTime}>
+                            {formatMessageTime(message.dateTime)}
+                          </Text>
+                        </View>
+                      ) : message.type === 'video' ? (
+                        <VideoMessage
+                          uri={message.content}
+                          timestamp={formatMessageTime(message.dateTime)}
+                        />
+                      ) : message.type === 'document' ? (
+                        <DocumentMessage
+                          uri={message.content}
+                          timestamp={formatMessageTime(message.dateTime)}
+                        />
+                      ) : (
+                        <>
+                          <Text style={styles.messageText} numberOfLines={0}>{message.content}</Text>
+                          <Text style={styles.messageTime}>
+                            {formatMessageTime(message.dateTime)}
+                          </Text>
+                        </>
+                      )}
                     </View>
-                  ) : message.type === 'video' ? (
-                    <VideoMessage 
-                      uri={message.content} 
-                      timestamp={formatMessageTime(message.dateTime)} 
-                    />
-                  ) : message.type === 'document' ? (
-                    <DocumentMessage
-                      uri={message.content}
-                      timestamp={formatMessageTime(message.dateTime)}
-                    />
-                  ) : (
-                    <>
-                      <Text style={styles.messageText} numberOfLines={0}>{message.content}</Text>
-                      <Text style={styles.messageTime}>
-                        {formatMessageTime(message.dateTime)}
-                      </Text>
-                    </>
-                  )}
-                </View>
-              </TouchableOpacity>
-            )}
-          />         
-           {/* Input area */} 
-                    <View style={styles.inputContainer}>
-            <TouchableOpacity 
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+          />
+          {/* Input area */}
+          <View style={styles.inputContainer}>
+            <TouchableOpacity
               style={styles.attachButton}
               onPress={() => setShowEmojiPicker(!showEmojiPicker)}
-              hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               activeOpacity={0.7}
             >
               <Ionicons name="happy-outline" size={26} color="#645C5C" />
-            </TouchableOpacity>       
-                 <TouchableOpacity 
+            </TouchableOpacity>
+            <TouchableOpacity
               style={styles.attachButton}
-              hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               activeOpacity={0.7}
               onPress={handlePickDocument}
             >
@@ -1424,21 +2199,21 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
                 multiline
                 maxLength={1000}
               />
-            </View> 
-                       <View style={styles.rightButtons}>
+            </View>
+            <View style={styles.rightButtons}>
               {!messageText.trim() ? (
                 <>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.iconButton}
                     onPress={handleTakePhoto}
                   >
                     <Ionicons name="camera-outline" size={26} color="#645C5C" />
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.iconButton}
                     onPress={handlePickImage}
                   >
-                    <Ionicons name="image-outline" size={26} color="#645C5C" />
+                    <Ionicons name="image-outline" size={26} color="#645C5C5C" />
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.iconButton}>
                     <Ionicons name="mic-outline" size={26} color="#645C5C" />
@@ -1447,7 +2222,6 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
               ) : (
                 <TouchableOpacity
                   style={[
-
                     styles.sendButton,
                     { backgroundColor: '#1FAEEB' }
                   ]}
@@ -1462,17 +2236,17 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
               )}
             </View>
           </View>
-            
-          {/* Emoji picker */}   
-                 {showEmojiPicker && (
+
+          {/* Emoji picker */}
+          {showEmojiPicker && (
             <View style={styles.emojiPickerContainer}>
               <FlatList
                 data={emojiList}
                 numColumns={8}
                 keyExtractor={(item, index) => `emoji-${index}`}
                 renderItem={({ item }) => (
-                  <TouchableOpacity 
-                    style={styles.emojiItem} 
+                  <TouchableOpacity
+                    style={styles.emojiItem}
                     onPress={() => handleEmojiSelect(item)}
                   >
                     <Text style={styles.emojiText}>{item}</Text>
@@ -1521,14 +2295,22 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 5,
+  }, headerTitleContainer: {
+    flex: 1,
+    marginLeft: 10,
+    justifyContent: 'center',
   },
   headerTitle: {
     color: '#FDF8F8',
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'Inter',
-    fontWeight: '400',
-    flex: 1,
-    marginLeft: 10,
+    fontWeight: '500',
+  },
+  headerSubtitle: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    marginTop: 2,
+    fontFamily: 'Inter',
   },
   headerIcons: {
     flexDirection: 'row',
@@ -1600,15 +2382,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     opacity: 0.7,
-  },
-  playButton: {
-    position: 'absolute',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   documentMessage: {
     minWidth: 180,
@@ -1827,7 +2600,7 @@ const styles = StyleSheet.create({
   },
   recalledMessage: {
     backgroundColor: '#f0f0f0',
-  },  recalledMessageText: {
+  }, recalledMessageText: {
     fontStyle: 'italic',
     color: '#999',
   },
@@ -1853,6 +2626,55 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontStyle: 'italic',
   },
+  // New styles for message sender info
+  messageBubbleWithSender: {
+    marginTop: 10,
+    marginBottom: 2,
+  },
+  // System message styles
+  systemMessageContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 5,
+    marginVertical: 10,
+    width: '100%',
+  },
+  systemMessageText: {
+    // backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: 'white',
+    color: '#666',
+    fontSize: 12,
+    padding: 8,
+    borderRadius: 10,
+    overflow: 'hidden',
+    textAlign: 'center',
+  },
+  senderInfoContainer: {
+    flexDirection:
+      'row',
+    alignItems: 'center',
+    marginBottom: 2,
+    marginLeft: 10,
+  },
+  senderAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginRight: 6,
+  },
+  senderAvatarContainer: {
+    position: 'relative',
+  },
+  keyIcon: {
+    position: 'absolute',
+    bottom: -2,
+    right: 2,
+    width: 12,
+    height: 12,
+    zIndex: 1,
+  },
 });
 
-export default ChatScreen;
+export default GroupChatScreen;
+

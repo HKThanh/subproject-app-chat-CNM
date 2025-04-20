@@ -68,7 +68,7 @@ const InfoScreen = ({ navigation, route }: InfoScreenProps) => {
 
     setIsLoadingUserData(true);
     try {
-      const response = await fetch('http://192.168.1.9:3000/user', {
+      const response = await fetch('http://192.168.0.103:3000/user', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -97,6 +97,9 @@ const InfoScreen = ({ navigation, route }: InfoScreenProps) => {
     if (tabName === 'messages') {
       navigation?.navigate('HomeScreen');
     }
+    if (tabName === 'contacts') {
+      navigation?.navigate('SearchUserScreen');
+    }
   };  const handleLogout = async () => {
     try {
       setIsLoading(true);
@@ -114,7 +117,7 @@ const InfoScreen = ({ navigation, route }: InfoScreenProps) => {
       await socketService.emitUserOffline();
       
       // Gọi API đăng xuất
-      const response = await fetch('http://192.168.1.9:3000/auth/logout/mobile', {
+      const response = await fetch('http://192.168.0.103:3000/auth/logout/mobile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -185,7 +188,7 @@ const InfoScreen = ({ navigation, route }: InfoScreenProps) => {
                 <Text style={styles.profileName}>
                   {userData?.fullname || (userData?.username && !userData?.username.match(/^\d+$/) ? userData?.username : 'Người dùng')}
                 </Text>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() => navigation?.navigate('BioScreen', { userData, accessToken })}>
                   <Text style={styles.profileAction}>Xem trang cá nhân</Text>
                 </TouchableOpacity>
               </View>

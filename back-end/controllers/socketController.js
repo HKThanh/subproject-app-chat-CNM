@@ -481,99 +481,103 @@ const handleDeleteMessage = async (io, socket) => {
     }
   });
 };
-
 const handleRecallMessage = async (io, socket) => {
-  socket.on("recall_message", async (payload) => {
-    try {
-      const { idMessage, idConversation } = payload;
 
-      // Tìm tin nhắn và thông tin người nhận
-      const message = await MessageDetail.findOne({ idMessage });
-      if (!message) {
-        throw new Error("Không tìm thấy tin nhắn");
-      }
-
-      // Cập nhật tin nhắn
-      const updatedMessage = await MessageDetail.findOneAndUpdate(
-        { idMessage },
-        {
-          isRecall: true,
-          content: "Tin nhắn đã được thu hồi",
-        },
-        { new: true }
-      );
-
-      // Tìm conversation để lấy thông tin người nhận
-      const conversation = await Conversation.findOne({ idConversation });
-      if (!conversation) {
-        throw new Error("Không tìm thấy cuộc hội thoại");
-      }
-      console.log("Conversation của tin nhắn bị thu hồi: ", conversation);
-
-      // Xử lý khác nhau cho nhóm và cuộc trò chuyện 1-1
-      if (conversation.isGroup) {
-        // Đối với nhóm, gửi thông báo đến tất cả thành viên trong nhóm
-        console.log("Sending recall notification to group conversation:", idConversation);
-        
-        // Gửi thông báo đến tất cả thành viên trong room của cuộc trò chuyện
-        io.to(idConversation).emit("message_recalled", {
-          messageId: idMessage,
-          updatedMessage: updatedMessage,
-          conversationId: idConversation
-        });
-        
-        // Nếu có danh sách thành viên nhóm, gửi thông báo trực tiếp đến từng thành viên online
-        if (conversation.groupMembers && Array.isArray(conversation.groupMembers)) {
-          conversation.groupMembers.forEach(memberId => {
-            if (memberId !== message.idSender) { // Không gửi lại cho người gửi
-              const memberSocket = getUser(memberId);
-              if (memberSocket) {
-                io.to(memberSocket.socketId).emit("message_recalled", {
-                  messageId: idMessage,
-                  updatedMessage: updatedMessage,
-                  conversationId: idConversation
-                });
-              }
-            }
-          });
+    socket.on("recall_message", async (payload) => {
+      try {
+        const { idMessage, idConversation } = payload;
+  
+        // Tìm tin nhắn và thông tin người nhận
+        const message = await MessageDetail.findOne({ idMessage });
+        if (!message) {
+          throw new Error("Không tìm thấy tin nhắn");
         }
-      } else {
-        // Đối với cuộc trò chuyện 1-1, xác định người nhận
-        const idReceiver =
-          conversation.idSender === message.idSender
-            ? conversation.idReceiver
-            : conversation.idSender;
+  
+        // Cập nhật tin nhắn
+        const updatedMessage = await MessageDetail.findOneAndUpdate(
+          { idMessage },
+          {
+            isRecall: true,
+            content: "Tin nhắn đã được thu hồi",
+          },
+          { new: true }
+        );
+  
+        // Tìm conversation để lấy thông tin người nhận
+        const conversation = await Conversation.findOne({ idConversation });
+        if (!conversation) {
+          throw new Error("Không tìm thấy cuộc hội thoại");
+        }
+        console.log("Conversation của tin nhắn bị thu hồi: ", conversation);
+  
+        // Xử lý khác nhau cho nhóm và cuộc trò chuyện 1-1
+        if (conversation.isGroup) {
+          // Đối với nhóm, gửi thông báo đến tất cả thành viên trong nhóm
+          console.log("Sending recall notification to group conversation:", idConversation);
+          
+          // Gửi thông báo đến tất cả thành viên trong room của cuộc trò chuyện
+          io.to(idConversation).emit("message_recalled", {
 
-        console.log("Sending recall notification to receiver:", idReceiver);
-
-        // Gửi thông báo cho người nhận
-        const receiverSocket = getUser(idReceiver);
-        if (receiverSocket) {
-          io.to(receiverSocket.socketId).emit("message_recalled", {
             messageId: idMessage,
             updatedMessage: updatedMessage,
             conversationId: idConversation
           });
+
+          
+          // Nếu có danh sách thành viên nhóm, gửi thông báo trực tiếp đến từng thành viên online
+          if (conversation.groupMembers && Array.isArray(conversation.groupMembers)) {
+            conversation.groupMembers.forEach(memberId => {
+              if (memberId !== message.idSender) { // Không gửi lại cho người gửi
+                const memberSocket = getUser(memberId);
+                if (memberSocket) {
+                  io.to(memberSocket.socketId).emit("message_recalled", {
+                    messageId: idMessage,
+                    updatedMessage: updatedMessage,
+                    conversationId: idConversation
+                  });
+                }
+              }
+            });
+          }
+        } else {
+          // Đối với cuộc trò chuyện 1-1, xác định người nhận
+          const idReceiver =
+            conversation.idSender === message.idSender
+              ? conversation.idReceiver
+              : conversation.idSender;
+  
+          console.log("Sending recall notification to receiver:", idReceiver);
+  
+          // Gửi thông báo cho người nhận
+          const receiverSocket = getUser(idReceiver);
+          if (receiverSocket) {
+            io.to(receiverSocket.socketId).emit("message_recalled", {
+              messageId: idMessage,
+              updatedMessage: updatedMessage,
+              conversationId: idConversation
+            });
+          }
         }
+  
+        // Gửi thông báo thành công cho người gửi
+        socket.emit("recall_message_success", {
+          messageId: idMessage,
+          success: true,
+          conversationId: idConversation
+        });
+  
+        console.log("Recall message notification sent");
+      } catch (error) {
+        console.error("Error recalling message:", error);
+        socket.emit("error", {
+          message: "Lỗi khi thu hồi tin nhắn",
+          error: error.message,
+        });
       }
+    });
+  };
+  
 
-      // Gửi thông báo thành công cho người gửi
-      socket.emit("recall_message_success", {
-        messageId: idMessage,
-        success: true,
-        conversationId: idConversation
-      });
-
-      console.log("Recall message notification sent");
-    } catch (error) {
-      console.error("Error recalling message:", error);
-      socket.emit("error", {
-        message: "Lỗi khi thu hồi tin nhắn",
-        error: error.message,
-      });
-    }
-  });
-};
 
 const handleForwardMessage = async (io, socket) => {
   socket.on("forward_message", async (payload) => {
@@ -1169,138 +1173,232 @@ const handleCreatGroupConversation = (io, socket) => {
     });
 };
 
+// const handleAddMemberToGroup = async (io, socket) => {
+//     socket.on("add_member_to_group", async (payload) => {
+//         const { IDConversation, IDUser, newGroupMembers } = payload;
+//         const conversation = await Conversation.findOne({ idConversation: IDConversation });
+//         if (!conversation) {
+//             socket.emit("message_from_server", "Cuộc trò chuyện không tồn tại!");
+//             return;
+//         }
+
+//         const user = User.findOne({ id: IDUser });
+
+//         // Check permission
+//         if (
+//             !(conversation.rules.IDOwner === IDUser ||
+//                 conversation.rules.listIDCoOwner.includes(IDUser))
+//         ) {
+//             socket.emit(
+//                 "message_from_server",
+//                 {
+//                     success: false,
+//                     message: "Chỉ có trưởng nhóm hoặc phó nhóm mới quyền thêm thành viên!",
+//                 }
+//             );
+//             return;
+//         }
+
+//         // Kiểm tra xem người dùng đã có trong nhóm chưa
+//         const existingMembers = conversation.groupMembers || [];
+//         const newMembers = newGroupMembers.filter(member => !existingMembers.includes(member));
+//         if (newMembers.length === 0) {
+//             socket.emit("message_from_server",
+//                 {
+//                     success: false,
+//                     message: "Người dùng đã có trong nhóm!",
+//                 }
+//             );
+//             return;
+//         }
+
+//         // Cập nhật danh sách thành viên
+//         conversation.groupMembers.push(...newMembers);
+
+//         const updatedConversation = await conversationController.updateConversation(conversation);
+//         await updateLastChangeConversation(IDConversation, updatedConversation.idNewestMessage);
+
+//         const dataNewMembers = await Promise.all(
+//             newMembers.map(async (member) => {
+//                 const userInfo = await User.findOne({ id: member })
+//                     .select('id fullname urlavatar phone status');
+//                 return {
+//                     id: member,
+//                     fullname: userInfo ? userInfo.fullname : 'Unknown User',
+//                     urlavatar: userInfo ? userInfo.urlavatar : null,
+//                     phone: userInfo ? userInfo.phone : null,
+//                     status: userInfo ? userInfo.status : 'offline'
+//                 };
+//             })
+//         );
+
+//         // Gửi thông báo cho các thành viên mới
+//         newMembers.forEach(async (member) => {
+//             const user = getUser(member);
+//             if (user?.socketId) {
+//                 io.to(user.socketId).emit(
+//                     "new_group_conversation",
+//                     {
+//                         success: true,
+//                         conversation: updatedConversation,
+//                         message: "Bạn đã được thêm vào nhóm",
+//                         members: dataNewMembers
+//                     }
+//                 );
+//             }
+//         });
+
+//         dataNewMembers.forEach(async (member) => {
+//             const user = getUser(member.id);
+//             if (user?.socketId) {
+//                 io.to(user.socketId).emit(
+//                     "new_group_conversation",
+//                     {
+//                         success: true,
+//                         conversation: updatedConversation,
+//                         message: `${user?.fullname || IDUser} đã được thêm vào nhóm`,
+//                     }
+//                 );
+//             }
+//         });
+//     });
+// };
 const handleAddMemberToGroup = async (io, socket) => {
-  socket.on("add_member_to_group", async (payload) => {
-    const { IDConversation, IDUser, newGroupMembers } = payload;
-    const conversation = await Conversation.findOne({
-      idConversation: IDConversation,
-    });
-    if (!conversation) {
-      socket.emit("message_from_server", {
-        success: false,
-        message: "Cuộc trò chuyện không tồn tại!"
+
+    socket.on("add_member_to_group", async (payload) => {
+      const { IDConversation, IDUser, newGroupMembers } = payload;
+      const conversation = await Conversation.findOne({
+        idConversation: IDConversation,
       });
-      return;
-    }
-
-    // Check permission
-    if (
-      !(
-        conversation.rules.IDOwner === IDUser ||
-        conversation.rules.listIDCoOwner.includes(IDUser)
-      )
-    ) {
-      socket.emit("message_from_server", {
-        success: false,
-        message: "Chỉ có trưởng nhóm hoặc phó nhóm mới quyền thêm thành viên!",
-      });
-      return;
-    }
-
-    // Kiểm tra xem người dùng đã có trong nhóm chưa
-    const existingMembers = conversation.groupMembers || [];
-    const newMembers = newGroupMembers.filter(
-      (member) => !existingMembers.includes(member)
-    );
-    if (newMembers.length === 0) {
-      socket.emit("message_from_server", {
-        success: false,
-        message: "Người dùng đã có trong nhóm!",
-      });
-      return;
-    }
-
-    // Cập nhật danh sách thành viên
-    conversation.groupMembers.push(...newMembers);
-
-    const updatedConversation = await conversationController.updateConversation(
-      conversation
-    );
-    
-    // Tạo thông báo hệ thống
-    const currentUser = await User.findOne({ id: IDUser }).select("fullname");
-    const newMembersInfo = await Promise.all(
-      newMembers.map(async (memberId) => {
-        const userInfo = await User.findOne({ id: memberId }).select("fullname");
-        return userInfo ? userInfo.fullname : "Unknown User";
-      })
-    );
-    
-    const systemMessage = await MessageDetail.create({
-      idMessage: uuidv4(),
-      idSender: "system",
-      idConversation: IDConversation,
-      type: "text",
-      content: `${currentUser ? currentUser.fullname : IDUser} đã thêm ${newMembersInfo.join(", ")} vào nhóm`,
-      dateTime: new Date().toISOString(),
-      isRead: false,
-    });
-    
-    // Cập nhật lastChange và idNewestMessage
-    await updateLastChangeConversation(IDConversation, systemMessage.idMessage);
-
-    const dataNewMembers = await Promise.all(
-      newMembers.map(async (member) => {
-        const userInfo = await User.findOne({ id: member }).select(
-          "id fullname urlavatar phone status"
-        );
-        return {
-          id: member,
-          fullname: userInfo ? userInfo.fullname : "Unknown User",
-          urlavatar: userInfo ? userInfo.urlavatar : null,
-          phone: userInfo ? userInfo.phone : null,
-          status: userInfo ? userInfo.status : "offline",
-        };
-      })
-    );
-
-    [...existingMembers, ...newMembers].forEach(async (memberId) => {
-      const userSocket = getUser(memberId);
-      if (userSocket?.socketId) {
-        io.to(userSocket.socketId).emit("receive_message", {
-          conversationId: IDConversation,
-          message: systemMessage
+      if (!conversation) {
+        socket.emit("message_from_server", {
+          success: false,
+          message: "Cuộc trò chuyện không tồn tại!"
         });
+        return;
       }
-    });
-    // Gửi thông báo cho các thành viên mới
-    newMembers.forEach(async (member) => {
-      const userSocket = getUser(member);
-      if (userSocket?.socketId) {
-        io.to(userSocket.socketId).emit("new_group_conversation", {
-          success: true,
-          conversation: updatedConversation,
-          message: "Bạn đã được thêm vào nhóm",
-          members: dataNewMembers,
-          systemMessage
+  
+      // Check permission
+      if (
+        !(
+          conversation.rules.IDOwner === IDUser ||
+          conversation.rules.listIDCoOwner.includes(IDUser)
+        )
+      ) {
+        socket.emit("message_from_server", {
+          success: false,
+          message: "Chỉ có trưởng nhóm hoặc phó nhóm mới quyền thêm thành viên!",
         });
+        return;
       }
-    });
+  
+      // Kiểm tra xem người dùng đã có trong nhóm chưa
+      const existingMembers = conversation.groupMembers || [];
+      const newMembers = newGroupMembers.filter(
+        (member) => !existingMembers.includes(member)
+      );
+      if (newMembers.length === 0) {
+        socket.emit("message_from_server", {
+          success: false,
+          message: "Người dùng đã có trong nhóm!",
+        });
+        return;
+      }
+  
+      // Cập nhật danh sách thành viên
+      conversation.groupMembers.push(...newMembers);
+  
+      const updatedConversation = await conversationController.updateConversation(
+        conversation
+      );
+      
+      // Tạo thông báo hệ thống
+      const currentUser = await User.findOne({ id: IDUser }).select("fullname");
+      const newMembersInfo = await Promise.all(
+        newMembers.map(async (memberId) => {
+          const userInfo = await User.findOne({ id: memberId }).select("fullname");
+          return userInfo ? userInfo.fullname : "Unknown User";
+        })
+      );
+      
+      const systemMessage = await MessageDetail.create({
+        idMessage: uuidv4(),
+        idSender: "system",
+        idConversation: IDConversation,
+        type: "text",
+        content: `${currentUser ? currentUser.fullname : IDUser} đã thêm ${newMembersInfo.join(", ")} vào nhóm`,
+        dateTime: new Date().toISOString(),
+        isRead: false,
+      });
+      
+      // Cập nhật lastChange và idNewestMessage
+      await updateLastChangeConversation(IDConversation, systemMessage.idMessage);
+  
+      const dataNewMembers = await Promise.all(
+        newMembers.map(async (member) => {
+          const userInfo = await User.findOne({ id: member }).select(
+            "id fullname urlavatar phone status"
+          );
+          return {
+            id: member,
+            fullname: userInfo ? userInfo.fullname : "Unknown User",
+            urlavatar: userInfo ? userInfo.urlavatar : null,
+            phone: userInfo ? userInfo.phone : null,
+            status: userInfo ? userInfo.status : "offline",
+          };
+        })
+      );
+  
+      [...existingMembers, ...newMembers].forEach(async (memberId) => {
+        const userSocket = getUser(memberId);
+        if (userSocket?.socketId) {
+          io.to(userSocket.socketId).emit("receive_message", {
+            conversationId: IDConversation,
+            message: systemMessage
+          });
+        }
+      });
+      // Gửi thông báo cho các thành viên mới
+      newMembers.forEach(async (member) => {
 
-    // Gửi thông báo cho các thành viên hiện có (trừ người thêm)
-    existingMembers.forEach(async (member) => {
-      if (member !== IDUser) { // Không gửi cho người thêm thành viên
         const userSocket = getUser(member);
         if (userSocket?.socketId) {
           io.to(userSocket.socketId).emit("new_group_conversation", {
             success: true,
             conversation: updatedConversation,
-            message: `${newMembersInfo.join(", ")} đã được thêm vào nhóm`,
+
+            message: "Bạn đã được thêm vào nhóm",
+            members: dataNewMembers,
             systemMessage
           });
         }
-      }
+      });
+  
+      // Gửi thông báo cho các thành viên hiện có (trừ người thêm)
+      existingMembers.forEach(async (member) => {
+        if (member !== IDUser) { // Không gửi cho người thêm thành viên
+          const userSocket = getUser(member);
+          if (userSocket?.socketId) {
+            io.to(userSocket.socketId).emit("new_group_conversation", {
+              success: true,
+              conversation: updatedConversation,
+              message: `${newMembersInfo.join(", ")} đã được thêm vào nhóm`,
+              systemMessage
+            });
+          }
+        }
+      });
+      
+      // Gửi thông báo cho người thêm thành viên
+      socket.emit("message_from_server", {
+        success: true,
+        message: "Thêm thành viên thành công",
+        conversation: updatedConversation,
+        systemMessage
+      });
     });
-    
-    // Gửi thông báo cho người thêm thành viên
-    socket.emit("message_from_server", {
-      success: true,
-      message: "Thêm thành viên thành công",
-      conversation: updatedConversation,
-      systemMessage
-    });
-  });
-};
+  };
+  
 
 const handleRemoveMemberFromGroup = async (io, socket) => {
   socket.on("remove_member_from_group", async (payload) => {
@@ -1525,10 +1623,114 @@ const handleLoadMemberOfGroup = async (io, socket) => {
 };
 
 const handleChangeOwnerGroup = async (io, socket) => {
-  socket.on("change_owner_group", async (payload) => {
-    const { IDConversation, IDUser, IDNewOwner } = payload;
-    const conversation = await Conversation.findOne({
-      idConversation: IDConversation,
+
+    socket.on("change_owner_group", async (payload) => {
+        const { IDConversation, IDUser, IDNewOwner } = payload;
+        const conversation = await Conversation.findOne({ idConversation: IDConversation });
+
+        if (!conversation) {
+            socket.emit("message_from_server", 
+                {
+                    success: false,
+                    message: "Cuộc trò chuyện không tồn tại!",
+                }
+            );
+            return;
+        }
+
+        // Check permission
+        if (!(conversation.rules.IDOwner === IDUser)) {
+            socket.emit(
+                "message_from_server",
+                {
+                    success: false,
+                    message: "Chỉ có trưởng nhóm mới quyền thay đổi chủ nhóm!",
+                }
+            );
+            return;
+        }
+
+        // Kiểm tra xem người mới có trong danh sách thành viên không
+        if (!conversation.groupMembers.includes(IDNewOwner)) {
+            socket.emit("message_from_server",
+                {
+                    success: false,
+                    message: "Người này không có trong danh sách thành viên nhóm!",
+                }
+            );
+            return;
+        }
+
+        // Cập nhật chủ nhóm mới
+        conversation.rules.IDOwner = IDNewOwner;
+        conversation.idSender = IDNewOwner;
+        conversation.groupMembers = [
+            IDNewOwner,
+            ...conversation.groupMembers.filter(member => member !== IDNewOwner)
+        ]; // Đưa chủ nhóm mới lên đầu danh sách thành viên
+        
+        if (conversation.rules.listIDCoOwner) {
+            conversation.rules.listIDCoOwner = conversation.rules.listIDCoOwner.filter(coOwner => coOwner !== IDNewOwner);
+        }
+        
+        const updatedConversation = await conversationController.updateConversation(conversation);
+
+        await updateLastChangeConversation(IDConversation, updatedConversation.idNewestMessage);
+
+        const user = await User.findOne({ id: IDUser }).select('fullname');
+        const newOwner = await User.findOne({ id: IDNewOwner }).select('fullname');
+        const systemMessage = await MessageDetail.create({
+            idMessage: uuidv4(),
+            idSender: "system",
+            idConversation: IDConversation,
+            type: "system",
+            content: `${user?.fullname || IDUser} đã chuyển quyền chủ nhóm cho ${newOwner?.fullname || IDNewOwner}`,
+            dateTime: new Date().toISOString(),
+            isRead: false
+        });
+        // Cập nhật lastChange và idNewestMessage
+        await updateLastChangeConversation(
+            IDConversation,
+            systemMessage.idMessage
+        );
+
+        // Thông báo cho người thực hiện thay đổi
+        socket.emit("message_from_server",
+            {
+                success: true,
+                message: "Thay đổi chủ nhóm thành công",
+                conversation: updatedConversation
+            }
+        );
+
+        // Thông báo cho người mới
+        const newOwnerSocket = getUser(IDNewOwner);
+        if (newOwnerSocket) {
+            io.to(newOwnerSocket.socketId).emit(
+                "new_group_owner_noti",
+                {
+                    success: true,
+                    conversation: updatedConversation,
+                    message: `Bạn đã trở thành chủ nhóm ${conversation.groupName}`,
+                }
+            );
+        }
+
+        // Thông báo cho các thành viên còn lại
+        conversation.groupMembers.forEach(member => {
+            if (member !== IDUser) {
+                const userSocket = getUser(member);
+                if (userSocket) {
+                    io.to(userSocket.socketId).emit("member_removed_notification", {
+                        success: true,
+                        conversationId: IDConversation,
+                        systemMessage,
+                        message: `${user?.fullname || IDUser} đã chuyển quyền chủ nhóm cho ${newOwner?.fullname || IDNewOwner}`
+                    });
+                }
+            }
+        });
+
     });
 
     if (!conversation) {
@@ -1733,140 +1935,272 @@ const handleSendGroupMessage = (io, socket) => {
 };
 
 // Thêm vào socketController.js
+// const handleUpdateGroupInfo = (io, socket) => {
+//     socket.on("update_group_info", async (payload) => {
+//         try {
+//             const { IDConversation, IDUser, groupName, groupAvatar } = payload;
+            
+//             // Kiểm tra quyền người dùng
+//             const conversation = await Conversation.findOne({
+//                 idConversation: IDConversation,
+//                 isGroup: true
+//             });
+            
+//             if (!conversation) {
+//                 socket.emit("update_group_info_response", {
+//                     success: false,
+//                     message: "Không tìm thấy nhóm chat"
+//                 });
+//                 return;
+//             }
+            
+//             // Chỉ trưởng nhóm và phó nhóm mới có quyền cập nhật
+//             const isOwner = conversation.rules.IDOwner === IDUser;
+//             const isCoOwner = conversation.rules.listIDCoOwner.includes(IDUser);
+            
+//             if (!isOwner && !isCoOwner) {
+//                 socket.emit("update_group_info_response", {
+//                     success: false,
+//                     message: "Bạn không có quyền cập nhật thông tin nhóm"
+//                 });
+//                 return;
+//             }
+            
+//             // Xử lý upload avatar mới nếu có
+//             let avatarUrl = conversation.groupAvatar;
+//             if (groupAvatar && groupAvatar.startsWith('data:')) {
+//                 // Xử lý base64 image
+//                 const base64Data = groupAvatar.replace(/^data:image\/\w+;base64,/, '');
+//                 const buffer = Buffer.from(base64Data, 'base64');
+                
+//                 // Upload lên S3
+//                 const params = {
+//                     Bucket: process.env.AWS_BUCKET_NAME,
+//                     Key: `group-avatars/${uuidv4()}.jpg`,
+//                     Body: buffer,
+//                     ContentType: 'image/jpeg'
+//                 };
+                
+//                 const uploadResult = await s3.upload(params).promise();
+//                 avatarUrl = uploadResult.Location;
+//             }
+            
+//             // Tạo object chứa các update
+//             const updates = {};
+//             if (groupName && groupName.trim() !== '') {
+//                 updates.groupName = groupName.trim();
+//             }
+//             if (avatarUrl && avatarUrl !== conversation.groupAvatar) {
+//                 updates.groupAvatar = avatarUrl;
+//             }
+            
+//             if (Object.keys(updates).length === 0) {
+//                 socket.emit("update_group_info_response", {
+//                     success: false,
+//                     message: "Không có thông tin nào được cập nhật"
+//                 });
+//                 return;
+//             }
+            
+//             // Thêm lastChange vào updates
+//             updates.lastChange = moment.tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DDTHH:mm:ss.SSS');
+            
+//             // Cập nhật thông tin nhóm
+//             await Conversation.updateMany(
+//                 { idConversation: IDConversation },
+//                 { $set: updates }
+//             );
+            
+//             // Tạo thông báo hệ thống
+//             const user = await User.findOne({ id: IDUser }).select('fullname');
+//             const changes = [];
+            
+//             if (updates.groupName) {
+//                 changes.push(`tên nhóm thành "${updates.groupName}"`);
+//             }
+//             if (updates.groupAvatar && updates.groupAvatar !== conversation.groupAvatar) {
+//                 changes.push("ảnh đại diện nhóm");
+//             }
+            
+//             const systemMessage = await MessageDetail.create({
+//                 idMessage: uuidv4(),
+//                 idSender: "system",
+//                 idConversation: IDConversation,
+//                 type: "system",
+//                 content: `${user.fullname || IDUser} đã cập nhật ${changes.join(" và ")}`,
+//                 dateTime: new Date().toISOString(),
+//                 isRead: false
+//             });
+            
+//             // Cập nhật lastChange và idNewestMessage
+//             await updateLastChangeConversation(
+//                 IDConversation,
+//                 systemMessage.idMessage
+//             );
+            
+//             // Thông báo cho người cập nhật
+//             socket.emit("update_group_info_response", {
+//                 success: true,
+//                 message: "Cập nhật thông tin nhóm thành công",
+//                 updates: {
+//                     ...updates,
+//                     lastChange: undefined // Không cần trả về lastChange
+//                 }
+//             });
+            
+//             // Thông báo cho tất cả thành viên trong nhóm
+//             conversation.groupMembers.forEach(member => {
+//                 if (member !== IDUser) {
+//                     const memberSocket = getUser(member);
+//                     if (memberSocket) {
+//                         io.to(memberSocket.socketId).emit("group_info_updated", {
+//                             conversationId: IDConversation,
+//                             updates: {
+//                                 ...updates,
+//                                 lastChange: undefined
+//                             },
+//                             message: systemMessage
+//                         });
+//                     }
+//                 }
+//             });
+            
+//         } catch (error) {
+//             console.error("Error updating group info:", error);
+//             socket.emit("update_group_info_response", {
+//                 success: false,
+//                 message: "Lỗi khi cập nhật thông tin nhóm",
+//                 error: error.message
+//             });
+//         }
+//     });
+// };
 const handleUpdateGroupInfo = (io, socket) => {
-  socket.on("update_group_info", async (payload) => {
-    try {
-      const { IDConversation, IDUser, groupName, groupAvatar } = payload;
 
-      // Kiểm tra quyền người dùng
-      const conversation = await Conversation.findOne({
-        idConversation: IDConversation,
-        isGroup: true,
-      });
+    socket.on("update_group_info", async (payload) => {
+        try {
+            const { IDConversation, IDUser, groupName, groupAvatarUrl } = payload;
 
-      if (!conversation) {
-        socket.emit("update_group_info_response", {
-          success: false,
-          message: "Không tìm thấy nhóm chat",
-        });
-        return;
-      }
-
-      // Chỉ trưởng nhóm và phó nhóm mới có quyền cập nhật
-      const isOwner = conversation.rules.IDOwner === IDUser;
-      const isCoOwner = conversation.rules.listIDCoOwner.includes(IDUser);
-
-      if (!isOwner && !isCoOwner) {
-        socket.emit("update_group_info_response", {
-          success: false,
-          message: "Bạn không có quyền cập nhật thông tin nhóm",
-        });
-        return;
-      }
-
-      // Xử lý upload avatar mới nếu có
-      let avatarUrl = conversation.groupAvatar;
-      if (groupAvatar && groupAvatar.startsWith("data:")) {
-        // Xử lý base64 image
-        const base64Data = groupAvatar.replace(/^data:image\/\w+;base64,/, "");
-        const buffer = Buffer.from(base64Data, "base64");
-
-        // Upload lên S3
-        const params = {
-          Bucket: process.env.AWS_BUCKET_NAME,
-          Key: `group-avatars/${uuidv4()}.jpg`,
-          Body: buffer,
-          ContentType: "image/jpeg",
-        };
-
-        const uploadResult = await s3.upload(params).promise();
-        avatarUrl = uploadResult.Location;
-      }
-
-      // Tạo object chứa các update
-      const updates = {};
-      if (groupName && groupName.trim() !== "") {
-        updates.groupName = groupName.trim();
-      }
-      if (avatarUrl && avatarUrl !== conversation.groupAvatar) {
-        updates.groupAvatar = avatarUrl;
-      }
-
-      if (Object.keys(updates).length === 0) {
-        socket.emit("update_group_info_response", {
-          success: false,
-          message: "Không có thông tin nào được cập nhật",
-        });
-        return;
-      }
-
-      // Thêm lastChange vào updates
-      updates.lastChange = moment
-        .tz("Asia/Ho_Chi_Minh")
-        .format("YYYY-MM-DDTHH:mm:ss.SSS");
-
-      // Cập nhật thông tin nhóm
-      await Conversation.updateMany(
-        { idConversation: IDConversation },
-        { $set: updates }
-      );
-
-      // Tạo thông báo hệ thống
-      const user = await User.findOne({ id: IDUser }).select("fullname");
-      const changes = [];
-
-      if (updates.groupName) {
-        changes.push(`tên nhóm thành "${updates.groupName}"`);
-      }
-      if (
-        updates.groupAvatar &&
-        updates.groupAvatar !== conversation.groupAvatar
-      ) {
-        changes.push("ảnh đại diện nhóm");
-      }
-
-      const systemMessage = await MessageDetail.create({
-        idMessage: uuidv4(),
-        idSender: "system",
-        idConversation: IDConversation,
-        type: "system",
-        content: `${user.fullname || IDUser} đã cập nhật ${changes.join(
-          " và "
-        )}`,
-        dateTime: new Date().toISOString(),
-        isRead: false,
-      });
-
-      // Cập nhật lastChange và idNewestMessage
-      await updateLastChangeConversation(
-        IDConversation,
-        systemMessage.idMessage
-      );
-
-      // Thông báo cho người cập nhật
-      socket.emit("update_group_info_response", {
-        success: true,
-        message: "Cập nhật thông tin nhóm thành công",
-        updates: {
-          ...updates,
-          lastChange: undefined, // Không cần trả về lastChange
-        },
-      });
-
-      // Thông báo cho tất cả thành viên trong nhóm
-      conversation.groupMembers.forEach((member) => {
-        if (member !== IDUser) {
-          const memberSocket = getUser(member);
-          if (memberSocket) {
-            io.to(memberSocket.socketId).emit("group_info_updated", {
-              conversationId: IDConversation,
-              updates: {
-                ...updates,
-                lastChange: undefined,
-              },
-              message: systemMessage,
+            // Kiểm tra quyền người dùng
+            const conversation = await Conversation.findOne({
+                idConversation: IDConversation,
+                isGroup: true,
             });
-          }
+
+            if (!conversation) {
+                socket.emit("update_group_info_response", {
+                    success: false,
+                    message: "Không tìm thấy nhóm chat",
+                });
+                return;
+            }
+
+            // Chỉ trưởng nhóm và phó nhóm mới có quyền cập nhật
+            const isOwner = conversation.rules.IDOwner === IDUser;
+            const isCoOwner = conversation.rules.listIDCoOwner.includes(IDUser);
+
+            if (!isOwner && !isCoOwner) {
+                socket.emit("update_group_info_response", {
+                    success: false,
+                    message: "Bạn không có quyền cập nhật thông tin nhóm",
+                });
+                return;
+            }
+
+            // Tạo object chứa các update
+            const updates = {};
+            if (groupName && groupName.trim() !== "") {
+                updates.groupName = groupName.trim();
+            }
+            if (groupAvatarUrl && groupAvatarUrl !== conversation.groupAvatar) {
+                updates.groupAvatar = groupAvatarUrl;
+            }
+
+            if (Object.keys(updates).length === 0) {
+                socket.emit("update_group_info_response", {
+                    success: false,
+                    message: "Không có thông tin nào được cập nhật",
+                });
+                return;
+            }
+
+            // Thêm lastChange vào updates
+            updates.lastChange = moment
+                .tz("Asia/Ho_Chi_Minh")
+                .format("YYYY-MM-DDTHH:mm:ss.SSS");
+
+            // Cập nhật thông tin nhóm
+            await Conversation.updateMany(
+                { idConversation: IDConversation },
+                { $set: updates }
+            );
+
+            // Tạo thông báo hệ thống
+            const user = await User.findOne({ id: IDUser }).select("fullname");
+            const changes = [];
+
+            if (updates.groupName) {
+                changes.push(`tên nhóm thành "${updates.groupName}"`);
+            }
+            if (
+                updates.groupAvatar &&
+                updates.groupAvatar !== conversation.groupAvatar
+            ) {
+                changes.push("ảnh đại diện nhóm");
+            }
+
+            const systemMessage = await MessageDetail.create({
+                idMessage: uuidv4(),
+                idSender: "system",
+                idConversation: IDConversation,
+                type: "system",
+                content: `${user.fullname || IDUser} đã cập nhật ${changes.join(
+                    " và "
+                )}`,
+                dateTime: new Date().toISOString(),
+                isRead: false,
+            });
+
+            // Cập nhật lastChange và idNewestMessage
+            await updateLastChangeConversation(
+                IDConversation,
+                systemMessage.idMessage
+            );
+
+            // Thông báo cho người cập nhật
+            socket.emit("update_group_info_response", {
+                success: true,
+                message: "Cập nhật thông tin nhóm thành công",
+                updates: {
+                    ...updates,
+                    lastChange: undefined, // Không cần trả về lastChange
+                },
+            });
+
+            // Thông báo cho tất cả thành viên trong nhóm
+            conversation.groupMembers.forEach((member) => {
+                if (member !== IDUser) {
+                    const memberSocket = getUser(member);
+                    if (memberSocket) {
+                        io.to(memberSocket.socketId).emit("group_info_updated", {
+                            conversationId: IDConversation,
+                            updates: {
+                                ...updates,
+                                lastChange: undefined,
+                            },
+                            message: systemMessage,
+                        });
+                    }
+                }
+            });
+        } catch (error) {
+            console.error("Error updating group info:", error);
+            socket.emit("update_group_info_response", {
+                success: false,
+                message: "Lỗi khi cập nhật thông tin nhóm",
+                error: error.message,
+            });
+
         }
       });
     } catch (error) {

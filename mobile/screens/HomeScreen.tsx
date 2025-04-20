@@ -10,15 +10,18 @@ import {
   RefreshControl,
   Image,
   TextInput,
-  Alert
+  Alert,
+  Modal,
+  FlatList
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import FooterComponent from '../components/FooterComponent';
 import io from 'socket.io-client';
 import SocketService from '../services/SocketService';
+import SearchUserScreen from './SearchUserScreen';
 
 // Socket.IO server URL
-const SOCKET_URL = 'http://192.168.1.9:3000';
+const SOCKET_URL = 'http://192.168.0.103:3000';
 
 // Global state for persisting conversations between screen navigations
 if (!global.socketInstance) {
@@ -46,7 +49,25 @@ interface ConversationItem {
   idNewestMessage?: string;
   rules: {
     listIDCoOwner: string[];
+    IDOwner?: string;
   };
+  // Additional properties for UI
+  latestMessage?: {
+    content: string;
+    dateTime: string;
+    isRead: boolean;
+    isRecall: boolean;
+    type?: string;
+    idSender?: string;
+  };
+  unreadCount?: number;
+  otherUser?: {
+    id?: string;
+    fullname?: string;
+    urlavatar?: string;
+  };
+  groupName?: string;
+  groupAvatar?: string;
 }
 
 // Interface for unread messages
@@ -117,6 +138,7 @@ const avatarPlaceholders = [
 
 type HomeScreenProps = {
   navigation?: any;
+  route?: any;
 };
 
 interface ChatItem {
@@ -143,6 +165,13 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
   // Get user data from route params or SocketService if route params are not available
   const [userData, setUserData] = useState(route?.params?.user);
   const [userId, setUserId] = useState(route?.params?.user?.id);
+  
+  // Group chat creation modal state
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [selectedMembers, setSelectedMembers] = useState<SearchUserResult[]>([]);
+  const [friendsList, setFriendsList] = useState<SearchUserResult[]>([]);
+  const [isFetchingFriends, setIsFetchingFriends] = useState(false);
 
   // Load user data from SocketService if not available in route params
   useEffect(() => {
@@ -163,6 +192,96 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
 
     loadUser();
   }, []);
+  
+  // Function to fetch friends list for group creation
+  const fetchFriendsList = async () => {
+    try {
+      setIsFetchingFriends(true);
+      
+      // Get authentication token
+      const authService = require('../services/AuthService').default.getInstance();
+      const token = await authService.getAccessToken();
+      
+      if (!token) {
+        console.error('No access token available');
+        Alert.alert('Error', 'Please log in again');
+        setIsFetchingFriends(false);
+        return;
+      }
+      
+    // Call the API to get friends list
+      const response = await fetch(`${SOCKET_URL}/user/friend/get-friends`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (result.code === 0 && result.data) {
+        console.log('Friends list received:', result.data.length);
+        setFriendsList(result.data);
+      } else {
+        console.log('Failed to get friends list:', result.message);
+        setFriendsList([]);
+      }
+    } catch (error) {
+      console.error('Error fetching friends:', error);
+      Alert.alert('Error', 'Failed to fetch friends list');
+    } finally {
+      setIsFetchingFriends(false);
+    }
+  };
+  
+  // Function to toggle member selection for group
+  const toggleMemberSelection = (friend: SearchUserResult) => {
+    setSelectedMembers(prevSelected => {
+      const isAlreadySelected = prevSelected.some(item => item.id === friend.id);
+      
+      if (isAlreadySelected) {
+        return prevSelected.filter(item => item.id !== friend.id);
+      } else {
+        return [...prevSelected, friend];
+      }
+    });
+  };
+    // Function to create a group conversation
+  const createGroupConversation = () => {
+    if (!socket || !userId) {
+      Alert.alert('Lỗi', 'Không thể kết nối với máy chủ chat');
+      return;
+    }
+    
+    if (groupName.trim() === '') {
+      Alert.alert('Lỗi', 'Vui lòng nhập tên nhóm');
+      return;
+    }
+    
+    // Nhóm phải có ít nhất 2 thành viên được chọn (tổng cộng 3 người khi tính cả người tạo)
+    if (selectedMembers.length < 2) {
+      Alert.alert('Lỗi', 'Vui lòng chọn ít nhất 2 thành viên để tạo nhóm (tổng cộng 3 người khi tính cả bạn)');
+      return;
+    }
+    
+    // Emit group creation event
+    const memberIds = selectedMembers.map(member => member.id);
+    
+    console.log(`Đang tạo nhóm trò chuyện "${groupName}" với các thành viên:`, memberIds);
+    console.log(`Người tạo nhóm: ${userId}`);
+    
+    socket.emit('create_group_conversation', {
+      IDOwner: userId,
+      groupName: groupName.trim(),
+      groupMembers: memberIds
+    });
+    
+    // Reset state and close modal
+    setGroupName('');
+    setSelectedMembers([]);
+    setShowGroupModal(false);
+  };
 
   // Handle search input with debounce of 3 seconds
   const handleSearchInput = (text: string) => {
@@ -271,10 +390,27 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
 
     // Add event listener for create_conversation_response
     socket.on('create_conversation_response', handleCreateConversationResponse);
+    
+    // Add event listener for group conversation creation response
+    const handleGroupCreateResponse = (data: any) => {
+      console.log('Group creation response:', data);
+      
+      if (data.success) {
+        Alert.alert('Thành công', 'Đã tạo nhóm trò chuyện mới');
+        
+        // Reload conversations to show the new group
+        socket.emit('load_conversations', { IDUser: userId });
+      } else {
+        Alert.alert('Lỗi', data.message || 'Không thể tạo nhóm trò chuyện');
+      }
+    };
+    
+    socket.on('create_group_conversation_response', handleGroupCreateResponse);
 
     // Cleanup
     return () => {
       socket.off('create_conversation_response', handleCreateConversationResponse);
+      socket.off('create_group_conversation_response', handleGroupCreateResponse);
     };
   }, [socket, userId, navigation]);
 
@@ -285,7 +421,6 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
       setConversations(global.conversations);
     }
   }, []);
-
   // Add focus listener to refresh data when coming back to this screen
   useEffect(() => {
     // Function to run when the screen comes into focus
@@ -345,9 +480,9 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
   }, [userId]);
 
   // Setup all socket event listeners
-  const setupSocketListeners = (socketInstance) => {
-    // Remove any existing listeners to avoid duplicates
+  const setupSocketListeners = (socketInstance) => {    // Remove any existing listeners to avoid duplicates
     socketInstance.off('load_conversations_response');
+    socketInstance.off('load_group_conversations_response');
     socketInstance.off('connect_error');
     socketInstance.off('connection_success');
     socketInstance.off('unread_messages');
@@ -362,12 +497,18 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
     }) => {
 
       if (data && data.Items && data.Items.length > 0) {
-        setConversations(data.Items);
-        // Save to global state
-        global.conversations = data.Items;
+        // Store personal conversations
+        const personalConversations = data.Items;
+        
+        // Now request group conversations
+        socketInstance.emit('load_group_conversations', { IDUser: userId });
+        
+        setConversations(personalConversations);
+        // Save to global state (will be updated again when group conversations arrive)
+        global.conversations = personalConversations;
 
         // Extract user IDs from conversations to check their online status
-        const userIds = data.Items.map((conversation) => {
+        const userIds = personalConversations.map((conversation) => {
           // Get the other user's ID (not the current user)
           return conversation.idSender === userId
             ? conversation.idReceiver
@@ -379,6 +520,47 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
           console.log('Checking status for users:', userIds);
           socketInstance.emit('check_users_status', { userIds });
         }
+      }
+    };
+      // Function to handle received group conversations
+    const handleGroupConversationsResponse = (data: {
+      Items: any[],
+      LastEvaluatedKey: any,
+      total: number
+    }) => {
+      console.log('Group conversations received:', data.Items?.length || 0);
+      
+      if (data && data.Items && data.Items.length > 0) {
+        // Merge group conversations with existing conversations
+        setConversations(prevConversations => {
+          // Create a map of existing conversations by idConversation for easy lookup
+          const existingConversationsMap = new Map();
+          prevConversations.forEach(conv => {
+            existingConversationsMap.set(conv.idConversation, conv);
+          });
+          
+          // Filter out duplicates from new group conversations
+          const newGroupConversations = data.Items.filter(groupConv => 
+            !existingConversationsMap.has(groupConv.idConversation)
+          );
+          
+          console.log(`Adding ${newGroupConversations.length} unique group conversations`);
+          
+          // Only add unique conversations
+          const updatedConversations = [...prevConversations, ...newGroupConversations];
+          
+          // Sort by lastChange (most recent first)
+          updatedConversations.sort((a, b) => {
+            const dateA = new Date(a.lastChange);
+            const dateB = new Date(b.lastChange);
+            return dateB.getTime() - dateA.getTime();
+          });
+          
+          // Update global state
+          global.conversations = updatedConversations;
+          
+          return updatedConversations;
+        });
       }
     };
 
@@ -455,10 +637,9 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
 
         return updatedConversations;
       });
-    };
-
-    // Add all the event listeners
+    };    // Add all the event listeners
     socketInstance.on('load_conversations_response', handleConversationsResponse);
+    socketInstance.on('load_group_conversations_response', handleGroupConversationsResponse);
     socketInstance.on('connection_success', handleConnectionSuccess);
     socketInstance.on('unread_messages', handleUnreadMessages);
     socketInstance.on('users_status', handleUsersStatus);
@@ -496,12 +677,42 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
   // No more hardcoded chat data - we'll use only data from Socket.IO
   const handleChatPress = (conversationId: string) => {
     const selectedConversation = conversations.find(conversation => conversation.idConversation === conversationId);
-    navigation?.navigate('ChatScreen', { conversationId: selectedConversation?.idConversation });
+    
+    if (!selectedConversation) return;
+
+    if (selectedConversation.isGroup) {
+      // Navigate to GroupChatScreen for group conversations
+      navigation?.navigate('GroupChatScreen', { 
+        conversationId: selectedConversation?.idConversation,
+        idConversation: selectedConversation?.idConversation,
+        groupInfo: {
+          name: selectedConversation?.groupName || 'Group Chat',
+          avatar: selectedConversation?.groupAvatar,
+          members: selectedConversation?.groupMembers,
+          rules: selectedConversation?.rules
+        }
+      });
+    } else {
+      // Navigate to regular ChatScreen for 1-on-1 conversations
+      navigation?.navigate('ChatScreen', { 
+        conversationId: selectedConversation?.idConversation,
+        idConversation: selectedConversation?.idConversation,
+        idSender: selectedConversation?.idSender,
+        idReceiver: selectedConversation?.idReceiver,
+        chatItem: {
+          name: selectedConversation.otherUser?.fullname || 'Chat',
+          avatar: selectedConversation.otherUser?.urlavatar || null
+        }
+      });
+    }
   };
 
   const handleTabPress = (tabName: string) => {
     if (tabName === 'profile') {
       navigation?.navigate('InfoScreen');
+    }
+    if (tabName === 'contacts') {
+      navigation?.navigate('SearchUserScreen');
     }
   };  // Function to handle pull-to-refresh
   const onRefresh = async () => {
@@ -545,9 +756,10 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
       }
     }
 
-    if (socketToUse && currentUserId) {
-      // Request fresh conversations data
+    if (socketToUse && currentUserId) {      // Request fresh conversations data
       socketToUse.emit('load_conversations', { IDUser: currentUserId });
+      // Also request fresh group conversations
+      socketToUse.emit('load_group_conversations', { IDUser: currentUserId });
 
       // Get user IDs from current conversations to check their status
       const userIds = conversations.map((conversation) => {
@@ -592,6 +804,15 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
             </View>
           )}
         </View>
+        <TouchableOpacity
+          style={styles.headerIconButton}
+          onPress={() => {
+            setShowGroupModal(true);
+            fetchFriendsList();
+          }}
+        >
+          <Ionicons name="people-outline" size={20} color="rgba(242, 228, 228, 0.7)" />
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.headerIconButton}
           onPress={() => navigation.navigate('SearchUserScreen')}
@@ -645,12 +866,12 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
         {/* Conversations Section */}
         <Text style={styles.sectionTitle}>Cuộc trò chuyện</Text>
         {conversations.length > 0 ? (
-          conversations.map((conversation) => {
-            // Xác định người nhận là ai (nếu người đang đăng nhập là sender thì lấy receiver, ngược lại)
+          conversations.map((conversation) => {            // Xác định tên hiển thị cho cuộc trò chuyện
             const otherUserInfo = conversation.otherUser || {};
-            const chatName = otherUserInfo.fullname ||
-              (conversation.isGroup ? `Nhóm ${conversation.idConversation.substring(0, 8)}` :
-                (conversation.idSender === userId ? conversation.idReceiver : conversation.idSender));
+            const chatName = conversation.isGroup 
+              ? conversation.groupName || `Nhóm ${conversation.idConversation.substring(0, 8)}` 
+              : (otherUserInfo.fullname || 
+                  (conversation.idSender === userId ? conversation.idReceiver : conversation.idSender));
             // Lấy tin nhắn mới nhất nếu có
             const latestMessage = conversation.latestMessage || {};
             // Format message content based on message type and sender
@@ -689,20 +910,34 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
 
             const messageTime = latestMessage.dateTime ?
               new Date(latestMessage.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) :
-              new Date(conversation.lastChange).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-            return (
+              new Date(conversation.lastChange).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });            return (
               <TouchableOpacity key={conversation._id}
                 style={styles.chatItem}
-                onPress={() => navigation?.navigate('ChatScreen', {
-                  idConversation: conversation.idConversation,
-                  idSender: conversation.idSender,
-                  idReceiver: conversation.idReceiver,
-                  chatItem: {
-                    name: chatName,
-                    avatar: otherUserInfo.avatar || null
+                onPress={() => {
+                  // Check if this is a group conversation
+                  if (conversation.isGroup) {
+                    navigation?.navigate('GroupChatScreen', {
+                      conversationId: conversation.idConversation,
+                      idConversation: conversation.idConversation,
+                      groupInfo: {
+                        name: conversation.groupName || chatName,
+                        avatar: conversation.groupAvatar,
+                        members: conversation.groupMembers || [],
+                        rules: conversation.rules || {}
+                      }
+                    });
+                  } else {
+                    navigation?.navigate('ChatScreen', {
+                      idConversation: conversation.idConversation,
+                      idSender: conversation.idSender,
+                      idReceiver: conversation.idReceiver,
+                      chatItem: {
+                        name: chatName,
+                        avatar: otherUserInfo.urlavatar || null
+                      }
+                    });
                   }
-                })}
+                }}
               >
                 <View style={styles.avatarContainer}>
                   <Image
@@ -754,6 +989,85 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
 
       {/* Footer */}
       <FooterComponent activeTab="messages" onTabPress={handleTabPress} />
+
+      {/* Group Creation Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showGroupModal}
+        onRequestClose={() => setShowGroupModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Tạo nhóm trò chuyện</Text>
+              <TouchableOpacity onPress={() => setShowGroupModal(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.groupNameInputContainer}>
+              <TextInput
+                style={styles.groupNameInput}
+                placeholder="Nhập tên nhóm"
+                value={groupName}
+                onChangeText={setGroupName}
+              />
+            </View>
+
+            <Text style={styles.sectionTitle}>Chọn thành viên</Text>
+            
+            {isFetchingFriends ? (
+              <View style={styles.loadingContainer}>
+                <Text>Đang tải danh sách bạn bè...</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={friendsList}
+                keyExtractor={(item) => item.id}
+                style={styles.friendsList}
+                renderItem={({ item }) => {
+                  const isSelected = selectedMembers.some(member => member.id === item.id);
+                  return (
+                    <TouchableOpacity 
+                      style={[styles.friendItem, isSelected && styles.friendItemSelected]} 
+                      onPress={() => toggleMemberSelection(item)}
+                    >
+                      <Image
+                        source={item.urlavatar ? { uri: item.urlavatar } : require('../assets/Welo_image.png')}
+                        style={styles.friendAvatar}
+                      />
+                      <Text style={styles.friendName}>{item.fullname}</Text>
+                      {isSelected && (
+                        <View style={styles.checkmarkContainer}>
+                          <Ionicons name="checkmark-circle" size={24} color="#1FAEEB" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
+
+            <View style={styles.selectedMembersContainer}>
+              <Text style={styles.selectedMembersText}>
+                Đã chọn: {selectedMembers.length} thành viên
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.createGroupButton,
+                (groupName.trim() === '' || selectedMembers.length === 0) && styles.disabledButton
+              ]}
+              onPress={createGroupConversation}
+              disabled={groupName.trim() === '' || selectedMembers.length === 0}
+            >
+              <Text style={styles.createGroupButtonText}>Tạo nhóm</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -956,6 +1270,102 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#645C5C',
     textAlign: 'center',
+  },
+  
+  // Group creation modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',
+    maxHeight: '80%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  groupNameInputContainer: {
+    borderWidth: 1,
+    borderColor: '#DDD',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 20,
+  },
+  groupNameInput: {
+    fontSize: 16,
+    height: 40,
+  },
+  friendsList: {
+    maxHeight: 300,
+    marginBottom: 10,
+  },
+  friendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#EFEFEF',
+  },
+  friendItemSelected: {
+    backgroundColor: 'rgba(31, 174, 235, 0.1)',
+  },
+  friendAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  friendName: {
+    flex: 1,
+    fontSize: 16,
+  },
+  checkmarkContainer: {
+    marginLeft: 10,
+  },
+  selectedMembersContainer: {
+    marginVertical: 10,
+    alignItems: 'center',
+  },
+  selectedMembersText: {
+    fontSize: 14,
+    color: '#1FAEEB',
+  },
+  createGroupButton: {
+    backgroundColor: '#1FAEEB',
+    padding: 12,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  disabledButton: {
+    backgroundColor: '#CCCCCC',
+  },
+  createGroupButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
   },
 });
 
