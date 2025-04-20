@@ -262,6 +262,8 @@ export default function ChatInfo({
       removeMembersFromGroup(activeConversation.idConversation, [
         confirmationState.memberId,
       ]);
+      setConfirmationState({ isOpen: false, memberId: "", action: "" });
+      setIsMembersModalOpen(false);
       toast.success("Đang xóa thành viên khỏi nhóm...");
     } else if (confirmationState.action === "promote") {
       // Add this section to handle promotion

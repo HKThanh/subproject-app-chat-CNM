@@ -493,7 +493,8 @@ export const useChat = (userId: string) => {
       );
 
       if (!currentConversation) {
-        console.error("Cannot find conversation in state:", updatedConversation.idConversation);
+        // is create conversation group
+        // console.error("Cannot find conversation in state:", updatedConversation.idConversation);
         return;
       }
 
@@ -563,6 +564,27 @@ export const useChat = (userId: string) => {
         });
       }
     }
+    else if (data.status === "deleted"){
+      console.log("Group deleted notification:", data);
+      if (data.conversationId) {
+        // Remove the conversation from the list
+        dispatch({
+          type: 'REMOVE_CONVERSATION',
+          payload: {
+            conversationId: data.conversationId
+          }
+        });
+  
+        // Show notification
+        if (typeof window !== 'undefined') {
+          import('sonner').then(({ toast }) => {
+            toast.info(data.message || "Nhóm đã bị xóa bởi trưởng nhóm", {
+              duration: 5000
+            });
+          });
+        }
+      }
+    }
   }, [dispatch, state.conversations]);
 
   // Handler for message_from_server event (for the user who added members)
@@ -591,7 +613,7 @@ export const useChat = (userId: string) => {
 
       // Get new member details from the response - check multiple possible properties
       const newMembersDetails = data.newMembers || data.members || [];
-      
+
       console.log("New members details:", newMembersDetails);
       console.log("Existing members details:", existingMemberDetails);
 
@@ -678,7 +700,25 @@ export const useChat = (userId: string) => {
           toast.success("Đã thêm thành viên vào nhóm");
         });
       }
-    } else if (!data.success) {
+    }
+    else if(data.success && data.message === "Nhóm đã được xóa thành công!"){
+      console.log("Group deleted notification:", data);
+        // If the group was successfully deleted, remove it from the conversations list
+        dispatch({
+          type: 'REMOVE_CONVERSATION',
+          payload: {
+            conversationId: data.conversationId || data.IDConversation
+          }
+        });
+  
+        // Show success toast
+        if (typeof window !== 'undefined') {
+          import('sonner').then(({ toast }) => {
+            toast.success(data.message || "Nhóm đã được xóa thành cônggg");
+          });
+        }
+    }
+    else if (!data.success) {
       // Show error message
       console.error("Failed to add members:", data.message);
       if (typeof window !== 'undefined') {
@@ -1147,28 +1187,28 @@ export const useChat = (userId: string) => {
   // Add handler for promotion response (for the user who initiated the promotion)
   const handlePromoteMemberResponse = useCallback((data: any) => {
     console.log("Promote member response:", data);
-    
+
     if (data.success) {
       // If we have the conversation and member data, update immediately
       if (data.conversationId && data.memberId && data.systemMessage) {
         // Find the conversation
         const conversation = conversations.find(c => c.idConversation === data.conversationId);
-        
+
         if (!conversation) {
           console.error("Cannot find conversation in state:", data.conversationId);
           return;
         }
-        
+
         // Find the member in regularMembers to get their details
         const promotedMember = conversation.regularMembers.find(
           member => member.id === data.memberId
         );
-        
+
         if (!promotedMember) {
           console.error("Cannot find promoted member in regularMembers:", data.memberId);
           return;
         }
-        
+
         // Add the system message to the conversation
         dispatch({
           type: 'ADD_MESSAGE',
@@ -1181,7 +1221,7 @@ export const useChat = (userId: string) => {
             }
           }
         });
-        
+
         // Create updated coOwners array with the new coOwner
         const updatedCoOwners = [
           ...(conversation.coOwners || []),
@@ -1191,7 +1231,7 @@ export const useChat = (userId: string) => {
             urlavatar: promotedMember.urlavatar
           }
         ];
-        
+
         // Create updated rules with the new coOwner ID
         const updatedRules = {
           ...conversation.rules,
@@ -1200,7 +1240,7 @@ export const useChat = (userId: string) => {
             data.memberId
           ]
         };
-        
+
         // Update the conversation
         dispatch({
           type: 'UPDATE_CONVERSATION',
@@ -1213,7 +1253,7 @@ export const useChat = (userId: string) => {
             }
           }
         });
-        
+
         // Update the latest message in the conversation
         dispatch({
           type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
@@ -1228,7 +1268,7 @@ export const useChat = (userId: string) => {
           }
         });
       }
-      
+
       // Show success toast
       if (typeof window !== 'undefined') {
         import('sonner').then(({ toast }) => {
@@ -1237,7 +1277,7 @@ export const useChat = (userId: string) => {
       }
     } else {
       console.error("Error promoting member:", data.message);
-      
+
       // Show error toast
       if (typeof window !== 'undefined') {
         import('sonner').then(({ toast }) => {
@@ -1316,6 +1356,58 @@ export const useChat = (userId: string) => {
       }
     }
   }, [dispatch, conversations, userId]);
+  const handleGroupDeletedResponse = useCallback((data: any) => {
+    console.log("Group deleted response:", data);
+
+    if (data.success) {
+      // If the group was successfully deleted, remove it from the conversations list
+      dispatch({
+        type: 'REMOVE_CONVERSATION',
+        payload: {
+          conversationId: data.conversationId || data.IDConversation
+        }
+      });
+
+      // Show success toast
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.success(data.message || "Nhóm đã được xóa thành cônggg");
+        });
+      }
+    } else {
+      // Show error message
+      console.error("Failed to delete group:", data.message);
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.error(data.message || "Không thể xóa nhóm");
+        });
+      }
+    }
+  }, [dispatch, conversations]);
+
+  // Add this handler for group deleted notification (for other members)
+  const handleGroupDeletedNotification = useCallback((data: any) => {
+    console.log("Group deleted notification:", data);
+
+    if (data.conversationId) {
+      // Remove the conversation from the list
+      dispatch({
+        type: 'REMOVE_CONVERSATION',
+        payload: {
+          conversationId: data.conversationId
+        }
+      });
+
+      // Show notification
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.info(data.message || "Nhóm đã bị xóa bởi trưởng nhóm", {
+            duration: 5000
+          });
+        });
+      }
+    }
+  }, [dispatch, conversations]);
   // Gộp các useEffect đăng ký sự kiện socket
   useEffect(() => {
     if (!socket) return;
@@ -1787,7 +1879,7 @@ export const useChat = (userId: string) => {
       socket.off("member_promoted", handleCurrentUserPromoted);
       socket.offAny();
     };
-  }, [socket, userId, messages, conversations, loadConversations]);
+  }, [socket, userId, messages, conversations, loadConversations, handleGroupDeletedResponse, handleGroupDeletedNotification]);
 
   // Kết nối người dùng khi socket sẵn sàng
   useEffect(() => {
