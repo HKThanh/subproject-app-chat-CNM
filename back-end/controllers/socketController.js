@@ -1500,6 +1500,7 @@ const handleDeleteGroup = async (io, socket) => {
     socket.emit("message_from_server", {
       success: true,
       message: "Nhóm đã được xóa thành công!",
+      conversationId: IDConversation,
     });
 
     groupMembers.forEach(async (member) => {
@@ -1508,6 +1509,8 @@ const handleDeleteGroup = async (io, socket) => {
         io.to(user.socketId).emit("new_group_conversation", {
           success: true,
           message: `Nhóm ${groupName} đã bị xóa`,
+          status: "deleted",
+          conversationId: IDConversation,
         });
       }
     });
