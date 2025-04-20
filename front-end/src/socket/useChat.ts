@@ -121,7 +121,8 @@ type ChatAction =
   | { type: 'FORWARD_MESSAGE_SUCCESS', payload: { results: Array<{ conversationId: string, message: Message }> } }
   | { type: 'UPDATE_CONVERSATION_LATEST_MESSAGE', payload: { conversationId: string, latestMessage: Message } }
   | { type: 'ADD_GROUP_CONVERSATION', payload: Conversation }
-  | { type: 'UPDATE_GROUP_MEMBERS', payload: { conversationId: string, members: Array<any> } };
+  | { type: 'UPDATE_GROUP_MEMBERS', payload: { conversationId: string, members: Array<any> } }
+  | { type: 'REMOVE_CONVERSATION', payload: { conversationId: string } }
   ;
 
 ;
@@ -303,6 +304,13 @@ const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
         )
       };
     }
+    case 'REMOVE_CONVERSATION':
+    return {
+      ...state,
+      conversations: state.conversations.filter(
+        conversation => conversation.idConversation !== action.payload.conversationId
+      )
+    };
     default:
       return state;
   }
@@ -918,6 +926,110 @@ export const useChat = (userId: string) => {
       // });
     }
   }, [dispatch, state.conversations]);
+    // Add this handler for leave group response
+    const handleLeaveGroupResponse = useCallback((data: any) => {
+      console.log("Leave group response:", data);
+      
+      if (data.success) {
+        // If successfully left the group, remove the conversation from state
+        dispatch({
+          type: 'REMOVE_CONVERSATION',
+          payload: {
+            conversationId: data.conversationId
+          }
+        });
+        
+        // Show success toast
+        if (typeof window !== 'undefined') {
+          import('sonner').then(({ toast }) => {
+            toast.success("Đã rời khỏi nhóm");
+          });
+        }
+      } else {
+        // Show error message
+        console.error("Failed to leave group:", data.message);
+        if (typeof window !== 'undefined') {
+          import('sonner').then(({ toast }) => {
+            toast.error(data.message || "Không thể rời khỏi nhóm");
+          });
+        }
+      }
+    }, [dispatch]);
+      // Add this handler for member left group event
+      const handleMemberLeftGroup = useCallback((data: any) => {
+        console.log("Member left group notification:", data);
+        
+        if (!data.conversationId || !data.userId || !data.message) {
+          console.error("Invalid member_left_group data:", data);
+          return;
+        }
+        
+        // Add the system message to the conversation
+        dispatch({
+          type: 'ADD_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            message: {
+              ...data.message,
+              isOwn: false,
+              type: "system"
+            }
+          }
+        });
+        
+        // Find the current conversation
+        const currentConversation = conversations.find(c => c.idConversation === data.conversationId);
+        
+        if (!currentConversation) {
+          console.error("Cannot find conversation in state:", data.conversationId);
+          return;
+        }
+        
+        // Filter out the leaving user from regularMembers
+        const updatedRegularMembers = (currentConversation.regularMembers || [])
+          .filter(member => member.id !== data.userId);
+        
+        // Filter out the leaving user from groupMembers
+        const updatedGroupMembers = (currentConversation.groupMembers || [])
+          .filter(memberId => memberId !== data.userId);
+        
+        // Filter out the leaving user from coOwners
+        const updatedCoOwners = (currentConversation.coOwners || [])
+          .filter(coOwner => coOwner.id !== data.userId);
+        
+        // Create updated rules object with the user removed from listIDCoOwner
+        const updatedRules = {
+          ...currentConversation.rules,
+          listIDCoOwner: (currentConversation.rules?.listIDCoOwner || [])
+            .filter(coOwnerId => coOwnerId !== data.userId)
+        };
+        
+        // Create a proper latestMessage object from the system message
+        const latestMessage = {
+          content: data.message.content,
+          dateTime: data.message.dateTime,
+          isRead: false,
+          type: "system",
+          idSender: data.message.idSender || "system",
+          idReceiver: data.message.idReceiver
+        };
+        
+        // Update the conversation with all member-related fields
+        dispatch({
+          type: 'UPDATE_CONVERSATION',
+          payload: {
+            conversationId: data.conversationId,
+            updates: {
+              regularMembers: updatedRegularMembers,
+              groupMembers: updatedGroupMembers,
+              coOwners: updatedCoOwners,
+              rules: updatedRules,
+              latestMessage: latestMessage,
+              lastChange: new Date().toISOString()
+            }
+          }
+        });
+      }, [dispatch, conversations]);
   // Gộp các useEffect đăng ký sự kiện socket
   useEffect(() => {
     if (!socket) return;
@@ -930,6 +1042,8 @@ export const useChat = (userId: string) => {
     socket.on("remove_member_response", handleRemoveMemberResponse);
     socket.on("member_removed_notification", handleMemberRemovedNotification);
     socket.on("removed_from_group", handleRemovedFromGroup);
+    socket.on("leave_group_response", handleLeaveGroupResponse);
+    socket.on("member_left_group", handleMemberLeftGroup);
     socket.on("error", handleError);
     const handleGroupConversationCreated = (data: any) => {
       console.log("Group conversation creation response:", data);
@@ -1375,6 +1489,8 @@ export const useChat = (userId: string) => {
       socket.off("remove_member_response", handleRemoveMemberResponse);
       socket.off("member_removed_notification", handleMemberRemovedNotification);
       socket.off("removed_from_group", handleRemovedFromGroup);
+      socket.off("leave_group_response", handleLeaveGroupResponse);
+      socket.off("member_left_group", handleMemberLeftGroup);
       socket.offAny();
     };
   }, [socket, userId, messages, conversations, loadConversations]);
@@ -1899,6 +2015,7 @@ export const useChat = (userId: string) => {
     forwardMessage,
     createGroupConversation,
     addMembersToGroup,
-    removeMembersFromGroup
+    removeMembersFromGroup,
+    
   };
 };
