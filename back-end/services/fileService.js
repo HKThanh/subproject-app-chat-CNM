@@ -112,7 +112,7 @@ fileService.processAvatar = async (req, res, next) => {
       .toString(36)
       .substring(2, num + 2)}`
 
-  const FILE_TYPE_ACTION = ["image/png", "image/jpeg", "image/jpg", "image/gif"]
+  const FILE_TYPE_ACTION = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/avif"]
 
   const filePath = `${random(4)}-${new Date().getTime()}-${req.file.originalname}`
 
