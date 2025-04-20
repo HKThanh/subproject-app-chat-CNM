@@ -3,7 +3,9 @@ import { auth } from "@/auth";
 export async function middleware(request: any) {
   const session = await auth();
   const isProfile = request.nextUrl.pathname.startsWith("/chat");
-  if (isProfile && !session?.user) {
+  const isContact = request.nextUrl.pathname.startsWith("/contacts");
+
+  if ((isProfile || isContact)  && !session?.user ) {
     return NextResponse.redirect(new URL("/auth/login", request.url));
   }
 
