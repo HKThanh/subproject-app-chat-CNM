@@ -473,34 +473,189 @@ export const useChat = (userId: string) => {
   }, [socket, userId]);
   //xử lý phản hồi thêm thành viên vào nhóm
   const handleAddMemberToGroupResponse = useCallback((data: any) => {
-    console.log("Add member to group response:", data);
+    console.log("Add member to group response (new_group_conversation):", data);
     
     if (data.success && data.conversation) {
-      // Update the conversation with new members
-      const updatedMembers = data.members || [];
+      // Get the updated conversation data
+      const updatedConversation = data.conversation;
       
-      dispatch({
-        type: 'UPDATE_GROUP_MEMBERS',
-        payload: {
-          conversationId: data.conversation.idConversation,
-          members: updatedMembers
-        }
+      // Find the current conversation in state to merge with existing data
+      const currentConversation = state.conversations.find(
+        c => c.idConversation === updatedConversation.idConversation
+      );
+      
+      if (!currentConversation) {
+        console.error("Cannot find conversation in state:", updatedConversation.idConversation);
+        return;
+      }
+      
+      // Get the complete list of members from the updated conversation
+      const updatedMemberIds = updatedConversation.groupMembers || [];
+      
+      // Get the complete member details by combining existing members with new members
+      const existingMemberDetails = currentConversation.regularMembers || [];
+      
+      // Get new member details from the response
+      // Try different properties where the backend might send the new member data
+      const newMembersDetails = data.newMembers || data.members || [];
+      
+      // Create a map of existing members for quick lookup
+      const memberMap = new Map();
+      existingMemberDetails.forEach(member => {
+        memberMap.set(member.id, member);
       });
       
-      // Update the conversation object
+      // Add new members to the map
+      newMembersDetails.forEach((member: any) => {
+        memberMap.set(member.id, member);
+      });
+      
+      // Convert map back to array to get complete regularMembers list
+      const updatedRegularMembers = Array.from(memberMap.values());
+      
+      console.log("Updated regular members:", updatedRegularMembers);
+      console.log("Updated member IDs:", updatedMemberIds);
+      
+      // Update the conversation with all necessary fields
       dispatch({
         type: 'UPDATE_CONVERSATION',
         payload: {
-          conversationId: data.conversation.idConversation,
+          conversationId: updatedConversation.idConversation,
           updates: {
-            groupMembers: updatedMembers.map((member: any) => member.id),
-            regularMembers: updatedMembers
+            // Include all the fields that might be updated
+            groupMembers: updatedMemberIds,
+            regularMembers: updatedRegularMembers,
+            // Preserve other important fields from the updated conversation
+            rules: updatedConversation.rules || currentConversation.rules,
+            lastChange: updatedConversation.lastChange || currentConversation.lastChange
           }
         }
       });
+      
+      // If there's a system message, add it to the conversation
+      if (data.systemMessage) {
+        dispatch({
+          type: 'ADD_MESSAGE',
+          payload: {
+            conversationId: updatedConversation.idConversation,
+            message: {
+              ...data.systemMessage,
+              isOwn: false
+            }
+          }
+        });
+        
+        // Update the conversation's latest message
+        dispatch({
+          type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+          payload: {
+            conversationId: updatedConversation.idConversation,
+            latestMessage: data.systemMessage
+          }
+        });
+      }
     }
-  }, [dispatch]);
+  }, [dispatch, state.conversations]);
 
+  // Handler for message_from_server event (for the user who added members)
+  const handleAddMemberToGroupResponseOnOwner = useCallback((data: any) => {
+    console.log("Add member to group response (message_from_server):", data);
+    
+    if (data.success && data.conversation) {
+      // Get the updated conversation data
+      const updatedConversation = data.conversation;
+      
+      // Find the current conversation in state to merge with existing data
+      const currentConversation = state.conversations.find(
+        c => c.idConversation === updatedConversation.idConversation
+      );
+      
+      if (!currentConversation) {
+        console.error("Cannot find conversation in state:", updatedConversation.idConversation);
+        return;
+      }
+      
+      // Get the complete list of members from the updated conversation
+      const updatedMemberIds = updatedConversation.groupMembers || [];
+      
+      // Get the complete member details by combining existing members with new members
+      const existingMemberDetails = currentConversation.regularMembers || [];
+      
+      // Get new member details from the response
+      const newMembersDetails = data.members || [];
+      
+      // Create a map of existing members for quick lookup
+      const memberMap = new Map();
+      existingMemberDetails.forEach(member => {
+        memberMap.set(member.id, member);
+      });
+      
+      // Add new members to the map
+      newMembersDetails.forEach((member: any) => {
+        memberMap.set(member.id, member);
+      });
+      
+      // Convert map back to array to get complete regularMembers list
+      const updatedRegularMembers = Array.from(memberMap.values());
+      
+      console.log("Owner updated regular members:", updatedRegularMembers);
+      console.log("Owner updated member IDs:", updatedMemberIds);
+      
+      // Update the conversation with all necessary fields
+      dispatch({
+        type: 'UPDATE_CONVERSATION',
+        payload: {
+          conversationId: updatedConversation.idConversation,
+          updates: {
+            // Include all the fields that might be updated
+            groupMembers: updatedMemberIds,
+            regularMembers: updatedRegularMembers,
+            // Preserve other important fields from the updated conversation
+            rules: updatedConversation.rules || currentConversation.rules,
+            lastChange: updatedConversation.lastChange || currentConversation.lastChange
+          }
+        }
+      });
+      
+      // If there's a system message, add it to the conversation
+      if (data.systemMessage) {
+        dispatch({
+          type: 'ADD_MESSAGE',
+          payload: {
+            conversationId: updatedConversation.idConversation,
+            message: {
+              ...data.systemMessage,
+              isOwn: false
+            }
+          }
+        });
+        
+        // Update the conversation's latest message
+        dispatch({
+          type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+          payload: {
+            conversationId: updatedConversation.idConversation,
+            latestMessage: data.systemMessage
+          }
+        });
+      }
+      
+      // Show success toast
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.success("Đã thêm thành viên vào nhóm");
+        });
+      }
+    } else if (!data.success) {
+      // Show error message
+      console.error("Failed to add members:", data.message);
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.error(data.message || "Không thể thêm thành viên");
+        });
+      }
+    }
+  }, [dispatch, state.conversations]);
   // Add this after the addMembersToGroup function
   const removeMembersFromGroup = useCallback((
     conversationId: string,
@@ -549,6 +704,67 @@ export const useChat = (userId: string) => {
         coOwner => updatedConversation.rules?.listIDCoOwner?.includes(coOwner.id)
       ) || [];
       
+      // Create a proper latestMessage object from the system message if available
+      let latestMessageUpdate = currentConversation.latestMessage;
+      
+      // Create a system message if one wasn't provided
+      if (!data.systemMessage && data.removedMembers) {
+        const removedNames = data.removedMembers
+          .map((user: any) => user.fullname || user.id)
+          .join(", ");
+          
+        // Create a synthetic system message
+        const syntheticMessage: Message = {
+          idMessage: `temp-${Date.now()}`, // Generate a temporary ID using timestamp
+          idSender: "system",
+          idConversation: updatedConversation.idConversation,
+          type: "text",
+          content: `Bạn đã xóa ${removedNames} khỏi nhóm`,
+          dateTime: new Date().toISOString(),
+          isRead: false,
+          isOwn: false
+        };
+        
+        // Add this message to the conversation
+        dispatch({
+          type: 'ADD_MESSAGE',
+          payload: {
+            conversationId: updatedConversation.idConversation,
+            message: syntheticMessage
+          }
+        });
+        
+        // Update latest message
+        latestMessageUpdate = {
+          content: syntheticMessage.content,
+          dateTime: syntheticMessage.dateTime,
+          isRead: false,
+          type: syntheticMessage.type,
+          idSender: syntheticMessage.idSender
+        };
+      } else if (data.systemMessage) {
+        // Use the provided system message
+        dispatch({
+          type: 'ADD_MESSAGE',
+          payload: {
+            conversationId: updatedConversation.idConversation,
+            message: {
+              ...data.systemMessage,
+              isOwn: false
+            }
+          }
+        });
+        
+        latestMessageUpdate = {
+          content: data.systemMessage.content,
+          dateTime: data.systemMessage.dateTime,
+          isRead: false,
+          type: data.systemMessage.type || "text",
+          idSender: data.systemMessage.idSender,
+          idReceiver: data.systemMessage.idReceiver
+        };
+      }
+      
       // Update the conversation with all necessary fields
       dispatch({
         type: 'UPDATE_CONVERSATION',
@@ -560,6 +776,8 @@ export const useChat = (userId: string) => {
             regularMembers: updatedRegularMembers,
             rules: updatedConversation.rules,
             coOwners: updatedCoOwners,
+            // Update the latest message directly in the conversation update
+            latestMessage: latestMessageUpdate,
             // Preserve other important fields
             owner: currentConversation.owner,
             lastChange: updatedConversation.lastChange || currentConversation.lastChange
@@ -707,7 +925,8 @@ export const useChat = (userId: string) => {
     // Đăng ký lắng nghe các sự kiện
     socket.on("load_conversations_response", handleLoadConversationsResponse);
     socket.on("load_group_conversations_response", handleLoadGroupConversationsResponse);
-    socket.on("add_member_to_group_response", handleAddMemberToGroupResponse);
+    socket.on("new_group_conversation", handleAddMemberToGroupResponse);
+    socket.on("message_from_server", handleAddMemberToGroupResponseOnOwner);
     socket.on("remove_member_response", handleRemoveMemberResponse);
     socket.on("member_removed_notification", handleMemberRemovedNotification);
     socket.on("removed_from_group", handleRemovedFromGroup);
@@ -1151,7 +1370,8 @@ export const useChat = (userId: string) => {
       socket.off("create_group_conversation_response", handleGroupConversationCreated);
       socket.off("group_message_response", handleGroupMessageResponse);
       socket.off("receive_group_message", handleGroupMessageResponse);
-      socket.off("add_member_to_group_response", handleAddMemberToGroupResponse);
+      socket.off("new_group_conversation", handleAddMemberToGroupResponse);
+      socket.off("message_from_server", handleAddMemberToGroupResponseOnOwner);
       socket.off("remove_member_response", handleRemoveMemberResponse);
       socket.off("member_removed_notification", handleMemberRemovedNotification);
       socket.off("removed_from_group", handleRemovedFromGroup);
