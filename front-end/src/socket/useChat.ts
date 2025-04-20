@@ -65,6 +65,11 @@ export interface Conversation {
     birthday?: string;
     coverPhoto?: string;
   }
+  coOwners: Array<{
+    id: string;
+    fullname: string;
+    urlavatar?: string; 
+  }>
   groupMembers?: string[];
   regularMembers: Array<{
     id: string;
@@ -495,6 +500,206 @@ export const useChat = (userId: string) => {
       });
     }
   }, [dispatch]);
+
+  // Add this after the addMembersToGroup function
+  const removeMembersFromGroup = useCallback((
+    conversationId: string,
+    membersToRemove: string[]
+  ) => {
+    if (!socket || !userId) {
+      console.error("Cannot remove members: Socket not connected or user not authenticated");
+      return;
+    }
+    
+    socket.emit("remove_member_from_group", {
+      IDConversation: conversationId,
+      IDUser: userId,
+      groupMembers: membersToRemove
+    });
+  }, [socket, userId]);
+
+  // Add handler for remove member response
+  const handleRemoveMemberResponse = useCallback((data: any) => {
+    console.log("Remove member from group response:", data);
+    
+    if (data.success && data.conversation) {
+      // Get the updated conversation data
+      const updatedConversation = data.conversation;
+      
+      // Find the current conversation in state to access existing member details
+      const currentConversation = state.conversations.find(
+        c => c.idConversation === updatedConversation.idConversation
+      );
+      
+      if (!currentConversation) {
+        console.error("Cannot find conversation in state:", updatedConversation.idConversation);
+        return;
+      }
+      
+      // Get the updated member IDs from the conversation
+      const updatedMemberIds = updatedConversation.groupMembers || [];
+      
+      // Filter the existing regularMembers to keep only those still in the group
+      const updatedRegularMembers = currentConversation.regularMembers.filter(
+        member => updatedMemberIds.includes(member.id)
+      );
+      
+      // Update coOwners based on the updated rules
+      const updatedCoOwners = currentConversation.coOwners?.filter(
+        coOwner => updatedConversation.rules?.listIDCoOwner?.includes(coOwner.id)
+      ) || [];
+      
+      // Update the conversation with all necessary fields
+      dispatch({
+        type: 'UPDATE_CONVERSATION',
+        payload: {
+          conversationId: updatedConversation.idConversation,
+          updates: {
+            // Include all the fields that might be updated
+            groupMembers: updatedMemberIds,
+            regularMembers: updatedRegularMembers,
+            rules: updatedConversation.rules,
+            coOwners: updatedCoOwners,
+            // Preserve other important fields
+            owner: currentConversation.owner,
+            lastChange: updatedConversation.lastChange || currentConversation.lastChange
+          }
+        }
+      });
+      
+      // Show success toast
+      if (typeof window !== 'undefined') {
+        // Using dynamic import to avoid SSR issues
+        import('sonner').then(({ toast }) => {
+          toast.success("Đã xóa thành viên khỏi nhóm");
+        });
+      }
+    } else if (!data.success) {
+      // Show error message
+      console.error("Failed to remove member:", data.message);
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.error(data.message || "Không thể xóa thành viên");
+        });
+      }
+    }
+  }, [dispatch, state.conversations]);
+  const handleMemberRemovedNotification = useCallback((data: any) => {
+    console.log("Member removed notification:", data);
+    
+    if (data.success && data.conversationId) {
+      // Find the current conversation in state
+      const currentConversation = state.conversations.find(
+        c => c.idConversation === data.conversationId
+      );
+      
+      if (!currentConversation) {
+        console.error("Cannot find conversation in state:", data.conversationId);
+        return;
+      }
+      
+      // Add the system message to the conversation
+      if (data.systemMessage) {
+        dispatch({
+          type: 'ADD_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            message: {
+              ...data.systemMessage,
+              isOwn: false
+            }
+          }
+        });
+        
+        // Update the conversation's latest message
+        dispatch({
+          type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            latestMessage: data.systemMessage
+          }
+        });
+      }
+      
+      // Update the conversation members list
+      if (data.removedMembers && Array.isArray(data.removedMembers)) {
+        const removedIds = data.removedMembers.map((member: any) => member.id);
+        
+        // Filter out removed members from regularMembers
+        const updatedRegularMembers = currentConversation.regularMembers.filter(
+          member => !removedIds.includes(member.id)
+        );
+        
+        // Filter out removed members from groupMembers
+        const updatedGroupMembers = (currentConversation.groupMembers || []).filter(
+          memberId => !removedIds.includes(memberId)
+        );
+        
+        // Update the conversation
+        dispatch({
+          type: 'UPDATE_CONVERSATION',
+          payload: {
+            conversationId: data.conversationId,
+            updates: {
+              regularMembers: updatedRegularMembers,
+              groupMembers: updatedGroupMembers
+            }
+          }
+        });
+      }
+      
+      // Show notification
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.info(data.message || "Thành viên đã bị xóa khỏi nhóm");
+        });
+      }
+    }
+  }, [dispatch, state.conversations]);
+  
+  const handleRemovedFromGroup = useCallback((data: any) => {
+    console.log("Removed from group:", data);
+    
+    if (data.success && data.conversationId) {
+      // Find the conversation in state
+      const conversation = state.conversations.find(
+        c => c.idConversation === data.conversationId
+      );
+      
+      if (!conversation) {
+        console.error("Cannot find conversation in state:", data.conversationId);
+        return;
+      }
+      
+      // Show notification
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.error(data.message || "Bạn đã bị xóa khỏi nhóm", {
+            duration: 5000
+          });
+        });
+      }
+      
+      // Remove the conversation from the list or mark it as inactive
+      // Option 1: Remove the conversation
+      dispatch({
+        type: 'SET_CONVERSATIONS',
+        payload: state.conversations.filter(c => c.idConversation !== data.conversationId)
+      });
+      
+      // Option 2 (alternative): Mark the conversation as inactive but keep it in history
+      // dispatch({
+      //   type: 'UPDATE_CONVERSATION',
+      //   payload: {
+      //     conversationId: data.conversationId,
+      //     updates: {
+      //       isActive: false,
+      //       leftAt: new Date().toISOString()
+      //     }
+      //   }
+      // });
+    }
+  }, [dispatch, state.conversations]);
   // Gộp các useEffect đăng ký sự kiện socket
   useEffect(() => {
     if (!socket) return;
@@ -503,6 +708,9 @@ export const useChat = (userId: string) => {
     socket.on("load_conversations_response", handleLoadConversationsResponse);
     socket.on("load_group_conversations_response", handleLoadGroupConversationsResponse);
     socket.on("add_member_to_group_response", handleAddMemberToGroupResponse);
+    socket.on("remove_member_response", handleRemoveMemberResponse);
+    socket.on("member_removed_notification", handleMemberRemovedNotification);
+    socket.on("removed_from_group", handleRemovedFromGroup);
     socket.on("error", handleError);
     const handleGroupConversationCreated = (data: any) => {
       console.log("Group conversation creation response:", data);
@@ -944,6 +1152,9 @@ export const useChat = (userId: string) => {
       socket.off("group_message_response", handleGroupMessageResponse);
       socket.off("receive_group_message", handleGroupMessageResponse);
       socket.off("add_member_to_group_response", handleAddMemberToGroupResponse);
+      socket.off("remove_member_response", handleRemoveMemberResponse);
+      socket.off("member_removed_notification", handleMemberRemovedNotification);
+      socket.off("removed_from_group", handleRemovedFromGroup);
       socket.offAny();
     };
   }, [socket, userId, messages, conversations, loadConversations]);
@@ -1467,6 +1678,7 @@ export const useChat = (userId: string) => {
     deleteMessage,
     forwardMessage,
     createGroupConversation,
-    addMembersToGroup
+    addMembersToGroup,
+    removeMembersFromGroup
   };
 };

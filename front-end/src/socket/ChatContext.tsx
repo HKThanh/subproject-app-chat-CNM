@@ -12,14 +12,27 @@ interface ChatContextType {
   unreadMessages: Message[];
   loadConversations: () => void;
   loadMessages: (conversationId: string) => void;
-  sendMessage: (conversationId: string, text: string, type?: "text" | "image" | "video" | "document" | "file", fileUrl?: string) => void;
+  sendMessage: (
+    conversationId: string,
+    text: string,
+    type?: "text" | "image" | "video" | "document" | "file",
+    fileUrl?: string
+  ) => void;
   markMessagesAsRead: (messageIds: string[], conversationId: string) => void;
   deleteMessage: (messageId: string, conversationId: string) => void;
   // Add to ChatContextType
   forwardMessage: (messageId: string, targetConversations: string[]) => void;
   recallMessage: (messageId: string, conversationId: string) => void;
-createGroupConversation: (groupName: string, groupMembers: string[], groupAvatar?: string) => void;
-addMembersToGroup: (conversationId: string, membersToAdd: string[]) => void;
+  createGroupConversation: (
+    groupName: string,
+    groupMembers: string[],
+    groupAvatar?: string
+  ) => void;
+  addMembersToGroup: (conversationId: string, membersToAdd: string[]) => void;
+  removeMembersFromGroup: (
+    conversationId: string,
+    membersToRemove: string[]
+  ) => void
 }
 
 // Tạo context với giá trị mặc định
@@ -37,7 +50,8 @@ const ChatContext = createContext<ChatContextType>({
   forwardMessage: () => {},
   recallMessage: () => {},
   createGroupConversation: () => {},
-  addMembersToGroup: () => {}
+  addMembersToGroup: () => {},
+  removeMembersFromGroup: () => {},
 });
 
 // Hook để sử dụng chat context
@@ -49,7 +63,10 @@ interface ChatProviderProps {
   userId: string;
 }
 
-export const ChatProvider: React.FC<ChatProviderProps> = ({ children, userId }) => {
+export const ChatProvider: React.FC<ChatProviderProps> = ({
+  children,
+  userId,
+}) => {
   const {
     conversations,
     messages,
@@ -64,7 +81,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children, userId }) 
     forwardMessage,
     recallMessage,
     createGroupConversation,
-    addMembersToGroup
+    addMembersToGroup,
+    removeMembersFromGroup
   } = useChat(userId);
 
   return (
@@ -83,7 +101,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children, userId }) 
         forwardMessage,
         recallMessage,
         createGroupConversation,
-        addMembersToGroup
+        addMembersToGroup,
+        removeMembersFromGroup
       }}
     >
       {children}
