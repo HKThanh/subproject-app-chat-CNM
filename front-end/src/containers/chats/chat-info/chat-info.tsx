@@ -158,7 +158,40 @@ export default function ChatInfo({
       socket.off("message_from_server", handleNewGroupConversation);
     };
   }, [socket, isLoading, activeConversation]);
+  // Add this useEffect to handle promotion response
+  // useEffect(() => {
+  //   if (!socket) return;
 
+  //   const handlePromoteResponse = (data: any) => {
+  //     if (data.success) {
+  //       toast.success("Thăng cấp thành viên thành công");
+  //       // No need to manually update the UI as we'll receive a new_group_conversation event
+  //     } else {
+  //       toast.error(data.message || "Không thể thăng cấp thành viên");
+  //     }
+  //   };
+
+  //   socket.on("promote_member_response", handlePromoteResponse);
+
+  //   // Add listener for system message about promotion
+  //   const handleSystemMessage = (data: any) => {
+  //     if (
+  //       data.message &&
+  //       data.message.type === "system" &&
+  //       data.conversationId === activeConversation?.idConversation
+  //     ) {
+  //       // The server will send updated conversation data, so we'll get it automatically
+  //       toast.info(data.message.content);
+  //     }
+  //   };
+
+  //   socket.on("new_message", handleSystemMessage);
+
+  //   return () => {
+  //     socket.off("promote_member_response", handlePromoteResponse);
+  //     socket.off("new_message", handleSystemMessage);
+  //   };
+  // }, [socket, activeConversation]);
   // Add timeout for loading state
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
@@ -231,7 +264,16 @@ export default function ChatInfo({
       ]);
       toast.success("Đang xóa thành viên khỏi nhóm...");
     } else if (confirmationState.action === "promote") {
-      handlePromoteToCoOwner(confirmationState.memberId);
+      // Add this section to handle promotion
+      if (!socket || !currentUser) return;
+
+      socket.emit("promote_member_to_admin", {
+        IDConversation: activeConversation.idConversation,
+        IDUser: currentUser.id,
+        IDMemberToPromote: confirmationState.memberId,
+      });
+
+      toast.success("Đang thăng cấp thành viên lên phó nhóm...");
     } else if (confirmationState.action === "transfer") {
       handleTransferOwnership(confirmationState.memberId);
     }
@@ -1095,13 +1137,8 @@ export default function ChatInfo({
       <Dialog
         open={confirmationState.isOpen}
         onOpenChange={(open) => {
-          if (!open) {
-            setConfirmationState({
-              isOpen: false,
-              memberId: "",
-              action: "",
-            });
-          }
+          if (!open)
+            setConfirmationState({ isOpen: false, memberId: "", action: "" });
         }}
       >
         <DialogContent className="sm:max-w-md">
@@ -1112,57 +1149,31 @@ export default function ChatInfo({
               "Chuyển quyền trưởng nhóm"}
           </DialogTitle>
 
-          <div className="py-4">
-            {confirmationState.action === "remove" && (
-              <div className="flex items-center space-x-2">
-                <AlertTriangle className="h-6 w-6 text-yellow-500" />
-                <p>Bạn có chắc chắn muốn xóa thành viên này khỏi nhóm?</p>
-              </div>
-            )}
-            {confirmationState.action === "promote" && (
-              <div className="flex items-center space-x-2">
-                <UserCog className="h-6 w-6 text-blue-500" />
-                <p>
-                  Bạn có chắc chắn muốn thăng cấp thành viên này thành phó nhóm?
-                </p>
-              </div>
-            )}
-            {confirmationState.action === "transfer" && (
-              <div className="flex items-center space-x-2">
-                <Crown className="h-6 w-6 text-yellow-500" />
-                <p>
-                  Bạn có chắc chắn muốn chuyển quyền trưởng nhóm cho thành viên
-                  này?
-                </p>
-              </div>
-            )}
-          </div>
+          <div className="mt-4">
+            <p>
+              {confirmationState.action === "remove" &&
+                "Bạn có chắc chắn muốn xóa thành viên này khỏi nhóm?"}
+              {confirmationState.action === "promote" &&
+                "Bạn có chắc chắn muốn thăng cấp thành viên này lên phó nhóm?"}
+              {confirmationState.action === "transfer" &&
+                "Bạn có chắc chắn muốn chuyển quyền trưởng nhóm cho thành viên này?"}
+            </p>
 
-          <div className="flex justify-end gap-2 mt-4">
-            <Button
-              variant="outline"
-              onClick={() =>
-                setConfirmationState({
-                  isOpen: false,
-                  memberId: "",
-                  action: "",
-                })
-              }
-            >
-              Hủy
-            </Button>
-            <Button
-              variant={
-                confirmationState.action === "remove"
-                  ? "destructive"
-                  : "default"
-              }
-              onClick={handleConfirmAction}
-            >
-              {confirmationState.action === "remove" && "Xóa"}
-              {confirmationState.action === "promote" && "Thăng cấp"}
-              {confirmationState.action === "transfer" && "Chuyển quyền"}
-            </Button>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() =>
+                  setConfirmationState({
+                    isOpen: false,
+                    memberId: "",
+                    action: "",
+                  })
+                }
+              >
+                Hủy
+              </Button>
+              <Button onClick={handleConfirmAction}>Xác nhận</Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

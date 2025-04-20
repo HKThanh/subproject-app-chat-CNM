@@ -68,7 +68,7 @@ export interface Conversation {
   coOwners: Array<{
     id: string;
     fullname: string;
-    urlavatar?: string; 
+    urlavatar?: string;
   }>
   groupMembers?: string[];
   regularMembers: Array<{
@@ -290,27 +290,27 @@ const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
     }
     case 'UPDATE_GROUP_MEMBERS': {
       const { conversationId, members } = action.payload;
-      
+
       return {
         ...state,
-        conversations: state.conversations.map(conv => 
-          conv.idConversation === conversationId 
-            ? { 
-                ...conv, 
-                regularMembers: members,
-                groupMembers: members.map(member => member.id)
-              } 
+        conversations: state.conversations.map(conv =>
+          conv.idConversation === conversationId
+            ? {
+              ...conv,
+              regularMembers: members,
+              groupMembers: members.map(member => member.id)
+            }
             : conv
         )
       };
     }
     case 'REMOVE_CONVERSATION':
-    return {
-      ...state,
-      conversations: state.conversations.filter(
-        conversation => conversation.idConversation !== action.payload.conversationId
-      )
-    };
+      return {
+        ...state,
+        conversations: state.conversations.filter(
+          conversation => conversation.idConversation !== action.payload.conversationId
+        )
+      };
     default:
       return state;
   }
@@ -472,7 +472,7 @@ export const useChat = (userId: string) => {
       console.error("Cannot add members: Socket not connected or user not authenticated");
       return;
     }
-    
+
     socket.emit("add_member_to_group", {
       IDConversation: conversationId,
       IDUser: userId,
@@ -482,48 +482,48 @@ export const useChat = (userId: string) => {
   //xử lý phản hồi thêm thành viên vào nhóm
   const handleAddMemberToGroupResponse = useCallback((data: any) => {
     console.log("Add member to group response (new_group_conversation):", data);
-    
+
     if (data.success && data.conversation) {
       // Get the updated conversation data
       const updatedConversation = data.conversation;
-      
+
       // Find the current conversation in state to merge with existing data
       const currentConversation = state.conversations.find(
         c => c.idConversation === updatedConversation.idConversation
       );
-      
+
       if (!currentConversation) {
         console.error("Cannot find conversation in state:", updatedConversation.idConversation);
         return;
       }
-      
+
       // Get the complete list of members from the updated conversation
       const updatedMemberIds = updatedConversation.groupMembers || [];
-      
+
       // Get the complete member details by combining existing members with new members
       const existingMemberDetails = currentConversation.regularMembers || [];
-      
+
       // Get new member details from the response
       // Try different properties where the backend might send the new member data
       const newMembersDetails = data.newMembers || data.members || [];
-      
+
       // Create a map of existing members for quick lookup
       const memberMap = new Map();
       existingMemberDetails.forEach(member => {
         memberMap.set(member.id, member);
       });
-      
+
       // Add new members to the map
       newMembersDetails.forEach((member: any) => {
         memberMap.set(member.id, member);
       });
-      
+
       // Convert map back to array to get complete regularMembers list
       const updatedRegularMembers = Array.from(memberMap.values());
-      
+
       console.log("Updated regular members:", updatedRegularMembers);
       console.log("Updated member IDs:", updatedMemberIds);
-      
+
       // Update the conversation with all necessary fields
       dispatch({
         type: 'UPDATE_CONVERSATION',
@@ -539,7 +539,7 @@ export const useChat = (userId: string) => {
           }
         }
       });
-      
+
       // If there's a system message, add it to the conversation
       if (data.systemMessage) {
         dispatch({
@@ -552,7 +552,7 @@ export const useChat = (userId: string) => {
             }
           }
         });
-        
+
         // Update the conversation's latest message
         dispatch({
           type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
@@ -568,47 +568,63 @@ export const useChat = (userId: string) => {
   // Handler for message_from_server event (for the user who added members)
   const handleAddMemberToGroupResponseOnOwner = useCallback((data: any) => {
     console.log("Add member to group response (message_from_server):", data);
-    
+
     if (data.success && data.conversation) {
       // Get the updated conversation data
       const updatedConversation = data.conversation;
-      
+
       // Find the current conversation in state to merge with existing data
       const currentConversation = state.conversations.find(
         c => c.idConversation === updatedConversation.idConversation
       );
-      
+
       if (!currentConversation) {
         console.error("Cannot find conversation in state:", updatedConversation.idConversation);
         return;
       }
-      
+
       // Get the complete list of members from the updated conversation
       const updatedMemberIds = updatedConversation.groupMembers || [];
-      
+
       // Get the complete member details by combining existing members with new members
       const existingMemberDetails = currentConversation.regularMembers || [];
+
+      // Get new member details from the response - check multiple possible properties
+      const newMembersDetails = data.newMembers || data.members || [];
       
-      // Get new member details from the response
-      const newMembersDetails = data.members || [];
-      
+      console.log("New members details:", newMembersDetails);
+      console.log("Existing members details:", existingMemberDetails);
+
       // Create a map of existing members for quick lookup
       const memberMap = new Map();
       existingMemberDetails.forEach(member => {
-        memberMap.set(member.id, member);
+        if (member && member.id) {
+          memberMap.set(member.id, member);
+        }
       });
-      
+
       // Add new members to the map
       newMembersDetails.forEach((member: any) => {
-        memberMap.set(member.id, member);
+        if (member && member.id) {
+          // Ensure the member object has the correct structure
+          const formattedMember = {
+            id: member.id,
+            fullname: member.fullname || member.name || "",
+            urlavatar: member.urlavatar || member.avatar || "",
+            phone: member.phone || "",
+            email: member.email || "",
+            status: member.status || "active"
+          };
+          memberMap.set(member.id, formattedMember);
+        }
       });
-      
+
       // Convert map back to array to get complete regularMembers list
       const updatedRegularMembers = Array.from(memberMap.values());
-      
-      console.log("Owner updated regular members:", updatedRegularMembers);
-      console.log("Owner updated member IDs:", updatedMemberIds);
-      
+
+      console.log("Updated regular members:", updatedRegularMembers);
+      console.log("Updated member IDs:", updatedMemberIds);
+
       // Update the conversation with all necessary fields
       dispatch({
         type: 'UPDATE_CONVERSATION',
@@ -624,7 +640,7 @@ export const useChat = (userId: string) => {
           }
         }
       });
-      
+
       // If there's a system message, add it to the conversation
       if (data.systemMessage) {
         dispatch({
@@ -637,17 +653,25 @@ export const useChat = (userId: string) => {
             }
           }
         });
-        
+
         // Update the conversation's latest message
         dispatch({
           type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
           payload: {
             conversationId: updatedConversation.idConversation,
-            latestMessage: data.systemMessage
+            latestMessage: {
+              idMessage: `system-${Date.now()}`,
+              idConversation: data.systemMessage.idConversation,
+              content: data.systemMessage.content,
+              dateTime: data.systemMessage.dateTime,
+              isRead: false,
+              type: data.systemMessage.type || "text",
+              idSender: data.systemMessage.idSender || "system"
+            },
           }
         });
       }
-      
+
       // Show success toast
       if (typeof window !== 'undefined') {
         import('sonner').then(({ toast }) => {
@@ -673,7 +697,7 @@ export const useChat = (userId: string) => {
       console.error("Cannot remove members: Socket not connected or user not authenticated");
       return;
     }
-    
+
     socket.emit("remove_member_from_group", {
       IDConversation: conversationId,
       IDUser: userId,
@@ -684,43 +708,43 @@ export const useChat = (userId: string) => {
   // Add handler for remove member response
   const handleRemoveMemberResponse = useCallback((data: any) => {
     console.log("Remove member from group response:", data);
-    
+
     if (data.success && data.conversation) {
       // Get the updated conversation data
       const updatedConversation = data.conversation;
-      
+
       // Find the current conversation in state to access existing member details
       const currentConversation = state.conversations.find(
         c => c.idConversation === updatedConversation.idConversation
       );
-      
+
       if (!currentConversation) {
         console.error("Cannot find conversation in state:", updatedConversation.idConversation);
         return;
       }
-      
+
       // Get the updated member IDs from the conversation
       const updatedMemberIds = updatedConversation.groupMembers || [];
-      
+
       // Filter the existing regularMembers to keep only those still in the group
       const updatedRegularMembers = currentConversation.regularMembers.filter(
         member => updatedMemberIds.includes(member.id)
       );
-      
+
       // Update coOwners based on the updated rules
       const updatedCoOwners = currentConversation.coOwners?.filter(
         coOwner => updatedConversation.rules?.listIDCoOwner?.includes(coOwner.id)
       ) || [];
-      
+
       // Create a proper latestMessage object from the system message if available
       let latestMessageUpdate = currentConversation.latestMessage;
-      
+
       // Create a system message if one wasn't provided
       if (!data.systemMessage && data.removedMembers) {
         const removedNames = data.removedMembers
           .map((user: any) => user.fullname || user.id)
           .join(", ");
-          
+
         // Create a synthetic system message
         const syntheticMessage: Message = {
           idMessage: `temp-${Date.now()}`, // Generate a temporary ID using timestamp
@@ -732,7 +756,7 @@ export const useChat = (userId: string) => {
           isRead: false,
           isOwn: false
         };
-        
+
         // Add this message to the conversation
         dispatch({
           type: 'ADD_MESSAGE',
@@ -741,7 +765,7 @@ export const useChat = (userId: string) => {
             message: syntheticMessage
           }
         });
-        
+
         // Update latest message
         latestMessageUpdate = {
           content: syntheticMessage.content,
@@ -762,7 +786,7 @@ export const useChat = (userId: string) => {
             }
           }
         });
-        
+
         latestMessageUpdate = {
           content: data.systemMessage.content,
           dateTime: data.systemMessage.dateTime,
@@ -772,7 +796,7 @@ export const useChat = (userId: string) => {
           idReceiver: data.systemMessage.idReceiver
         };
       }
-      
+
       // Update the conversation with all necessary fields
       dispatch({
         type: 'UPDATE_CONVERSATION',
@@ -792,7 +816,7 @@ export const useChat = (userId: string) => {
           }
         }
       });
-      
+
       // Show success toast
       if (typeof window !== 'undefined') {
         // Using dynamic import to avoid SSR issues
@@ -812,18 +836,18 @@ export const useChat = (userId: string) => {
   }, [dispatch, state.conversations]);
   const handleMemberRemovedNotification = useCallback((data: any) => {
     console.log("Member removed notification:", data);
-    
+
     if (data.success && data.conversationId) {
       // Find the current conversation in state
       const currentConversation = state.conversations.find(
         c => c.idConversation === data.conversationId
       );
-      
+
       if (!currentConversation) {
         console.error("Cannot find conversation in state:", data.conversationId);
         return;
       }
-      
+
       // Add the system message to the conversation
       if (data.systemMessage) {
         dispatch({
@@ -836,7 +860,7 @@ export const useChat = (userId: string) => {
             }
           }
         });
-        
+
         // Update the conversation's latest message
         dispatch({
           type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
@@ -846,21 +870,21 @@ export const useChat = (userId: string) => {
           }
         });
       }
-      
+
       // Update the conversation members list
       if (data.removedMembers && Array.isArray(data.removedMembers)) {
         const removedIds = data.removedMembers.map((member: any) => member.id);
-        
+
         // Filter out removed members from regularMembers
         const updatedRegularMembers = currentConversation.regularMembers.filter(
           member => !removedIds.includes(member.id)
         );
-        
+
         // Filter out removed members from groupMembers
         const updatedGroupMembers = (currentConversation.groupMembers || []).filter(
           memberId => !removedIds.includes(memberId)
         );
-        
+
         // Update the conversation
         dispatch({
           type: 'UPDATE_CONVERSATION',
@@ -873,7 +897,7 @@ export const useChat = (userId: string) => {
           }
         });
       }
-      
+
       // Show notification
       if (typeof window !== 'undefined') {
         import('sonner').then(({ toast }) => {
@@ -882,21 +906,21 @@ export const useChat = (userId: string) => {
       }
     }
   }, [dispatch, state.conversations]);
-  
+
   const handleRemovedFromGroup = useCallback((data: any) => {
     console.log("Removed from group:", data);
-    
+
     if (data.success && data.conversationId) {
       // Find the conversation in state
       const conversation = state.conversations.find(
         c => c.idConversation === data.conversationId
       );
-      
+
       if (!conversation) {
         console.error("Cannot find conversation in state:", data.conversationId);
         return;
       }
-      
+
       // Show notification
       if (typeof window !== 'undefined') {
         import('sonner').then(({ toast }) => {
@@ -905,14 +929,14 @@ export const useChat = (userId: string) => {
           });
         });
       }
-      
+
       // Remove the conversation from the list or mark it as inactive
       // Option 1: Remove the conversation
       dispatch({
         type: 'SET_CONVERSATIONS',
         payload: state.conversations.filter(c => c.idConversation !== data.conversationId)
       });
-      
+
       // Option 2 (alternative): Mark the conversation as inactive but keep it in history
       // dispatch({
       //   type: 'UPDATE_CONVERSATION',
@@ -926,41 +950,222 @@ export const useChat = (userId: string) => {
       // });
     }
   }, [dispatch, state.conversations]);
-    // Add this handler for leave group response
-    const handleLeaveGroupResponse = useCallback((data: any) => {
-      console.log("Leave group response:", data);
-      
-      if (data.success) {
-        // If successfully left the group, remove the conversation from state
-        dispatch({
-          type: 'REMOVE_CONVERSATION',
-          payload: {
-            conversationId: data.conversationId
-          }
-        });
-        
-        // Show success toast
-        if (typeof window !== 'undefined') {
-          import('sonner').then(({ toast }) => {
-            toast.success("Đã rời khỏi nhóm");
-          });
+  // Add this handler for leave group response
+  const handleLeaveGroupResponse = useCallback((data: any) => {
+    console.log("Leave group response:", data);
+
+    if (data.success) {
+      // If successfully left the group, remove the conversation from state
+      dispatch({
+        type: 'REMOVE_CONVERSATION',
+        payload: {
+          conversationId: data.conversationId
         }
-      } else {
-        // Show error message
-        console.error("Failed to leave group:", data.message);
-        if (typeof window !== 'undefined') {
-          import('sonner').then(({ toast }) => {
-            toast.error(data.message || "Không thể rời khỏi nhóm");
-          });
+      });
+
+      // Show success toast
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.success("Đã rời khỏi nhóm");
+        });
+      }
+    } else {
+      // Show error message
+      console.error("Failed to leave group:", data.message);
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.error(data.message || "Không thể rời khỏi nhóm");
+        });
+      }
+    }
+  }, [dispatch]);
+  // Add this handler for member left group event
+  const handleMemberLeftGroup = useCallback((data: any) => {
+    console.log("Member left group notification:", data);
+
+    if (!data.conversationId || !data.userId || !data.message) {
+      console.error("Invalid member_left_group data:", data);
+      return;
+    }
+
+    // Add the system message to the conversation
+    dispatch({
+      type: 'ADD_MESSAGE',
+      payload: {
+        conversationId: data.conversationId,
+        message: {
+          ...data.message,
+          isOwn: false,
+          type: "system"
         }
       }
-    }, [dispatch]);
-      // Add this handler for member left group event
-      const handleMemberLeftGroup = useCallback((data: any) => {
-        console.log("Member left group notification:", data);
+    });
+
+    // Find the current conversation
+    const currentConversation = conversations.find(c => c.idConversation === data.conversationId);
+
+    if (!currentConversation) {
+      console.error("Cannot find conversation in state:", data.conversationId);
+      return;
+    }
+
+    // Filter out the leaving user from regularMembers
+    const updatedRegularMembers = (currentConversation.regularMembers || [])
+      .filter(member => member.id !== data.userId);
+
+    // Filter out the leaving user from groupMembers
+    const updatedGroupMembers = (currentConversation.groupMembers || [])
+      .filter(memberId => memberId !== data.userId);
+
+    // Filter out the leaving user from coOwners
+    const updatedCoOwners = (currentConversation.coOwners || [])
+      .filter(coOwner => coOwner.id !== data.userId);
+
+    // Create updated rules object with the user removed from listIDCoOwner
+    const updatedRules = {
+      ...currentConversation.rules,
+      listIDCoOwner: (currentConversation.rules?.listIDCoOwner || [])
+        .filter(coOwnerId => coOwnerId !== data.userId)
+    };
+
+    // Create a proper latestMessage object from the system message
+    const latestMessage = {
+      content: data.message.content,
+      dateTime: data.message.dateTime,
+      isRead: false,
+      type: "system",
+      idSender: data.message.idSender || "system",
+      idReceiver: data.message.idReceiver
+    };
+
+    // Update the conversation with all member-related fields
+    dispatch({
+      type: 'UPDATE_CONVERSATION',
+      payload: {
+        conversationId: data.conversationId,
+        updates: {
+          regularMembers: updatedRegularMembers,
+          groupMembers: updatedGroupMembers,
+          coOwners: updatedCoOwners,
+          rules: updatedRules,
+          latestMessage: latestMessage,
+          lastChange: new Date().toISOString()
+        }
+      }
+    });
+  }, [dispatch, conversations]);
+  // Add handler for member promotion events
+  const handleMemberPromoted = useCallback((data: any) => {
+    console.log("Member promoted notification:", data);
+
+    if (!data.conversationId || !data.promotedMember || !data.systemMessage) {
+      console.error("Invalid member_promoted_notification data:", data);
+      return;
+    }
+
+    // Find the current conversation
+    const currentConversation = conversations.find(c => c.idConversation === data.conversationId);
+
+    if (!currentConversation) {
+      console.error("Cannot find conversation in state:", data.conversationId);
+      return;
+    }
+
+    // Add the system message to the conversation
+    dispatch({
+      type: 'ADD_MESSAGE',
+      payload: {
+        conversationId: data.conversationId,
+        message: {
+          ...data.systemMessage,
+          isOwn: false,
+          type: "system"
+        }
+      }
+    });
+
+    // Update the conversation with the new coOwner
+    const promotedMemberId = data.promotedMember;
+
+    // Find the member in regularMembers to get their details
+    const promotedMember = currentConversation.regularMembers.find(
+      member => member.id === promotedMemberId
+    );
+
+    if (!promotedMember) {
+      console.error("Cannot find promoted member in regularMembers:", promotedMemberId);
+      return;
+    }
+
+    // Create updated coOwners array with the new coOwner
+    const updatedCoOwners = [
+      ...(currentConversation.coOwners || []),
+      {
+        id: promotedMember.id,
+        fullname: promotedMember.fullname,
+        urlavatar: promotedMember.urlavatar
+      }
+    ];
+
+    // Create updated rules with the new coOwner ID
+    const updatedRules = {
+      ...currentConversation.rules,
+      listIDCoOwner: [
+        ...(currentConversation.rules?.listIDCoOwner || []),
+        promotedMemberId
+      ]
+    };
+
+    // Update the conversation
+    dispatch({
+      type: 'UPDATE_CONVERSATION',
+      payload: {
+        conversationId: data.conversationId,
+        updates: {
+          coOwners: updatedCoOwners,
+          rules: updatedRules,
+          lastChange: new Date().toISOString()
+        }
+      }
+    });
+
+    // Update the latest message in the conversation
+    dispatch({
+      type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+      payload: {
+        conversationId: data.conversationId,
+        latestMessage: {
+          content: data.systemMessage.content,
+          dateTime: data.systemMessage.dateTime,
+          isRead: false,
+          type: "system"
+        }
+      }
+    });
+  }, [dispatch, conversations]);
+
+  // Add handler for promotion response (for the user who initiated the promotion)
+  const handlePromoteMemberResponse = useCallback((data: any) => {
+    console.log("Promote member response:", data);
+    
+    if (data.success) {
+      // If we have the conversation and member data, update immediately
+      if (data.conversationId && data.memberId && data.systemMessage) {
+        // Find the conversation
+        const conversation = conversations.find(c => c.idConversation === data.conversationId);
         
-        if (!data.conversationId || !data.userId || !data.message) {
-          console.error("Invalid member_left_group data:", data);
+        if (!conversation) {
+          console.error("Cannot find conversation in state:", data.conversationId);
+          return;
+        }
+        
+        // Find the member in regularMembers to get their details
+        const promotedMember = conversation.regularMembers.find(
+          member => member.id === data.memberId
+        );
+        
+        if (!promotedMember) {
+          console.error("Cannot find promoted member in regularMembers:", data.memberId);
           return;
         }
         
@@ -970,66 +1175,147 @@ export const useChat = (userId: string) => {
           payload: {
             conversationId: data.conversationId,
             message: {
-              ...data.message,
+              ...data.systemMessage,
               isOwn: false,
               type: "system"
             }
           }
         });
         
-        // Find the current conversation
-        const currentConversation = conversations.find(c => c.idConversation === data.conversationId);
+        // Create updated coOwners array with the new coOwner
+        const updatedCoOwners = [
+          ...(conversation.coOwners || []),
+          {
+            id: promotedMember.id,
+            fullname: promotedMember.fullname,
+            urlavatar: promotedMember.urlavatar
+          }
+        ];
         
-        if (!currentConversation) {
-          console.error("Cannot find conversation in state:", data.conversationId);
-          return;
-        }
-        
-        // Filter out the leaving user from regularMembers
-        const updatedRegularMembers = (currentConversation.regularMembers || [])
-          .filter(member => member.id !== data.userId);
-        
-        // Filter out the leaving user from groupMembers
-        const updatedGroupMembers = (currentConversation.groupMembers || [])
-          .filter(memberId => memberId !== data.userId);
-        
-        // Filter out the leaving user from coOwners
-        const updatedCoOwners = (currentConversation.coOwners || [])
-          .filter(coOwner => coOwner.id !== data.userId);
-        
-        // Create updated rules object with the user removed from listIDCoOwner
+        // Create updated rules with the new coOwner ID
         const updatedRules = {
-          ...currentConversation.rules,
-          listIDCoOwner: (currentConversation.rules?.listIDCoOwner || [])
-            .filter(coOwnerId => coOwnerId !== data.userId)
+          ...conversation.rules,
+          listIDCoOwner: [
+            ...(conversation.rules?.listIDCoOwner || []),
+            data.memberId
+          ]
         };
         
-        // Create a proper latestMessage object from the system message
-        const latestMessage = {
-          content: data.message.content,
-          dateTime: data.message.dateTime,
-          isRead: false,
-          type: "system",
-          idSender: data.message.idSender || "system",
-          idReceiver: data.message.idReceiver
-        };
-        
-        // Update the conversation with all member-related fields
+        // Update the conversation
         dispatch({
           type: 'UPDATE_CONVERSATION',
           payload: {
             conversationId: data.conversationId,
             updates: {
-              regularMembers: updatedRegularMembers,
-              groupMembers: updatedGroupMembers,
               coOwners: updatedCoOwners,
               rules: updatedRules,
-              latestMessage: latestMessage,
               lastChange: new Date().toISOString()
             }
           }
         });
-      }, [dispatch, conversations]);
+        
+        // Update the latest message in the conversation
+        dispatch({
+          type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            latestMessage: {
+              content: data.systemMessage.content,
+              dateTime: data.systemMessage.dateTime,
+              isRead: false,
+              type: "system"
+            }
+          }
+        });
+      }
+      
+      // Show success toast
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.success("Thăng cấp thành viên thành công");
+        });
+      }
+    } else {
+      console.error("Error promoting member:", data.message);
+      
+      // Show error toast
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.error(data.message || "Không thể thăng cấp thành viên");
+        });
+      }
+    }
+  }, [dispatch, conversations]);
+
+  // Add handler for when the current user is promoted
+  const handleCurrentUserPromoted = useCallback((data: any) => {
+    console.log("Current user promoted:", data);
+
+    if (!data.conversationId) {
+      console.error("Invalid member_promoted data:", data);
+      return;
+    }
+
+    // Find the conversation
+    const conversation = conversations.find(c => c.idConversation === data.conversationId);
+
+    if (!conversation) {
+      console.error("Cannot find conversation in state:", data.conversationId);
+      return;
+    }
+
+    // Update the conversation with the current user as coOwner
+    if (userId) {
+      // Find the current user in regularMembers
+      const currentUserInfo = conversation.regularMembers.find(
+        member => member.id === userId
+      );
+
+      if (!currentUserInfo) {
+        console.error("Cannot find current user in regularMembers");
+        return;
+      }
+
+      // Create updated coOwners array with the current user
+      const updatedCoOwners = [
+        ...(conversation.coOwners || []),
+        {
+          id: currentUserInfo.id,
+          fullname: currentUserInfo.fullname,
+          urlavatar: currentUserInfo.urlavatar
+        }
+      ];
+
+      // Create updated rules with the current user ID
+      const updatedRules = {
+        ...conversation.rules,
+        listIDCoOwner: [
+          ...(conversation.rules?.listIDCoOwner || []),
+          userId
+        ]
+      };
+
+      // Update the conversation
+      dispatch({
+        type: 'UPDATE_CONVERSATION',
+        payload: {
+          conversationId: data.conversationId,
+          updates: {
+            coOwners: updatedCoOwners,
+            rules: updatedRules,
+            lastChange: new Date().toISOString()
+          }
+        }
+      });
+
+      // Show toast notification
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.success("Bạn đã được thăng cấp làm phó nhóm");
+        });
+      }
+    }
+  }, [dispatch, conversations, userId]);
   // Gộp các useEffect đăng ký sự kiện socket
   useEffect(() => {
     if (!socket) return;
@@ -1044,6 +1330,10 @@ export const useChat = (userId: string) => {
     socket.on("removed_from_group", handleRemovedFromGroup);
     socket.on("leave_group_response", handleLeaveGroupResponse);
     socket.on("member_left_group", handleMemberLeftGroup);
+    // Register the event listeners for member promotion
+    socket.on("member_promoted_notification", handleMemberPromoted);
+    socket.on("promote_member_response", handlePromoteMemberResponse);
+    socket.on("member_promoted", handleCurrentUserPromoted);
     socket.on("error", handleError);
     const handleGroupConversationCreated = (data: any) => {
       console.log("Group conversation creation response:", data);
@@ -1109,7 +1399,7 @@ export const useChat = (userId: string) => {
         return;
       }
       const conversation = conversations.find(conv => conv.idConversation === conversationId);
-  
+
       // Find sender information
       let senderInfo = null;
       if (message.idSender && conversation) {
@@ -1491,6 +1781,10 @@ export const useChat = (userId: string) => {
       socket.off("removed_from_group", handleRemovedFromGroup);
       socket.off("leave_group_response", handleLeaveGroupResponse);
       socket.off("member_left_group", handleMemberLeftGroup);
+      // Unregister the event listeners for member promotion
+      socket.off("member_promoted_notification", handleMemberPromoted);
+      socket.off("promote_member_response", handlePromoteMemberResponse);
+      socket.off("member_promoted", handleCurrentUserPromoted);
       socket.offAny();
     };
   }, [socket, userId, messages, conversations, loadConversations]);
@@ -1658,24 +1952,24 @@ export const useChat = (userId: string) => {
         console.log("Không thể gửi tin nhắn: Socket chưa sẵn sàng");
         return;
       }
-  
+
       console.log(`Gửi tin nhắn đến cuộc trò chuyện ${idConversation}: ${text}, type: ${type}`);
-  
+
       // Tìm thông tin người nhận từ cuộc trò chuyện
       const conversation = conversations.find(
         (conv) => conv.idConversation === idConversation
       );
-  
+
       if (!conversation) {
         console.error("Không tìm thấy cuộc trò chuyện");
         return;
       }
-  
+
       // Xác định người nhận
       const receiverId = conversation.idSender === userId
         ? conversation.idReceiver
         : conversation.idSender;
-  
+
       // Tạo tin nhắn tạm thời để hiển thị ngay lập tức
       const tempMessage: Message = {
         idMessage: `temp-${Date.now()}`,
@@ -1690,7 +1984,7 @@ export const useChat = (userId: string) => {
           id: userId
         }
       };
-  
+
       // Cập nhật danh sách tin nhắn với tin nhắn tạm thời
       dispatch({
         type: 'ADD_MESSAGE',
@@ -1699,19 +1993,19 @@ export const useChat = (userId: string) => {
           message: tempMessage
         }
       });
-  
+
       // Chuẩn bị payload dựa trên loại tin nhắn
       const payload: any = {
         IDSender: userId,
         IDConversation: idConversation,
         type: type
       };
-  
+
       // For direct messages, add the receiver ID
       if (!conversation.isGroup) {
         payload.IDReceiver = receiverId;
       }
-  
+
       // Nếu là tin nhắn văn bản
       if (type === "text") {
         payload.textMessage = text;
@@ -1721,7 +2015,7 @@ export const useChat = (userId: string) => {
         payload.fileUrl = fileUrl;
         payload.textMessage = text || "Gửi một tệp đính kèm";
       }
-  
+
       // Emit the appropriate event based on conversation type
       if (conversation.isGroup) {
         console.log("Sending group message:", payload);
@@ -1730,16 +2024,16 @@ export const useChat = (userId: string) => {
         console.log("Sending direct message:", payload);
         socket.emit("send_message", payload);
       }
-  
+
       // After sending the message, listen for the success response
       const successEvent = conversation.isGroup ? "group_message_response" : "send_message_success";
       socket.once(successEvent, (response) => {
         console.log(`${successEvent} received:`, response);
-        
+
         // Extract the message and conversation ID from the response
         const responseMessage = response.message || response;
         const responseConversationId = response.conversationId || response.idConversation;
-        
+
         if (responseMessage && responseConversationId) {
           // Update messages state
           dispatch({
@@ -1749,7 +2043,7 @@ export const useChat = (userId: string) => {
               message: responseMessage
             }
           });
-  
+
           // Also update the conversation with the latest message
           dispatch({
             type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
@@ -2016,6 +2310,6 @@ export const useChat = (userId: string) => {
     createGroupConversation,
     addMembersToGroup,
     removeMembersFromGroup,
-    
+
   };
 };
