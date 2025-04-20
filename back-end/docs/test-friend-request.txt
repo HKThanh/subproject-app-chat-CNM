@@ -305,3 +305,55 @@ output
         }
     ]
 }
+
+*localhost:3000/user/friend/unfriend (POST)
+Events: unfriend
+
+api:
+input
+{
+    "friendId": "user005" //id của bạn bè muốn hủy kết bạn
+}
+
+{
+    "code": -1,
+    "message": "Người này không có trong danh sách bạn bè"
+}
+
+input
+{
+    "friendId": "user012" //id của bạn bè muốn hủy kết bạn
+}
+output
+{
+    "code": -1,
+    "message": "Không tìm thấy người dùng bạn muốn hủy kết bạn"
+}
+
+Nếu gọi api thành công
+input
+{
+    "friendId": "user007" //id của bạn bè muốn hủy kết bạn
+}
+output
+{
+    "code": 1,
+    "message": "Hủy kết bạn thành công",
+    "data": {
+        "userId": "user009",
+        "friendId": "user007"
+    }
+}
+
+Phía người nhận có thể nhận được thông báo từ socket
+output
+{
+    "message": "Vũ Đức Minh đã hủy kết bạn với bạn",
+    "friendId": "user009"
+}
+
+Phía người gửi
+{
+    "message": "Bạn đã huỷ kết bạn với Lê Minh Hoàng",
+    "friendId": "user007"
+}
