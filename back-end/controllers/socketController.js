@@ -1381,7 +1381,24 @@ const handleAddMemberToGroup = async (io, socket) => {
 
     // Cập nhật lastChange và idNewestMessage
     await updateLastChangeConversation(IDConversation, systemMessage.idMessage);
+    // Get owner information
+    const ownerInfo = await User.findOne({ id: conversation.rules.IDOwner }).select(
+      "id fullname urlavatar phone email -_id"
+    );
 
+    // Get coOwners information
+    const coOwnersInfo = await Promise.all(
+      (conversation.rules.listIDCoOwner || []).map(async (coOwnerId) => {
+        const userInfo = await User.findOne({ id: coOwnerId }).select(
+          "id fullname urlavatar"
+        );
+        return {
+          id: coOwnerId,
+          fullname: userInfo ? userInfo.fullname : "Unknown User",
+          urlavatar: userInfo ? userInfo.urlavatar : null,
+        };
+      })
+    );
     const dataNewMembers = await Promise.all(
       newMembers.map(async (member) => {
         const userInfo = await User.findOne({ id: member }).select(
@@ -1404,19 +1421,42 @@ const handleAddMemberToGroup = async (io, socket) => {
           conversationId: IDConversation,
           message: systemMessage
         });
+
       }
     });
     // Gửi thông báo cho các thành viên mới
     newMembers.forEach(async (member) => {
-
+      const allMembersInfo = await Promise.all(
+        conversation.groupMembers.map(async (member) => {
+          const userInfo = await User.findOne({ id: member }).select(
+            "id fullname urlavatar phone status"
+          );
+          return {
+            id: member,
+            fullname: userInfo ? userInfo.fullname : "Unknown User",
+            urlavatar: userInfo ? userInfo.urlavatar : null,
+            phone: userInfo ? userInfo.phone : null,
+            status: userInfo ? userInfo.status : "offline",
+          };
+        })
+      );
       const userSocket = getUser(member);
       if (userSocket?.socketId) {
         io.to(userSocket.socketId).emit("new_group_conversation", {
           success: true,
-          conversation: updatedConversation,
-
+          conversation: {
+            ...updatedConversation.toObject(),
+          },
+          owner: ownerInfo ? {
+            id: ownerInfo.id,
+            fullname: ownerInfo.fullname,
+            urlavatar: ownerInfo.urlavatar,
+            phone: ownerInfo.phone,
+            email: ownerInfo.email
+          } : null,
+          coOwners: coOwnersInfo,
+          members: allMembersInfo,
           message: "Bạn đã được thêm vào nhóm",
-          members: dataNewMembers,
           systemMessage
         });
       }
@@ -2426,6 +2466,7 @@ const handleDemoteMember = (io, socket) => {
 
       // Thông báo cho người giáng cấp
       socket.emit("demote_member_response", {
+        conversationId: IDConversation,
         success: true,
         message: "Thu hồi quyền quản trị viên thành công",
         memberId: IDMemberToDemote,
