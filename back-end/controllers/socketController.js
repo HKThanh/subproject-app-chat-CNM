@@ -1597,7 +1597,6 @@ const handleDeleteGroup = async (io, socket) => {
     socket.emit("message_from_server", {
       success: true,
       message: "Nhóm đã được xóa thành công!",
-      conversationId: IDConversation,
     });
 
     groupMembers.forEach(async (member) => {
@@ -1606,8 +1605,6 @@ const handleDeleteGroup = async (io, socket) => {
         io.to(user.socketId).emit("new_group_conversation", {
           success: true,
           message: `Nhóm ${groupName} đã bị xóa`,
-          status: "deleted",
-          conversationId: IDConversation,
         });
       }
     });
@@ -1681,7 +1678,17 @@ const handleChangeOwnerGroup = async (io, socket) => {
     await updateLastChangeConversation(IDConversation, updatedConversation.idNewestMessage);
 
     const user = await User.findOne({ id: IDUser }).select('fullname');
-    const newOwner = await User.findOne({ id: IDNewOwner }).select('fullname');
+    const newOwner = await User.findOne({ id: IDNewOwner }).select("id fullname urlavatar phone email");
+    const oldOwner = await User.findOne({ id: IDUser }).select("fullname");
+
+    const newOwnerInfo = {
+      id: newOwner.id,
+      fullname: newOwner.fullname,
+      urlavatar: newOwner.urlavatar || "",
+      phone: newOwner.phone || "",
+      email: newOwner.email || ""
+    };
+    
     const systemMessage = await MessageDetail.create({
       idMessage: uuidv4(),
       idSender: "system",
@@ -1691,6 +1698,7 @@ const handleChangeOwnerGroup = async (io, socket) => {
       dateTime: new Date().toISOString(),
       isRead: false
     });
+    
     // Cập nhật lastChange và idNewestMessage
     await updateLastChangeConversation(
       IDConversation,
@@ -1702,7 +1710,10 @@ const handleChangeOwnerGroup = async (io, socket) => {
       {
         success: true,
         message: "Thay đổi chủ nhóm thành công",
-        conversation: updatedConversation
+        status: "changeOwner",
+        conversation: updatedConversation,
+        systemMessage: systemMessage,
+        newOwner: newOwnerInfo,
       }
     );
 
@@ -1715,6 +1726,8 @@ const handleChangeOwnerGroup = async (io, socket) => {
           success: true,
           conversation: updatedConversation,
           message: `Bạn đã trở thành chủ nhóm ${conversation.groupName}`,
+          systemMessage: systemMessage,
+          newOwner: newOwnerInfo,
         }
       );
     }
@@ -1728,7 +1741,8 @@ const handleChangeOwnerGroup = async (io, socket) => {
             success: true,
             conversationId: IDConversation,
             systemMessage,
-            message: `${user?.fullname || IDUser} đã chuyển quyền chủ nhóm cho ${newOwner?.fullname || IDNewOwner}`
+            newOwner: newOwnerInfo,
+            message: `${oldOwner?.fullname || IDUser} đã chuyển quyền chủ nhóm cho ${newOwner?.fullname || IDNewOwner}`,
           });
         }
       }
@@ -2166,11 +2180,23 @@ const handlePromoteMemberToAdmin = (io, socket) => {
         }
       );
 
+      const updatedConversation = await Conversation.findOne({
+        idConversation: IDConversation
+      });
+
       // Lấy thông tin người dùng
       const [promoter, promoted] = await Promise.all([
         User.findOne({ id: IDUser }).select("fullname"),
-        User.findOne({ id: IDMemberToPromote }).select("fullname"),
+        User.findOne({ id: IDMemberToPromote }).select("id fullname urlavatar phone email"),
       ]);
+
+      const promotedMemberInfo = {
+        id: promoted.id,
+        fullname: promoted.fullname,
+        urlavatar: promoted.urlavatar || "",
+        phone: promoted.phone || "",
+        email: promoted.email || ""
+      };
 
       // Tạo thông báo hệ thống
       const systemMessage = await MessageDetail.create({
@@ -2194,7 +2220,11 @@ const handlePromoteMemberToAdmin = (io, socket) => {
       socket.emit("promote_member_response", {
         success: true,
         message: "Thăng cấp thành viên thành quản trị viên thành công",
+        conversationId: IDConversation,
         memberId: IDMemberToPromote,
+        promotedMember: promotedMemberInfo,
+        systemMessage: systemMessage,
+        updatedRules: updatedConversation.rules
       });
 
       // Thông báo cho người được thăng cấp
@@ -2204,6 +2234,8 @@ const handlePromoteMemberToAdmin = (io, socket) => {
           conversationId: IDConversation,
           promotedBy: IDUser,
           message: "Bạn đã được thăng cấp làm quản trị viên nhóm",
+          systemMessage: systemMessage,
+          updatedRules: updatedConversation.rules
         });
       }
 
@@ -2217,6 +2249,7 @@ const handlePromoteMemberToAdmin = (io, socket) => {
               promotedMember: IDMemberToPromote,
               promotedBy: IDUser,
               systemMessage,
+              updatedRules: updatedConversation.rules,
             });
           }
         }
@@ -2311,6 +2344,7 @@ const handleDemoteMember = (io, socket) => {
         success: true,
         message: "Thu hồi quyền quản trị viên thành công",
         memberId: IDMemberToDemote,
+        systemMessage: systemMessage,
       });
 
       // Thông báo cho người bị giáng cấp
@@ -2320,6 +2354,7 @@ const handleDemoteMember = (io, socket) => {
           conversationId: IDConversation,
           demotedBy: IDUser,
           message: "Bạn đã bị thu hồi quyền quản trị viên nhóm",
+          systemMessage: systemMessage,
         });
       }
 
