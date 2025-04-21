@@ -44,11 +44,15 @@ interface ChatInfoProps {
     conversationId: string,
     membersToRemove: string[]
   ) => void;
+  changeGroupOwner: (conversationId: string, newOwnerId: string) => void;
+  demoteMember?: (conversationId: string, memberToDemote: string) => void;
 }
 
 export default function ChatInfo({
   activeConversation,
   removeMembersFromGroup,
+  changeGroupOwner,
+  demoteMember,
 }: ChatInfoProps) {
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
@@ -63,7 +67,7 @@ export default function ChatInfo({
   const [confirmationState, setConfirmationState] = useState({
     isOpen: false,
     memberId: "",
-    action: "" as "remove" | "promote" | "transfer" | "",
+    action: "" as "remove" | "promote" | "transfer" | "demote" | "",
   });
   const [isLeaveGroupConfirmOpen, setIsLeaveGroupConfirmOpen] = useState(false);
   const { socket } = useSocketContext();
@@ -259,6 +263,8 @@ export default function ChatInfo({
     if (!activeConversation || !confirmationState.memberId) return;
 
     if (confirmationState.action === "remove") {
+      console.log("is remove member>> ", confirmationState.memberId);
+
       removeMembersFromGroup(activeConversation.idConversation, [
         confirmationState.memberId,
       ]);
@@ -277,9 +283,27 @@ export default function ChatInfo({
 
       toast.success("Đang thăng cấp thành viên lên phó nhóm...");
     } else if (confirmationState.action === "transfer") {
-      handleTransferOwnership(confirmationState.memberId);
+      if (changeGroupOwner && activeConversation) {
+        changeGroupOwner(
+          activeConversation.idConversation,
+          confirmationState.memberId
+        );
+        toast.success("Đang chuyển quyền trưởng nhóm...");
+      } else {
+        toast.error("Không thể chuyển quyền trưởng nhóm");
+      }
+    } else if (confirmationState.action === "demote") {
+      // Call the demoteMember function
+      if (demoteMember && activeConversation) {
+        demoteMember(
+          activeConversation.idConversation,
+          confirmationState.memberId
+        );
+        toast.success("Đang thu hồi quyền quản trị viên...");
+      } else {
+        toast.error("Không thể thu hồi quyền quản trị viên");
+      }
     }
-
     // Close the modal
     setConfirmationState({
       isOpen: false,
@@ -323,7 +347,17 @@ export default function ChatInfo({
       [section]: !prev[section],
     }));
   };
+  // Add a function to handle demoting a co-owner
+  const handleDemoteMember = (memberId: string) => {
+    if (!activeConversation) return;
 
+    // Open confirmation modal
+    setConfirmationState({
+      isOpen: true,
+      memberId,
+      action: "demote",
+    });
+  };
   // New function to handle leaving group
   const handleLeaveGroup = () => {
     if (!socket || !activeConversation) return;
@@ -765,6 +799,12 @@ export default function ChatInfo({
                               >
                                 <Crown className="w-4 h-4 mr-2" />
                                 <span>Chuyển quyền trưởng nhóm</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDemoteMember(coOwnerId)}
+                              >
+                                <UserMinus className="mr-2 h-4 w-4" />
+                                Thu hồi quyền quản trị
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleRemoveMember(coOwnerId)}

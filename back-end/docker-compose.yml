@@ -4,12 +4,13 @@ services:
     ports:
       - "27018:27017"
     volumes:
-      - ./data-test/mongodb/data:/data/db
-      - ./data-test/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js
+      - mongo-data:/data/db
+      - ./data-test/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
     environment:
       - MONGO_INITDB_DATABASE=chat-app
     networks:
       - mongodb-net
+    restart: always
 
   mongo-express:
     image: mongo-express:latest
