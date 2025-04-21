@@ -1701,6 +1701,221 @@ export const useChat = (userId: string) => {
       IDNewOwner: newOwnerId
     });
   }, [socket, userId]);
+  // Add this handler for member demoted response
+  const handleDemoteMemberResponse = useCallback((data: any) => {
+    console.log("Demote member response:", data);
+
+    if (data.success) {
+      if (data.conversationId && data.memberId && data.systemMessage) {
+        // Find the conversation
+        const conversation = conversations.find(c => c.idConversation === data.conversationId);
+
+        if (!conversation) {
+          console.error("Cannot find conversation in state:", data.conversationId);
+          return;
+        }
+
+        // Add the system message to the conversation
+        dispatch({
+          type: 'ADD_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            message: {
+              ...data.systemMessage,
+              isOwn: false,
+              type: "system"
+            }
+          }
+        });
+
+        // Create updated coOwners array without the demoted member
+        const updatedCoOwners = (conversation.coOwners || []).filter(
+          coOwner => coOwner.id !== data.memberId
+        );
+
+        // Create updated rules without the demoted member ID
+        const updatedRules = {
+          ...conversation.rules,
+          listIDCoOwner: (conversation.rules?.listIDCoOwner || []).filter(
+            id => id !== data.memberId
+          )
+        };
+
+        // Update the conversation
+        dispatch({
+          type: 'UPDATE_CONVERSATION',
+          payload: {
+            conversationId: data.conversationId,
+            updates: {
+              coOwners: updatedCoOwners,
+              rules: updatedRules,
+              lastChange: new Date().toISOString()
+            }
+          }
+        });
+
+        // Update the latest message in the conversation
+        dispatch({
+          type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            latestMessage: {
+              idMessage: data.systemMessage.idMessage,
+              idConversation: data.systemMessage.idConversation,
+              content: data.systemMessage.content,
+              dateTime: data.systemMessage.dateTime,
+              isRead: false,
+              type: "system",
+              idSender: "system"
+            }
+          }
+        });
+      }
+      // Show success toast
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.success(data.message || "Đã thu hồi quyền quản trị viên thành công");
+        });
+      }
+    } else {
+      // Show error message
+      console.error("Failed to demote member:", data.message);
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.error(data.message || "Không thể thu hồi quyền quản trị viên");
+        });
+      }
+    }
+  }, []);
+
+  // Add this handler for member demoted notification (for the demoted member)
+  const handleMemberDemoted = useCallback((data: any) => {
+    console.log("Member demoted notification:", data);
+
+    if (data.conversationId) {
+      // Find the current conversation in state
+      const currentConversation = state.conversations.find(
+        c => c.idConversation === data.conversationId
+      );
+
+      if (!currentConversation) {
+        console.error("Cannot find conversation in state:", data.conversationId);
+        return;
+      }
+
+      // Update the conversation with the new co-owners list
+      dispatch({
+        type: 'UPDATE_CONVERSATION',
+        payload: {
+          conversationId: data.conversationId,
+          updates: {
+            coOwners: (currentConversation.coOwners || []).filter(
+              coOwner => coOwner.id !== userId
+            ),
+            rules: {
+              ...currentConversation.rules,
+              listIDCoOwner: (currentConversation.rules?.listIDCoOwner || []).filter(
+                id => id !== userId
+              )
+            }
+          }
+        }
+      });
+
+      // Show notification
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.info(data.message || "Bạn đã bị thu hồi quyền quản trị viên", {
+            duration: 5000
+          });
+        });
+      }
+    }
+  }, [dispatch, state.conversations, userId]);
+
+  // Add this handler for member demoted notification (for other members)
+  const handleMemberDemotedNotification = useCallback((data: any) => {
+    console.log("Member demoted notification for others:", data);
+
+    if (data.conversationId && data.demotedMember) {
+      // Find the current conversation in state
+      const currentConversation = state.conversations.find(
+        c => c.idConversation === data.conversationId
+      );
+
+      if (!currentConversation) {
+        console.error("Cannot find conversation in state:", data.conversationId);
+        return;
+      }
+
+      // Update the conversation with the new co-owners list
+      dispatch({
+        type: 'UPDATE_CONVERSATION',
+        payload: {
+          conversationId: data.conversationId,
+          updates: {
+            coOwners: (currentConversation.coOwners || []).filter(
+              coOwner => coOwner.id !== data.demotedMember
+            ),
+            rules: {
+              ...currentConversation.rules,
+              listIDCoOwner: (currentConversation.rules?.listIDCoOwner || []).filter(
+                id => id !== data.demotedMember
+              )
+            }
+          }
+        }
+      });
+
+      // Add the system message to the conversation
+      if (data.systemMessage) {
+        dispatch({
+          type: 'ADD_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            message: {
+              ...data.systemMessage,
+              isOwn: false
+            }
+          }
+        });
+
+        // Update the conversation's latest message
+        dispatch({
+          type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            latestMessage: {
+              idMessage: data.systemMessage.idMessage,
+              idConversation: data.systemMessage.idConversation,
+              content: data.systemMessage.content,
+              dateTime: data.systemMessage.dateTime,
+              isRead: false,
+              type: data.systemMessage.type || "text",
+              idSender: data.systemMessage.idSender || "system"
+            },
+          }
+        });
+      }
+    }
+  }, [dispatch, state.conversations]);
+
+  // Add this function to demote a member
+  const demoteMember = useCallback((
+    conversationId: string,
+    memberToDemote: string
+  ) => {
+    if (!socket || !userId) {
+      console.error("Cannot demote member: Socket not connected or user not authenticated");
+      return;
+    }
+
+    socket.emit("demote_member", {
+      IDConversation: conversationId,
+      IDUser: userId,
+      IDMemberToDemote: memberToDemote
+    });
+  }, [socket, userId]);
   // Gộp các useEffect đăng ký sự kiện socket
   useEffect(() => {
     if (!socket) return;
@@ -1723,6 +1938,10 @@ export const useChat = (userId: string) => {
     socket.on("new_group_owner_noti", handleOwnerChangeNotification);
     socket.on("member_removed_notification", handleOwnerChangeNotificationToRegularMember);
 
+    // Add these new event listeners for demote member
+    socket.on("demote_member_response", handleDemoteMemberResponse);
+    socket.on("member_demoted", handleMemberDemoted);
+    socket.on("member_demoted_notification", handleMemberDemotedNotification);
     socket.on("error", handleError);
     const handleGroupConversationCreated = (data: any) => {
       console.log("Group conversation creation response:", data);
@@ -2178,9 +2397,14 @@ export const useChat = (userId: string) => {
       socket.off("new_group_owner_noti", handleOwnerChangeNotification);
       socket.off("member_removed_notification", handleOwnerChangeNotificationToRegularMember);
 
+      // Unregister the event listeners for member demotion
+      socket.off("demote_member_response", handleDemoteMemberResponse);
+      socket.off("member_demoted", handleMemberDemoted);
+      socket.off("member_demoted_notification", handleMemberDemotedNotification);
       socket.offAny();
     };
-  }, [socket, userId, messages, conversations, loadConversations, handleGroupDeletedResponse, handleGroupDeletedNotification]);
+  }, [socket, userId, messages, conversations, loadConversations, handleGroupDeletedResponse, handleGroupDeletedNotification, 
+    handleDemoteMemberResponse, handleMemberDemoted,handleMemberDemotedNotification]);
 
   // Kết nối người dùng khi socket sẵn sàng
   useEffect(() => {
@@ -2704,5 +2928,6 @@ export const useChat = (userId: string) => {
     addMembersToGroup,
     removeMembersFromGroup,
     changeGroupOwner,
+    demoteMember,
   };
 };
