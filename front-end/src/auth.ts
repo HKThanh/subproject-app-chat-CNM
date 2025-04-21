@@ -115,7 +115,8 @@ export const {
 
                         const decoded = JSON.parse(jsonPayload);
                         console.log('Decoded refresh token in auth.ts:', decoded);
-
+                        console.log("Refresh token in auth.ts:", refreshToken);
+                        
                         const response = await fetch('http://localhost:3000/auth/refresh-token', {
                             method: 'POST',
                             headers: {
@@ -131,7 +132,16 @@ export const {
                         if (!response.ok) {
                             const errorData = await response.json().catch(() => ({}));
                             console.error('Refresh token error in auth.ts:', errorData);
-                            throw new Error(`Refresh token failed with status: ${response.status}`);
+                            
+                            // Clear all token data to force logout
+                            token = { 
+                                ...token,
+                                accessToken: undefined,
+                                refreshToken: undefined
+                            };
+                            
+                            // This will trigger a redirect to login page on next request
+                            throw new Error(`SESSION_EXPIRED`);
                         }
 
                         const data = await response.json();
@@ -158,9 +168,16 @@ export const {
                         }
                     } catch (error) {
                         console.error('Error refreshing token:', error);
-                        // // Clear tokens on refresh error
-                        // delete token.accessToken;
-                        // delete token.refreshToken;
+                        
+                        // Clear tokens on refresh error
+                        token.accessToken = undefined;
+                        token.refreshToken = undefined;
+                        
+                        // If we have a SESSION_EXPIRED error, we'll let the error propagate
+                        // to trigger the signOut in the error handler
+                        if (error instanceof Error && error.message === 'SESSION_EXPIRED') {
+                            throw error;
+                        }
                     }
                 }
             }

@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
       'example.com',
       'static.vecteezy.com',
       'danhgiaxe.edu.vn',
+      'https://picsum.photos'
     ],
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',

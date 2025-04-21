@@ -29,6 +29,8 @@ export default function Home() {
     deleteMessage,
     recallMessage,
     forwardMessage,
+    addMembersToGroup,
+    removeMembersFromGroup
   } = useChatContext();
 
   // Tải danh sách cuộc trò chuyện khi component được mount
@@ -211,6 +213,8 @@ export default function Home() {
                   ) || null
                 : null
             }
+            // addMembersToGroup={addMembersToGroup}
+            removeMembersFromGroup={removeMembersFromGroup}
           />
         </div>
       )}

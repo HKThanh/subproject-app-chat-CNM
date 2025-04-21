@@ -79,14 +79,14 @@ export default function ProfileView({ profile, onEdit, onViewImage }: ProfileVie
             </span>
           </div>
 
-          <div className="flex">
+          {/* <div className="flex">
             <span className="w-24 text-gray-500">Điện thoại</span>
             <span>{profile.phone}</span>
           </div>
 
           <div className="text-xs text-gray-500 mt-4">
             Chỉ bạn bè có lưu số của bạn trong danh bạ mới xem được số này
-          </div>
+          </div> */}
         </div>
       </div>
 
