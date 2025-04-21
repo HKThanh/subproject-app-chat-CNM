@@ -1740,6 +1740,7 @@ export const useChat = (userId: string) => {
             id => id !== data.memberId
           )
         };
+        
         // Update the regularMembers list to reflect the demotion
         const updatedRegularMembers = conversation.regularMembers.map(member => {
           if (member.id === data.memberId) {
@@ -1797,7 +1798,7 @@ export const useChat = (userId: string) => {
         });
       }
     }
-  }, []);
+  }, [dispatch, conversations]);
 
   // handler for member demoted notification (for the demoted member)
   const handleMemberDemoted = useCallback((data: any) => {
@@ -2433,10 +2434,46 @@ export const useChat = (userId: string) => {
           }
         });
       }
+      // Update conversation with new file/image lists if available
+      if (data.conversationUpdates) {
+        dispatch({
+          type: 'UPDATE_CONVERSATION',
+          payload: {
+            conversationId,
+            updates: {
+              listImage: data.conversationUpdates.listImage,
+              listFile: data.conversationUpdates.listFile,
+              listVideo: data.conversationUpdates.listVideo,
+              lastChange: data.conversationUpdates.lastChange
+            }
+          }
+        });
+      }
     };
 
     socket.on("send_message_success", handleSendMessageSuccess);
-
+    //handler for conversation updates
+    const handleConversationUpdated = (data: any) => {
+      console.log("Conversation updated:", data);
+      
+      if (data.conversationId && data.updates) {
+        dispatch({
+          type: 'UPDATE_CONVERSATION',
+          payload: {
+            conversationId: data.conversationId,
+            updates: {
+              listImage: data.updates.listImage,
+              listFile: data.updates.listFile,
+              listVideo: data.updates.listVideo,
+              lastChange: data.updates.lastChange
+            }
+          }
+        });
+      }
+    };
+    
+    // Xử lý sự kiện cập nhật cuộc trò chuyện
+    socket.on("conversation_updated", handleConversationUpdated);
     // Xử lý sự kiện xóa tin nhắn thành công
     const handleDeleteMessageSuccess = (data: { messageId: string, updatedMessage: Message }) => {
       console.log("Tin nhắn đã được xóa:", data);
@@ -2537,6 +2574,7 @@ export const useChat = (userId: string) => {
       socket.off("error", handleError);
       socket.off("load_messages_response", handleLoadMessagesResponseDirect);
       socket.off("receive_message", handleReceiveMessage);
+      socket.off("conversation_updated", handleConversationUpdated);
       socket.off("send_message_success", handleSendMessageSuccess);
       socket.off("delete_message_success", handleDeleteMessageSuccess);
       socket.off("forward_message_success", handleForwardMessageSuccess);

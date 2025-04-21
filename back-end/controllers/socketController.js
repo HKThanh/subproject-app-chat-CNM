@@ -386,7 +386,30 @@ const handleSendMessage = async (io, socket) => {
         dateTime: new Date().toISOString(),
         isRead: false,
       });
+      // Phân loại và lưu vào list tương ứng của conversation
+      const updateFields = {
+        lastChange: new Date().toISOString(),
+        idNewestMessage: messageDetail.idMessage,
+      };
 
+      // Tự động lưu vào danh sách tương ứng dựa vào type
+      if (type === "image") {
+        // Lưu vào listImage
+        updateFields.$push = { listImage: messageContent };
+      } else if (type === "video") {
+        // Lưu vào listVideo
+        updateFields.$push = { listVideo: messageContent };
+      } else if (type === "file" || type === "document") {
+        // Lưu vào listFile
+        updateFields.$push = { listFile: messageContent };
+      }
+
+      // Cập nhật conversation
+      await Conversation.findOneAndUpdate(
+        { idConversation: conversation.idConversation },
+        updateFields,
+        { new: true }
+      );
       // Update last change của conversation
       await updateLastChangeConversation(
         conversation.idConversation,
@@ -425,13 +448,27 @@ const handleSendMessage = async (io, socket) => {
           "receive_message",
           messageWithUsers
         );
-        console.log("Emitting message to receiver:", IDReceiver);
+        io.to(receiverOnline.socketId).emit("conversation_updated", {
+          conversationId: conversation.idConversation,
+          updates: {
+            listImage: updatedConversation.listImage || [],
+            listFile: updatedConversation.listFile || [],
+            listVideo: updatedConversation.listVideo || [],
+            lastChange: updatedConversation.lastChange
+          }
+        });
       }
 
       // Emit success cho sender
       socket.emit("send_message_success", {
         conversationId: conversation.idConversation,
         message: messageWithUsers,
+        conversationUpdates: {
+          listImage: updatedConversation.listImage || [],
+          listFile: updatedConversation.listFile || [],
+          listVideo: updatedConversation.listVideo || [],
+          lastChange: updatedConversation.lastChange
+        }
       });
     } catch (error) {
       console.error("Error sending message:", error);
@@ -1805,7 +1842,27 @@ const handleSendGroupMessage = (io, socket) => {
         dateTime: new Date().toISOString(),
         isRead: false,
       });
+      const updateFields = {
+        lastChange: new Date().toISOString(),
+        idNewestMessage: messageDetail.idMessage,
+      };
 
+      // Tự động lưu vào danh sách tương ứng dựa vào type
+      if (type === "image") {
+        // Lưu vào listImage
+        updateFields.$push = { listImage: messageContent };
+      } else if (type === "video") {
+        // Lưu vào listVideo
+        updateFields.$push = { listVideo: messageContent };
+      } else if (type === "file" || type === "document") {
+        // Lưu vào listFile
+        updateFields.$push = { listFile: messageContent };
+      }
+      const updatedConversation = await Conversation.findOneAndUpdate(
+        { idConversation: IDConversation },
+        updateFields,
+        { new: true }
+      );
       // Update last change của conversation
       await Conversation.updateOne(
         { idConversation: IDConversation },
@@ -1837,6 +1894,17 @@ const handleSendGroupMessage = (io, socket) => {
             "receive_message",
             messageWithUsers
           );
+
+          // Send updated conversation to group members
+          io.to(receiverOnline.socketId).emit("conversation_updated", {
+            conversationId: IDConversation,
+            updates: {
+              listImage: updatedConversation.listImage || [],
+              listFile: updatedConversation.listFile || [],
+              listVideo: updatedConversation.listVideo || [],
+              lastChange: updatedConversation.lastChange
+            }
+          });
         }
       });
 
@@ -1851,6 +1919,12 @@ const handleSendGroupMessage = (io, socket) => {
       socket.emit("send_message_success", {
         conversationId: IDConversation,
         message: messageWithUsers,
+        conversationUpdates: {
+          listImage: updatedConversation.listImage || [],
+          listFile: updatedConversation.listFile || [],
+          listVideo: updatedConversation.listVideo || [],
+          lastChange: updatedConversation.lastChange
+        }
       });
     } catch (error) {
       console.error("Error sending group message:", error);
