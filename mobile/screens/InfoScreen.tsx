@@ -68,7 +68,7 @@ const InfoScreen = ({ navigation, route }: InfoScreenProps) => {
 
     setIsLoadingUserData(true);
     try {
-      const response = await fetch('http://192.168.0.103:3000/user', {
+      const response = await fetch('http://192.168.0.106:3000/user', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -117,7 +117,7 @@ const InfoScreen = ({ navigation, route }: InfoScreenProps) => {
       await socketService.emitUserOffline();
       
       // Gọi API đăng xuất
-      const response = await fetch('http://192.168.0.103:3000/auth/logout/mobile', {
+      const response = await fetch('http://192.168.0.106:3000/auth/logout/mobile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

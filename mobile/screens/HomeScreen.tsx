@@ -21,7 +21,7 @@ import SocketService from '../services/SocketService';
 import SearchUserScreen from './SearchUserScreen';
 
 // Socket.IO server URL
-const SOCKET_URL = 'http://192.168.0.103:3000';
+const SOCKET_URL = 'http://192.168.0.106:3000';
 
 // Global state for persisting conversations between screen navigations
 if (!global.socketInstance) {

@@ -31,7 +31,7 @@ const RegisterScreen = ({ navigation }: RegisterScreenProps) => {
         setErrorMessage('');
 
         try {
-            const response = await fetch('http://192.168.0.103:3000/auth/verify-email-and-phone', {
+            const response = await fetch('http://192.168.0.106:3000/auth/verify-email-and-phone', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

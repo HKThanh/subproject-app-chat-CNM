@@ -82,7 +82,7 @@ const SearchUserScreen = ({ navigation }) => {
   const loadFriends = async () => {
     setIsFriendsLoading(true);
     try {
-      const response = await fetch('http://192.168.0.103:3000/user/friend/get-friends', {
+      const response = await fetch('http://192.168.0.106:3000/user/friend/get-friends', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -92,7 +92,7 @@ const SearchUserScreen = ({ navigation }) => {
       const data = await response.json();
       
       // Lấy danh sách người dùng đã chặn để kiểm tra
-      const blockedResponse = await fetch('http://192.168.0.103:3000/user/blocked/get-blocked', {
+      const blockedResponse = await fetch('http://192.168.0.106:3000/user/blocked/get-blocked', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -122,7 +122,7 @@ const SearchUserScreen = ({ navigation }) => {
   const loadReceivedRequests = async () => {
     setIsRequestsLoading(true);
     try {
-      const response = await fetch('http://192.168.0.103:3000/user/get-received-friend-requests', {
+      const response = await fetch('http://192.168.0.106:3000/user/get-received-friend-requests', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -175,7 +175,7 @@ const SearchUserScreen = ({ navigation }) => {
   const loadSentRequests = async () => {
     setIsRequestsLoading(true);
     try {
-      const response = await fetch('http://192.168.0.103:3000/user/get-sended-friend-requests', {
+      const response = await fetch('http://192.168.0.106:3000/user/get-sended-friend-requests', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -267,7 +267,7 @@ const SearchUserScreen = ({ navigation }) => {
     setError(null);
     
     try {
-      const response = await fetch('http://192.168.0.103:3000/user/search', {
+      const response = await fetch('http://192.168.0.106:3000/user/search', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -299,7 +299,7 @@ const SearchUserScreen = ({ navigation }) => {
   const processUserFriendshipStatus = async (users: User[]): Promise<User[]> => {
     try {
       // Get user's friends
-      const friendsResponse = await fetch('http://192.168.0.103:3000/user/friend/get-friends', {
+      const friendsResponse = await fetch('http://192.168.0.106:3000/user/friend/get-friends', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -309,7 +309,7 @@ const SearchUserScreen = ({ navigation }) => {
       const friendIds = friendsData.code === 0 ? friendsData.data.map(friend => friend.id) : [];
       
       // Get sent friend requests
-      const sentRequestsResponse = await fetch('http://192.168.0.103:3000/user/get-sended-friend-requests', {
+      const sentRequestsResponse = await fetch('http://192.168.0.106:3000/user/get-sended-friend-requests', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -319,7 +319,7 @@ const SearchUserScreen = ({ navigation }) => {
       const sentRequests = sentRequestsData.success ? sentRequestsData.data : [];
       
       // Get received friend requests
-      const receivedRequestsResponse = await fetch('http://192.168.0.103:3000/user/get-received-friend-requests', {
+      const receivedRequestsResponse = await fetch('http://192.168.0.106:3000/user/get-received-friend-requests', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -329,7 +329,7 @@ const SearchUserScreen = ({ navigation }) => {
       const receivedRequests = receivedRequestsData.success ? receivedRequestsData.data : [];
       
       // Get blocked users
-      const blockedUsersResponse = await fetch('http://192.168.0.103:3000/user/blocked/get-blocked', {
+      const blockedUsersResponse = await fetch('http://192.168.0.106:3000/user/blocked/get-blocked', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -417,7 +417,7 @@ const SearchUserScreen = ({ navigation }) => {
   // Set up socket connections
   useEffect(() => {
     // Connect to the socket server
-    socketRef.current = io('http://192.168.0.103:3000');
+    socketRef.current = io('http://192.168.0.106:3000');
     
     // Join user's room to receive notifications
     if (global.userData?.id) {
@@ -541,7 +541,7 @@ const SearchUserScreen = ({ navigation }) => {
         return;
       }
         // Gửi yêu cầu kết bạn mới
-      const response = await fetch('http://192.168.0.103:3000/user/send', {
+      const response = await fetch('http://192.168.0.106:3000/user/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -594,7 +594,7 @@ const SearchUserScreen = ({ navigation }) => {
     
     try {
       // Kiểm tra lại ID yêu cầu kết bạn mới nhất trước khi hủy
-      const sentResponse = await fetch('http://192.168.0.103:3000/user/get-sended-friend-requests', {
+      const sentResponse = await fetch('http://192.168.0.106:3000/user/get-sended-friend-requests', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -612,7 +612,7 @@ const SearchUserScreen = ({ navigation }) => {
       }
       
       // Sử dụng URL chính xác theo tài liệu API với ID yêu cầu mới nhất
-      const response = await fetch(`http://192.168.0.103:3000/user/cancel/${actualRequestId}`, {
+      const response = await fetch(`http://192.168.0.106:3000/user/cancel/${actualRequestId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -667,7 +667,7 @@ const SearchUserScreen = ({ navigation }) => {
     setIsProcessing(true);
     
     try {
-      const response = await fetch('http://192.168.0.103:3000/user/handle', {
+      const response = await fetch('http://192.168.0.106:3000/user/handle', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -716,7 +716,7 @@ const SearchUserScreen = ({ navigation }) => {
     setIsProcessing(true);
     
     try {
-      const response = await fetch('http://192.168.0.103:3000/user/handle', {
+      const response = await fetch('http://192.168.0.106:3000/user/handle', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -769,7 +769,7 @@ const SearchUserScreen = ({ navigation }) => {
         try {
           if (user.isPendingSent) {
             // Hủy lời mời đã gửi
-            await fetch(`http://192.168.0.103:3000/user/cancel/${user.friendRequestId}`, {
+            await fetch(`http://192.168.0.106:3000/user/cancel/${user.friendRequestId}`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${global.accessToken}`
@@ -777,7 +777,7 @@ const SearchUserScreen = ({ navigation }) => {
             });
           } else if (user.isPendingReceived) {
             // Từ chối lời mời đã nhận
-            await fetch('http://192.168.0.103:3000/user/handle', {
+            await fetch('http://192.168.0.106:3000/user/handle', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -795,7 +795,7 @@ const SearchUserScreen = ({ navigation }) => {
       }
       
       // Thực hiện chặn người dùng
-      const response = await fetch('http://192.168.0.103:3000/user/blocked/block', {
+      const response = await fetch('http://192.168.0.106:3000/user/blocked/block', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -862,7 +862,7 @@ const SearchUserScreen = ({ navigation }) => {
       
       const wasFriend = user?.wasFriendBeforeBlocking || false;
       
-      const response = await fetch('http://192.168.0.103:3000/user/blocked/unblock', {
+      const response = await fetch('http://192.168.0.106:3000/user/blocked/unblock', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -947,7 +947,7 @@ const SearchUserScreen = ({ navigation }) => {
             setIsProcessing(true);
             
             try {
-              const response = await fetch('http://192.168.0.103:3000/user/friend/unfriend', {
+              const response = await fetch('http://192.168.0.106:3000/user/friend/unfriend', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -1003,7 +1003,7 @@ const SearchUserScreen = ({ navigation }) => {
   const checkFriendRequestExists = async (userId: string) => {
     try {
       // Kiểm tra xem người dùng đã là bạn bè hay chưa
-      const friendResponse = await fetch('http://192.168.0.103:3000/user/friend/get-friends', {
+      const friendResponse = await fetch('http://192.168.0.106:3000/user/friend/get-friends', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -1019,7 +1019,7 @@ const SearchUserScreen = ({ navigation }) => {
       }
       
       // Kiểm tra yêu cầu kết bạn đã gửi
-      const sentResponse = await fetch('http://192.168.0.103:3000/user/get-sended-friend-requests', {
+      const sentResponse = await fetch('http://192.168.0.106:3000/user/get-sended-friend-requests', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -1038,7 +1038,7 @@ const SearchUserScreen = ({ navigation }) => {
       }
       
       // Kiểm tra yêu cầu kết bạn đã nhận
-      const receivedResponse = await fetch('http://192.168.0.103:3000/user/get-received-friend-requests', {
+      const receivedResponse = await fetch('http://192.168.0.106:3000/user/get-received-friend-requests', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
