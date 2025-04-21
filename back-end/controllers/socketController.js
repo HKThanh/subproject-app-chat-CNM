@@ -2118,6 +2118,7 @@ const handleDemoteMember = (io, socket) => {
         success: true,
         message: "Thu hồi quyền quản trị viên thành công",
         memberId: IDMemberToDemote,
+        systemMessage: systemMessage,
       });
 
       // Thông báo cho người bị giáng cấp
@@ -2127,6 +2128,7 @@ const handleDemoteMember = (io, socket) => {
           conversationId: IDConversation,
           demotedBy: IDUser,
           message: "Bạn đã bị thu hồi quyền quản trị viên nhóm",
+          systemMessage: systemMessage,
         });
       }
 
