@@ -152,7 +152,21 @@ export default function ChatDetail({
       </div>
     );
   }
-
+  const SystemMessage = ({ content, timestamp }: { content: string, timestamp: string }) => {
+    return (
+      <div className="flex justify-center my-2">
+        <div className="bg-gray-50 rounded-full px-4 py-1.5 flex items-center max-w-[80%] shadow-sm border border-gray-100">
+          <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center mr-2 shadow-sm">
+            <Info className="h-3 w-3 text-white" />
+          </div>
+          <span className="text-xs font-medium text-gray-600">{content}</span>
+          <span className="text-[10px] text-gray-400 ml-2 font-light">
+            {timestamp}
+          </span>
+        </div>
+      </div>
+    );
+  };
   // Update the header section of the ChatDetail component to show group information
   // Find the section that renders the conversation header and update it:
   
@@ -226,7 +240,25 @@ export default function ChatDetail({
                 if (!msg.content || msg.content.trim() === "") {
                   return null;
                 }
-
+                if (msg.idSender === "system") {
+                  return (
+                    <SystemMessage 
+                      key={msg.idMessage || `system-${index}`}
+                      content={msg.content}
+                      timestamp={
+                        msg.dateTime
+                          ? new Date(msg.dateTime).toLocaleTimeString("vi-VN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : new Date().toLocaleTimeString("vi-VN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                      }
+                    />
+                  );
+                }
                 let fileUrl;
                 let displayMessage = msg.content;
 

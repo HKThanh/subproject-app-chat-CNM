@@ -1,33 +1,47 @@
+"use client"
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "next-auth/react";
 import AuthSync from "@/components/auth/auth.sync";
 import { Toaster } from "sonner";
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
 });
-
-export const metadata: Metadata = {
-  title: "WeLo - Ứng dụng nhắn tin trực tuyến",
-  description: "WeChat là ứng dụng nhắn tin trực tuyến giúp bạn kết nối và trò chuyện với bạn bè một cách nhanh chóng và tiện lợi",
-  keywords: "chat app, nhắn tin trực tuyến, chat realtime, messenger",
-  authors: [{ name: "WeChat Team" }],
-  openGraph: {
-    title: "WeChat - Ứng dụng nhắn tin trực tuyến",
-    description: "Kết nối và trò chuyện với bạn bè một cách nhanh chóng và tiện lợi",
-    type: "website",
-    locale: "vi_VN",
-  },
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Add a global error handler for auth errors
+    const handleAuthError = (event: PromiseRejectionEvent): void => {
+      if (event && event.reason && 
+          typeof event.reason.message === 'string' && 
+          event.reason.message.includes('SESSION_EXPIRED')) {
+        console.log('Session expired, redirecting to login');
+        
+        // Sign out the user and redirect to login
+        signOut({ redirect: true, callbackUrl: '/auth/login' });
+      }
+    };
+
+    // Add the event listener
+    window.addEventListener('unhandledrejection', handleAuthError);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('unhandledrejection', handleAuthError);
+    };
+  }, [router]);
+
   return (
     <html lang="en">
       <body className={inter.className}>
