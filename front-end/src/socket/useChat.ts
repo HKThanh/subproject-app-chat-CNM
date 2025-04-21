@@ -1740,6 +1740,16 @@ export const useChat = (userId: string) => {
             id => id !== data.memberId
           )
         };
+        // Update the regularMembers list to reflect the demotion
+        const updatedRegularMembers = conversation.regularMembers.map(member => {
+          if (member.id === data.memberId) {
+            return {
+              ...member,
+              role: 'member' // Update role property to reflect demotion
+            };
+          }
+          return member;
+        });
 
         // Update the conversation
         dispatch({
@@ -1748,6 +1758,7 @@ export const useChat = (userId: string) => {
             conversationId: data.conversationId,
             updates: {
               coOwners: updatedCoOwners,
+              regularMembers: updatedRegularMembers,
               rules: updatedRules,
               lastChange: new Date().toISOString()
             }
@@ -1760,10 +1771,10 @@ export const useChat = (userId: string) => {
           payload: {
             conversationId: data.conversationId,
             latestMessage: {
-              idMessage: data.systemMessage.idMessage,
+              idMessage: data.systemMessage.idMessage || `system-${Date.now()}`,
               idConversation: data.systemMessage.idConversation,
               content: data.systemMessage.content,
-              dateTime: data.systemMessage.dateTime,
+              dateTime: data.systemMessage.dateTime || new Date().toISOString(),
               isRead: false,
               type: "system",
               idSender: "system"
@@ -1802,7 +1813,18 @@ export const useChat = (userId: string) => {
         console.error("Cannot find conversation in state:", data.conversationId);
         return;
       }
-
+      // Add the system message to the conversation
+      dispatch({
+        type: 'ADD_MESSAGE',
+        payload: {
+          conversationId: data.conversationId,
+          message: {
+           ...data.systemMessage,
+            isOwn: false,
+            type: "system"
+          }
+        }
+      });
       // Update the conversation with the new co-owners list
       dispatch({
         type: 'UPDATE_CONVERSATION',
@@ -2403,8 +2425,8 @@ export const useChat = (userId: string) => {
       socket.off("member_demoted_notification", handleMemberDemotedNotification);
       socket.offAny();
     };
-  }, [socket, userId, messages, conversations, loadConversations, handleGroupDeletedResponse, handleGroupDeletedNotification, 
-    handleDemoteMemberResponse, handleMemberDemoted,handleMemberDemotedNotification]);
+  }, [socket, userId, messages, conversations, loadConversations, handleGroupDeletedResponse, handleGroupDeletedNotification,
+    handleDemoteMemberResponse, handleMemberDemoted, handleMemberDemotedNotification]);
 
   // Kết nối người dùng khi socket sẵn sàng
   useEffect(() => {

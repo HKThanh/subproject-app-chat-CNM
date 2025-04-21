@@ -1189,6 +1189,8 @@ export default function ChatInfo({
             {confirmationState.action === "promote" && "Thăng cấp thành viên"}
             {confirmationState.action === "transfer" &&
               "Chuyển quyền trưởng nhóm"}
+            {confirmationState.action === "demote" &&
+              "Thu hồi quyền quản trị viên"}
           </DialogTitle>
 
           <div className="mt-4">
@@ -1199,6 +1201,8 @@ export default function ChatInfo({
                 "Bạn có chắc chắn muốn thăng cấp thành viên này lên phó nhóm?"}
               {confirmationState.action === "transfer" &&
                 "Bạn có chắc chắn muốn chuyển quyền trưởng nhóm cho thành viên này?"}
+                 {confirmationState.action === "demote" &&
+                "Bạn có chắc chắn muốn thu hồi quyền quản trị viên của thành viên này?"}
             </p>
 
             <div className="flex justify-end gap-2 mt-4">
@@ -1214,7 +1218,9 @@ export default function ChatInfo({
               >
                 Hủy
               </Button>
-              <Button onClick={handleConfirmAction}>Xác nhận</Button>
+              <Button 
+              variant={confirmationState.action === "demote" || confirmationState.action === "remove" ? "destructive" : "default"}
+              onClick={handleConfirmAction}>Xác nhận</Button>
             </div>
           </div>
         </DialogContent>
