@@ -374,7 +374,7 @@ const handleSendMessage = async (io, socket) => {
       // Tạo message detail dựa vào type
       let messageContent = textMessage;
       if (type !== "text") {
-        messageContent = fileUrl; // URL từ S3 sau khi upload
+        messageContent = fileUrl;
       }
 
       const messageDetail = await MessageDetail.create({
@@ -382,11 +382,29 @@ const handleSendMessage = async (io, socket) => {
         idSender: IDSender,
         idReceiver: IDReceiver,
         idConversation: conversation.idConversation,
-        type: type, // 'text', 'image', 'video', 'document'
+        type: type,
         content: messageContent,
         dateTime: new Date().toISOString(),
         isRead: false,
       });
+
+      // Nếu là ảnh hoặc file, lưu vào list tương ứng của conversation
+      if (type === "image" || type === "file") {
+        const updateField = type === "image" ? "listImage" : "listFile";
+        await Conversation.findOneAndUpdate(
+          { idConversation: conversation.idConversation },
+          {
+            $push: {
+              [updateField]: {
+                url: fileUrl,
+                fileName: textMessage, // Sử dụng textMessage làm fileName nếu có
+                uploadedBy: IDSender,
+                uploadedAt: new Date().toISOString()
+              }
+            }
+          }
+        );
+      }
 
       // Update last change của conversation
       await updateLastChangeConversation(
@@ -412,21 +430,11 @@ const handleSendMessage = async (io, socket) => {
 
       // Emit message cho receiver nếu online
       const receiverOnline = getUser(IDReceiver);
-      console.log(
-        "Receiver online status:",
-        receiverOnline,
-        "IDReceiver:",
-        IDReceiver,
-        "Online users:",
-        onlineUsers
-      );
-
       if (receiverOnline) {
         io.to(receiverOnline.socketId).emit(
           "receive_message",
           messageWithUsers
         );
-        console.log("Emitting message to receiver:", IDReceiver);
       }
 
       // Emit success cho sender
