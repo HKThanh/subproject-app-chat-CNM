@@ -632,10 +632,23 @@ const handleForwardMessage = async (io, socket) => {
           senderInfo,
         };
 
-        // Gửi tin nhắn tới receiver nếu online
-        const receiverOnline = getUser(IDReceiver);
-        if (receiverOnline) {
-          io.to(receiverOnline.socketId).emit("receive_message", messageWithUser);
+        if (conversation.isGroup) {
+          // Nếu là nhóm, gửi tới tất cả thành viên trong nhóm
+          conversation.groupMembers.forEach((memberId) => {
+            if (memberId !== IDSender) { // Không gửi lại cho người gửi
+              const memberSocket = getUser(memberId);
+              console.log("Member socket ID: ", memberSocket);
+              if (memberSocket) {
+                io.to(memberSocket.socketId).emit("receive_message", messageWithUser);
+              }
+            }
+          });
+        } else {
+          // Gửi tin nhắn tới receiver nếu online
+          const receiverOnline = getUser(IDReceiver);
+          if (receiverOnline) {
+            io.to(receiverOnline.socketId).emit("receive_message", messageWithUser);
+          }
         }
 
         io.to(IDConversation).emit("receive_message", messageWithUser);
