@@ -35,7 +35,7 @@ import { pickDocument, getDocumentIcon, createDocumentFileData } from '../compon
 import useAuthInit, { useSafeSocket } from '../hooks/useAuthInit';
 
 // API URL
-const API_URL = 'http://192.168.0.106:3000';
+const API_URL = 'http://192.168.0.105:3000';
 
 // Define allowed file types
 const allowedTypes = {
@@ -421,7 +421,6 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       setTimeout(scrollToBottom, 100);
     }
   }, [dataView.length]);
-
   // Thêm useEffect để cập nhật khi người dùng quay lại màn hình
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -439,6 +438,7 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       if (socket && socket.connected) {
         const userData = socketService.getUserData();
         if (userData && userData.id) {
+          console.log('Requesting updated group info after returning to screen');
           // Yêu cầu thông tin nhóm cập nhật từ server
           socket.emit('get_group_info', {
             IDUser: userData.id,
@@ -699,9 +699,7 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
     socket.off('group_owner_changed');
     socket.off('member_promoted_to_admin');
     socket.off('member_demoted_from_admin');
-    socket.off('group_deleted');
-
-    // Load messages response handler
+    socket.off('group_deleted');    // Load messages response handler
     socket.on('load_messages_response', (data) => {
       console.log('Messages received:', data);
       setIsLoading(false);
@@ -709,6 +707,7 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
 
       console.log('Debug - hasMessages:', data && data.messages && data.messages.length > 0);
       console.log('Debug - messages count:', data?.messages?.length || 0);
+      console.log('Debug - message direction:', data?.direction || 'newer');
 
       if (data && data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
         // Process messages
@@ -716,7 +715,8 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
         const userId = userData?.id || ''; // Fallback if not available
 
         console.log('Processing messages, current user ID:', userId);
-        console.log('First message in response:', data.messages[0]);          // First map to add sentByMe flag and handle senderInfo
+        console.log('First message in response:', data.messages[0]);     
+             // First map to add sentByMe flag and handle senderInfo
         const processedMessages = data.messages.map((msg: Message) => {
           // Xác định lại idSender của tin nhắn có trùng với userId hiện tại không
           // Đảm bảo rằng khi đăng nhập tài khoản khác, tin nhắn sẽ được phân loại đúng
@@ -765,24 +765,26 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
           return true; // Keep all other messages
         });
 
-        console.log(`After filtering, have ${filteredMessages.length} messages to display`);
-
-        // Update hasMoreOldMessages based on server response
+        console.log(`After filtering, have ${filteredMessages.length} messages to display`);        // Update hasMoreOldMessages based on server response
         if (data.hasMore !== undefined) {
           setHasMoreOldMessages(data.hasMore);
+          console.log('Server indicated hasMore:', data.hasMore);
         } else {
           // If server doesn't return hasMore, default to false
           setHasMoreOldMessages(false);
+          console.log('Server did not indicate hasMore, defaulting to false');
         }
 
         // Determine if these are older messages
         const isOlderMessages = data.direction === 'older';
+        console.log('Loading message direction:', isOlderMessages ? 'older' : 'newer');
 
         if (isOlderMessages) {
           console.log(`Received ${filteredMessages.length} older messages`);
 
-          // Reverse order so older messages are at the top
-          const reversedMessages = [...filteredMessages].reverse();
+          // Không cần đảo ngược nếu tin nhắn đã được sắp xếp theo thứ tự cũ nhất -> mới nhất
+          // Server đã trả về tin nhắn theo thứ tự từ cũ nhất đến mới nhất
+          const olderMessages = [...filteredMessages];
 
           setDataView(prevMessages => {
             // Create Set of existing message IDs to check for duplicates faster
@@ -791,15 +793,26 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
             ));
 
             // Filter messages to avoid duplicates
-            const uniqueNewMessages = reversedMessages.filter(msg =>
+            const uniqueNewMessages = olderMessages.filter(msg =>
               !existingIds.has(msg._id || msg.idMessage)
             );
 
             console.log(`Adding ${uniqueNewMessages.length} unique older messages to the list`);
+            
+            // Kiểm tra các tin nhắn hệ thống để xử lý đặc biệt
+            const systemMessages = uniqueNewMessages.filter(msg => 
+              msg.idSender === 'system' || msg.type === 'system'
+            );
+            
+            if (systemMessages.length > 0) {
+              console.log(`Found ${systemMessages.length} system messages in older messages`);
+            }
 
             // Combine messages in correct order: older messages on top, newer below
             return [...uniqueNewMessages, ...prevMessages];
           });
+          
+          // Không cuộn xuống khi tải tin nhắn cũ
         } else {
           // Initial message load, replace the entire list
           const sortedMessages = [...filteredMessages].reverse();
@@ -845,24 +858,57 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
           console.log('Group member statuses:', groupMemberStatuses);
         }
       }
-    });
-
-    // Listen for receive message event (real-time message receiving)
-    socket.on('receive_message', (newMessage) => {
-      console.log('New message received (real-time):', newMessage);
-
+    });    // Listen for receive message event (real-time message receiving)
+    socket.on('receive_message', (data) => {
+      console.log('New message received (real-time):', data);
+      
+      // Chuẩn hóa dữ liệu - trong một số trường hợp, message đến có thể nằm trong data.message
+      const newMessage = data.message || data;
+      
       // Add the new message to the chat immediately
       if (newMessage) {
         // Get user ID from the socket service
         const userData = socketService.getUserData();
         const userId = userData?.id || ''; // Fallback if not available
         const sentByMe = newMessage.idSender === userId;
-
+        
+        // Đặc biệt xử lý tin nhắn hệ thống
+        const isSystemMessage = newMessage.idSender === 'system' || newMessage.type === 'system';
+        
         // Check if the message belongs to current conversation
         const idConversationParam = route.params?.idConversation || conversationId;
-        if (newMessage.idConversation !== idConversationParam) {
-          console.log('Message is for another conversation, ignoring');
-          return;
+        
+        // Sử dụng log để debug
+        console.log('Received message conversation check:', {
+          messageConversation: newMessage.idConversation,
+          routeConversation: route.params?.idConversation,
+          conversationId: conversationId,
+          idConversationParam: idConversationParam,
+          isSystemMessage: isSystemMessage
+        });
+        
+        // Kiểm tra conversation ID linh hoạt hơn
+        const currentConversationIDs = [
+          idConversationParam, 
+          conversationId,
+          route.params?.conversation?.idConversation,
+          data.conversationId // Thêm trường conversationId từ payload
+        ].filter(Boolean);
+        
+        const isForCurrentConversation = currentConversationIDs.some(id => 
+          id === newMessage.idConversation
+        );
+        
+        if (!isForCurrentConversation && !isSystemMessage) {
+          console.log('Message is for another conversation:', newMessage.idConversation, 'current:', idConversationParam);
+          
+          // Special handling for forwarded messages - don't return early if this is the active conversation
+          // Even if route.params.idConversation is not set correctly
+          if (conversationId && newMessage.idConversation === conversationId) {
+            console.log('But this appears to be the active conversation by conversationId, showing message anyway');
+          } else {
+            return;
+          }
         }
 
         // Acknowledge message receipt immediately
@@ -879,32 +925,57 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
             // If not, fetch it
             fetchMemberInfo(newMessage.idSender);
           }
-        }
-
-        // Add new message to state immediately without waiting for duplicate check
+        }        // Add new message to state with enhanced duplicate detection
         setDataView(prevMessages => {
-          // Quick check if message already exists
-          const messageExists = prevMessages.some(msg =>
-            msg._id === newMessage._id || msg.idMessage === newMessage.idMessage
+          // Kiểm tra nhiều tiêu chí để phát hiện trùng lặp
+          // 1. Kiểm tra ID chính thức
+          // 2. Kiểm tra tin nhắn tạm (bằng nội dung và người gửi)
+          const isDuplicate = prevMessages.some(msg => 
+            // Kiểm tra ID chính thức
+            msg._id === newMessage._id || 
+            msg.idMessage === newMessage.idMessage ||
+            // Kiểm tra tin nhắn tạm với nội dung và người gửi giống nhau
+            (msg._id?.startsWith('temp-') && 
+             msg.idSender === newMessage.idSender && 
+             msg.content === newMessage.content &&
+             // Đảm bảo chỉ kiểm tra trong khoảng thời gian gần (30 giây)
+             new Date().getTime() - new Date(msg.dateTime).getTime() < 30000)
           );
 
-          if (messageExists) return prevMessages;
+          console.log(`Received message: ${newMessage.idMessage}, isDuplicate: ${isDuplicate}`);
+          
+          if (isDuplicate) {
+            console.log('Duplicate message detected, updating temporary message');
+            
+            // Thay thế tin nhắn tạm bằng tin nhắn chính thức tại vị trí hiện tại của tin nhắn tạm
+            return prevMessages.map(msg => {
+              // Nếu đây là tin nhắn tạm tương ứng với tin nhắn vừa nhận
+              if (msg._id?.startsWith('temp-') && 
+                  msg.content === newMessage.content && 
+                  msg.idSender === newMessage.idSender) {
+                console.log('Replacing temporary message with official one');
+                return {
+                  ...newMessage,
+                  sentByMe
+                };
+              }
+              return msg;
+            });
+          }
 
-          // If doesn't exist, add immediately
+          // Nếu không phải tin nhắn trùng lặp, thêm vào cuối danh sách
           const updatedMessages = [...prevMessages, {
             ...newMessage,
             sentByMe
           }];
 
-          // Ensure we scroll down after adding message
+          // Đảm bảo cuộn xuống sau khi thêm tin nhắn
           setTimeout(scrollToBottom, 10);
 
           return updatedMessages;
         });
       }
-    });
-
-    // Listen for send message success
+    });    // Listen for send message success
     socket.on('send_message_success', (response) => {
       console.log('Group message sent successfully:', response);
 
@@ -923,18 +994,22 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
         const userData = socketService.getUserData();
         const userId = userData?.id || ''; // Fallback if not available
         const sentByMe = message.idSender === userId;
-
+        
         // Handle message from current user
         if (sentByMe) {
           setDataView(prevMessages => {
-            // Find temporary message with matching ID
+            // Find temporary message with matching ID or content
             const tempIndex = prevMessages.findIndex(msg =>
               (msg._id && msg._id.startsWith('temp-') && msg.content === message.content) ||
-              (msg.tempId === response.tempId)
+              (msg.tempId && msg.tempId === response.tempId)
             );
+
+            // Log for debugging
+            console.log(`Processing sent message success. Found temp message: ${tempIndex !== -1}, temp ID: ${response.tempId}, message ID: ${message.idMessage}`);
 
             // If found temporary message, replace with official message
             if (tempIndex !== -1) {
+              console.log('Replacing temporary message with official message');
               const updatedMessages = [...prevMessages];
               updatedMessages[tempIndex] = {
                 ...message,
@@ -942,17 +1017,25 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
               };
               return updatedMessages;
             }
-
-            // If not found temp message, add new message (avoid duplicates)
-            const existingMessage = prevMessages.find(msg => msg._id === message._id || msg.idMessage === message.idMessage);
-            if (!existingMessage) {
-              return [...prevMessages, {
-                ...message,
-                sentByMe
-              }];
+            
+            // Kiểm tra kỹ xem tin nhắn đã có trong danh sách chưa
+            const messageExists = prevMessages.some(msg => 
+              msg.idMessage === message.idMessage || 
+              msg._id === message._id ||
+              (msg.content === message.content && 
+               msg.idSender === userId &&
+               new Date(msg.dateTime).getTime() > Date.now() - 10000) // Tin nhắn có cùng nội dung trong 10 giây gần đây
+            );
+            
+            if (messageExists) {
+              console.log('Message already exists in chat, not adding duplicate');
+              return prevMessages;
             }
-
-            return prevMessages; // No changes if message already exists
+            
+            // Không thêm tin nhắn mới nếu không tìm thấy tin nhắn tạm thời
+            // Tin nhắn chính thức sẽ đến qua sự kiện receive_message
+            console.log('No temporary message found, waiting for receive_message event');
+            return prevMessages;
           });
         }
 
@@ -1078,53 +1161,151 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
         setDataView(prevMessages => [...prevMessages, systemMessage]);
         setTimeout(scrollToBottom, 100);
       }
-    });
-    // New listener: New member added to group
+    });  // New listener: New member added to group - enhanced to handle multiple data formats
     socket.on('member_added_to_group', (data) => {
       console.log('Member added to group:', data);
-      if (data && data.success && data.newMembers && data.newMembers.length > 0) {
-        // Update group members in UI
-        const updatedMembers = [...(groupInfo.members || []), ...data.newMembers.map((m: any) => m.id)];
-        const updatedInfo = {
-          ...groupInfo,
-          members: updatedMembers
-        };
-
-        navigation.setParams({ groupInfo: updatedInfo });
-
-        // Get new members names
-        const newMembersNames = data.newMembers.map((m: any) => m.fullname || 'Unknown User').join(', ');
-
-        // Tạo tin nhắn hệ thống chi tiết - hiển thị ai đã thêm ai vào nhóm
-        const systemMessage: Message = {
-          _id: `system-${Date.now()}`,
-          idMessage: `system-${Date.now()}`,
-          idSender: 'system',
-          idConversation: conversationId,
-          type: 'system',
-          content: `${data.addedBy ? data.addedBy.fullname : 'Ai đó'} đã thêm ${newMembersNames} vào nhóm`,
-          dateTime: new Date().toISOString(),
-          isRead: true,
-          isRecall: false,
-          isReply: false,
-          isForward: false,
-          isRemove: false,
-          idMessageReply: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          __v: 0
-        };
-
-        // Thêm tin nhắn hệ thống vào danh sách tin nhắn
-        setDataView(prevMessages => [...prevMessages, systemMessage]);
-        setTimeout(scrollToBottom, 100);
-
-        // Fetch info for new members
-        data.newMembers.forEach((member: any) => {
-          if (member && member.id) {
-            fetchMemberInfo(member.id);
+      
+      // Handle multiple data formats that could come from server
+      if (data) {
+        let newMembers: any[] = [];
+        let addedBy: any = null;
+        let idConversationFromEvent = null;
+        
+        // Check for different data structures the server might send
+        if (data.success && data.newMembers && data.newMembers.length > 0) {
+          newMembers = data.newMembers;
+          addedBy = data.addedBy;
+          idConversationFromEvent = data.conversation?.idConversation;
+        } else if (data.success && data.members && data.members.length > 0) {
+          // Alternative format the server might use
+          newMembers = data.members;
+          addedBy = data.addedBy || { id: data.IDUser, fullname: data.IDUser };
+          idConversationFromEvent = data.conversation?.idConversation || data.IDConversation;
+        } else if (data.conversation && data.conversation.groupMembers) {
+          // Direct conversation update format
+          idConversationFromEvent = data.conversation.idConversation;
+          const currentMembers = groupInfo.members || [];
+          // Find new members by comparing with current members
+          const addedMemberIds = data.conversation.groupMembers.filter(
+            (id: string) => !currentMembers.includes(id)
+          );
+          
+          // If we have member info directly
+          if (data.members && data.members.length > 0) {
+            newMembers = data.members;
+          } else {
+            // Otherwise create placeholder entries for the new IDs
+            newMembers = addedMemberIds.map((id: string) => ({ id, fullname: id }));
           }
+          
+          // Use provided or fallback info for who added the members
+          addedBy = data.addedBy || { id: data.IDUser, fullname: data.IDUser || 'Ai đó' };
+        }
+          // Check if event belongs to current conversation - more flexible matching for conversation IDs
+        const idConversationParam = route.params?.idConversation || conversationId;
+        
+        // Make conversation ID matching more flexible by checking all possible ID sources
+        const currentConversationIDs = [
+          idConversationParam, 
+          conversationId,
+          route.params?.conversation?.idConversation,
+          route.params?.conversation?.id
+        ].filter(Boolean); // Filter out undefined/null values
+        
+        // Enhanced check: the event is for current conversation if any of our IDs match
+        const isForCurrentConversation = currentConversationIDs.some(id => 
+          id === idConversationFromEvent || 
+          id === data.conversation?.idConversation ||
+          id === data.IDConversation
+        );
+        
+        console.log('Member add event conversation check:', {
+          currentConversationIDs,
+          idConversationFromEvent,
+          conversationFromData: data.conversation?.idConversation || data.IDConversation,
+          isForCurrentConversation
         });
+
+        // Only proceed if we found new members and this appears to be for current conversation
+        // More permissive check to ensure notifications are shown
+        if (newMembers.length > 0 && (isForCurrentConversation || !idConversationFromEvent)) {
+          console.log('Processing new members:', newMembers);
+          
+          // Extract just the IDs for updating the members list
+          const newMemberIds = newMembers.map(m => m.id);
+          
+          // Update group members in UI - avoid duplicates
+          const currentMembers = groupInfo.members || [];
+          const uniqueNewMemberIds = newMemberIds.filter(id => !currentMembers.includes(id));
+          
+          if (uniqueNewMemberIds.length === 0) {
+            console.log('No new unique members to add');
+            return;
+          }
+          
+          const updatedMembers = [...currentMembers, ...uniqueNewMemberIds];
+          const updatedInfo = {
+            ...groupInfo,
+            members: updatedMembers
+          };
+
+          // Update group info in route params
+          navigation.setParams({ groupInfo: updatedInfo });
+
+          // Get new members names
+          const newMembersNames = newMembers.map(m => m.fullname || m.id || 'Unknown User').join(', ');
+
+          // Create detailed system message showing who added whom
+          const systemMessageId = `system-add-${Date.now()}`;
+          const systemMessage: Message = {
+            _id: systemMessageId,
+            idMessage: systemMessageId,
+            idSender: 'system',
+            idConversation: conversationId || idConversationFromEvent || (data.conversation && data.conversation.idConversation),
+            type: 'system',
+            content: `${addedBy?.fullname || 'Ai đó'} đã thêm ${newMembersNames} vào nhóm`,
+            dateTime: new Date().toISOString(),
+            isRead: true,
+            isRecall: false,
+            isReply: false,
+            isForward: false,
+            isRemove: false,
+            idMessageReply: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            __v: 0
+          };
+
+          // Add system message to message list, avoiding duplicates
+          setDataView(prevMessages => {
+            // Check if a very similar message was added in the last minute
+            const isDuplicate = prevMessages.some(msg => 
+              msg.type === 'system' &&
+              msg.content === systemMessage.content &&
+              new Date(msg.dateTime).getTime() > Date.now() - 60000
+            );
+            
+            if (isDuplicate) {
+              console.log('Duplicate system message detected, not adding');
+              return prevMessages;
+            }
+            
+            console.log('Adding system message about new members');
+            const newMessages = [...prevMessages, systemMessage];
+            
+            // Đảm bảo tin nhắn xuất hiện ngay lập tức
+            setTimeout(scrollToBottom, 100);
+            
+            return newMessages;
+          });
+
+          // Fetch info for new members
+          newMembers.forEach(member => {
+            if (member && member.id) {
+              fetchMemberInfo(member.id);
+            }
+          });
+        }
       }
     });
     // New listener: Member removed from group
@@ -1205,11 +1386,61 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
         };
         navigation.setParams({ groupInfo: updatedInfo });
       }
-    });
-
-    socket.on('member_removed_notification', (data) => {
+    });    socket.on('member_removed_notification', (data) => {
       console.log('Member removed notification:', data);
-      if (data && data.removedMembers && data.removedMembers.length > 0) {
+      
+      // Kiểm tra nếu server gửi trực tiếp system message (trường hợp chuyển quyền trưởng nhóm)
+      if (data && data.systemMessage) {
+        console.log('Received system message in notification:', data.systemMessage);
+        
+        // Kiểm tra ID cuộc trò chuyện
+        const idConversationParam = route.params?.idConversation || conversationId;
+        if (data.conversationId === idConversationParam || data.systemMessage.idConversation === idConversationParam) {
+          
+          // Tạo message từ systemMessage nhận từ server
+          const systemMessage: Message = {
+            ...data.systemMessage,
+            _id: data.systemMessage._id || data.systemMessage.idMessage || `system-${Date.now()}`,
+            type: 'system',
+            isRead: true,
+            sentByMe: false
+          };
+          
+          // Thêm tin nhắn hệ thống vào danh sách tin nhắn
+          setDataView(prevMessages => {
+            // Kiểm tra trùng lặp
+            const isDuplicate = prevMessages.some(msg => 
+              msg.idMessage === systemMessage.idMessage || 
+              (msg.type === 'system' && msg.content === systemMessage.content && 
+               new Date(msg.dateTime).getTime() > Date.now() - 60000)
+            );
+            
+            if (isDuplicate) {
+              console.log('Duplicate system message detected, not adding');
+              return prevMessages;
+            }
+            
+            console.log('Adding system message from notification');
+            return [...prevMessages, systemMessage];
+          });
+          
+          setTimeout(scrollToBottom, 100);
+          
+          // Nếu là thay đổi chủ nhóm, cập nhật thông tin nhóm
+          if (data.systemMessage.content && data.systemMessage.content.includes('đã chuyển quyền chủ nhóm')) {
+            if (data.conversation) {
+              navigation.setParams({ 
+                groupInfo: {
+                  ...groupInfo,
+                  rules: data.conversation.rules
+                }
+              });
+            }
+          }
+        }
+      }
+      // Xử lý trường hợp thông báo xóa thành viên
+      else if (data && data.removedMembers && data.removedMembers.length > 0) {
         // Xử lý tương tự như member_removed_from_group
         const removedNames = data.removedMembers.map(m => m.fullname).join(', ');
 
@@ -1279,9 +1510,7 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
 
         navigation.setParams({ groupInfo: updatedInfo });
       }
-    });
-
-    // New listener: Member promoted to admin (co-owner)
+    });    // New listener: Member promoted to admin (co-owner)
     socket.on('member_promoted_to_admin', (data) => {
       console.log('Member promoted to admin:', data);
       if (data && data.success && data.promotedMember) {
@@ -1327,8 +1556,78 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
         navigation.setParams({ groupInfo: updatedInfo });
       }
     });
-
-    // New listener: Member demoted from admin (co-owner)
+    
+    // Listener cho member_promoted_notification event
+    socket.on('member_promoted_notification', (data) => {
+      console.log('Member promotion notification received:', data);
+      
+      if (data && data.systemMessage) {
+        // Kiểm tra ID cuộc trò chuyện để đảm bảo tin nhắn thuộc về cuộc hội thoại hiện tại
+        const idConversationParam = route.params?.idConversation || conversationId;
+        const messageConversationId = data.systemMessage.idConversation || data.conversationId;
+        
+        if (messageConversationId === idConversationParam) {
+          console.log('Processing promotion notification for current conversation');
+          
+          // Tạo message từ systemMessage nhận được từ server
+          const systemMessage: Message = {
+            ...data.systemMessage,
+            _id: data.systemMessage._id || data.systemMessage.idMessage || `system-${Date.now()}`,
+            type: 'system',
+            isRead: true,
+            sentByMe: false
+          };
+          
+          // Thêm tin nhắn hệ thống vào danh sách tin nhắn
+          setDataView(prevMessages => {
+            // Kiểm tra trùng lặp
+            const isDuplicate = prevMessages.some(msg => 
+              msg.idMessage === systemMessage.idMessage || 
+              (msg.type === 'system' && msg.content === systemMessage.content && 
+               new Date(msg.dateTime).getTime() > Date.now() - 60000)
+            );
+            
+            if (isDuplicate) {
+              console.log('Duplicate promotion notification detected, not adding');
+              return prevMessages;
+            }
+            
+            console.log('Adding promotion notification system message');
+            const newMessages = [...prevMessages, systemMessage];
+            
+            // Đảm bảo tin nhắn xuất hiện ngay lập tức
+            setTimeout(scrollToBottom, 100);
+            
+            return newMessages;
+          });
+          
+          // Cập nhật thông tin nhóm nếu có thành viên được bổ nhiệm
+          if (data.promotedMember) {
+            const promotedMemberId = data.promotedMember;
+            
+            // Cập nhật danh sách co-owners
+            const updatedCoOwners = [...(groupInfo.rules?.listIDCoOwner || [])];
+            if (!updatedCoOwners.includes(promotedMemberId)) {
+              updatedCoOwners.push(promotedMemberId);
+            }
+            
+            // Cập nhật rules cho nhóm
+            const updatedRules = {
+              ...groupInfo.rules,
+              listIDCoOwner: updatedCoOwners
+            };
+            
+            // Cập nhật thông tin nhóm
+            navigation.setParams({ 
+              groupInfo: {
+                ...groupInfo,
+                rules: updatedRules
+              }
+            });
+          }
+        }
+      }
+    });    // New listener: Member demoted from admin (co-owner)
     socket.on('member_demoted_from_admin', (data) => {
       console.log('Member demoted from admin:', data);
       if (data && data.success && data.demotedMember) {
@@ -1376,14 +1675,137 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
         navigation.setParams({ groupInfo: updatedInfo });
       }
     });
-
-    // New listener: Group deleted
+    
+    // Listener cho member_demoted_notification event
+    socket.on('member_demoted_notification', (data) => {
+      console.log('Member demotion notification received:', data);
+      
+      if (data && data.systemMessage) {
+        // Kiểm tra ID cuộc trò chuyện để đảm bảo tin nhắn thuộc về cuộc hội thoại hiện tại
+        const idConversationParam = route.params?.idConversation || conversationId;
+        const messageConversationId = data.systemMessage.idConversation || data.conversationId;
+        
+        if (messageConversationId === idConversationParam) {
+          console.log('Processing demotion notification for current conversation');
+          
+          // Tạo message từ systemMessage nhận được từ server
+          const systemMessage: Message = {
+            ...data.systemMessage,
+            _id: data.systemMessage._id || data.systemMessage.idMessage || `system-${Date.now()}`,
+            type: 'system',
+            isRead: true,
+            sentByMe: false
+          };
+          
+          // Thêm tin nhắn hệ thống vào danh sách tin nhắn
+          setDataView(prevMessages => {
+            // Kiểm tra trùng lặp
+            const isDuplicate = prevMessages.some(msg => 
+              msg.idMessage === systemMessage.idMessage || 
+              (msg.type === 'system' && msg.content === systemMessage.content && 
+               new Date(msg.dateTime).getTime() > Date.now() - 60000)
+            );
+            
+            if (isDuplicate) {
+              console.log('Duplicate demotion notification detected, not adding');
+              return prevMessages;
+            }
+            
+            console.log('Adding demotion notification system message');
+            const newMessages = [...prevMessages, systemMessage];
+            
+            // Đảm bảo tin nhắn xuất hiện ngay lập tức
+            setTimeout(scrollToBottom, 100);
+            
+            return newMessages;
+          });
+          
+          // Cập nhật thông tin nhóm nếu có thành viên bị giáng cấp
+          if (data.demotedMember) {
+            const demotedMemberId = data.demotedMember;
+            
+            // Cập nhật danh sách co-owners bằng cách loại bỏ thành viên bị giáng cấp
+            const updatedCoOwners = (groupInfo.rules?.listIDCoOwner || []).filter(
+              id => id !== demotedMemberId
+            );
+            
+            // Cập nhật rules cho nhóm
+            const updatedRules = {
+              ...groupInfo.rules,
+              listIDCoOwner: updatedCoOwners
+            };
+            
+            // Cập nhật thông tin nhóm
+            navigation.setParams({ 
+              groupInfo: {
+                ...groupInfo,
+                rules: updatedRules
+              }
+            });
+          }
+        }
+      }
+    });    // New listener: Group deleted
     socket.on('group_deleted', (data) => {
       console.log('Group deleted:', data);
       if (data && data.success && data.conversationId === conversationId) {
         // Hiển thị thông báo và chuyển về màn hình Home
         Alert.alert('Thông báo', 'Nhóm đã bị xóa bởi trưởng nhóm', [
           { text: 'OK', onPress: () => navigation.navigate('HomeScreen') }
+        ]);
+      }
+    });
+
+    // Handle when user is removed from group
+    socket.on('removed_from_group', (data) => {
+      console.log('User removed from group event received:', data);
+      if (data && data.success) {
+        // Navigate immediately to HomeScreen when user is removed
+        navigation.navigate('HomeScreen');
+        
+        // Show alert after navigation is triggered
+        setTimeout(() => {
+          Alert.alert('Thông báo', data.message || 'Bạn đã bị xóa khỏi nhóm');
+        }, 100);
+      }
+    });
+
+    // New listener: Handle group deletion notification from server
+    socket.on('new_group_conversation', (data) => {
+      console.log('New group conversation event:', data);
+      
+      // Check if this is a group deletion notification
+      if (data && data.status === 'deleted' && data.conversationId === conversationId) {
+        console.log('Group deletion notification received, redirecting to HomeScreen');
+        
+        // Show alert and navigate to HomeScreen
+        Alert.alert('Thông báo', data.message || 'Nhóm đã bị xóa bởi trưởng nhóm', [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              // Navigate to HomeScreen with refresh flag to reload conversations list
+              navigation.navigate('HomeScreen', { refreshConversations: true });
+            } 
+          }
+        ]);
+      }
+    });
+    socket.on('new_group_conversation', (data) => {
+      console.log('New group conversation event:', data);
+      
+      // Check if this is a group deletion notification
+      if (data && data.status === 'deleted' && data.conversationId === conversationId) {
+        console.log('Group deletion notification received, redirecting to HomeScreen');
+        
+        // Show alert and navigate to HomeScreen
+        Alert.alert('Thông báo', data.message || 'Nhóm đã bị xóa bởi trưởng nhóm', [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              // Navigate to HomeScreen with refresh flag to reload conversations list
+              navigation.navigate('HomeScreen', { refreshConversations: true });
+            } 
+          }
         ]);
       }
     });
@@ -1463,8 +1885,31 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
     console.log('Loading older messages for conversation:', idConversationParam);
     console.log('Oldest message ID:', oldestMessageId);
 
-    // Use the enhanced loadMessages function with lastMessageId parameter
-    loadMessages(idConversationParam, oldestMessageId);
+    // Hiển thị trạng thái loading
+    setIsLoadingOlder(true);
+    
+    const socket = socketService.getSocket();
+    if (socket) {
+      // Tạo payload cho yêu cầu tải tin nhắn cũ
+      const loadOlderMessagesData = {
+        IDConversation: idConversationParam,
+        lastMessageId: oldestMessageId
+      };
+      
+      console.log('Emitting load_messages for older messages:', loadOlderMessagesData);
+      socket.emit('load_messages', loadOlderMessagesData);
+      
+      // Thiết lập timeout để tránh loading vô hạn nếu server không phản hồi
+      setTimeout(() => {
+        if (isLoadingOlder) {
+          console.log('Timeout reached while loading older messages');
+          setIsLoadingOlder(false);
+        }
+      }, 8000);
+    } else {
+      console.error('Socket not available to load older messages');
+      setIsLoadingOlder(false);
+    }
   };
 
   // Listen to keyboard events
@@ -1487,7 +1932,6 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       keyboardDidHideListener.remove();
     };
   }, []);
-
   // Handle sending a message  
   const handleSendMessage = () => {
     if (!messageText.trim()) return;
@@ -1552,7 +1996,7 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       }
     };
 
-    // Add temporary message to state for immediate display
+    // Add temporary message to state for immediate display - add to end of list
     setDataView(prevMessages => [...prevMessages, tempMessage]);
 
     // Scroll down to see the new message immediately
@@ -1628,7 +2072,7 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
     };
   }, []);
 
-  // File handling functions
+  // File handling functions```tsx
   // Determine file type category based on MIME type
   const getFileTypeCategory = (mimeType: string): 'image' | 'video' | 'document' => {
     if (allowedTypes.image.includes(mimeType)) return 'image';
@@ -2213,7 +2657,7 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
                     style={styles.iconButton}
                     onPress={handlePickImage}
                   >
-                    <Ionicons name="image-outline" size={26} color="#645C5C5C" />
+                    <Ionicons name="image-outline" size={26} color="#645C5C" />
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.iconButton}>
                     <Ionicons name="mic-outline" size={26} color="#645C5C" />
@@ -2677,4 +3121,5 @@ const styles = StyleSheet.create({
 });
 
 export default GroupChatScreen;
+
 

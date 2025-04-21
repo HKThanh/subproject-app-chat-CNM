@@ -633,10 +633,23 @@ const handleForwardMessage = async (io, socket) => {
           senderInfo,
         };
 
-        // Gửi tin nhắn tới receiver nếu online
-        const receiverOnline = getUser(IDReceiver);
-        if (receiverOnline) {
-          io.to(receiverOnline.socketId).emit("receive_message", messageWithUser);
+        if (conversation.isGroup) {
+          // Nếu là nhóm, gửi tới tất cả thành viên trong nhóm
+          conversation.groupMembers.forEach((memberId) => {
+            if (memberId !== IDSender) { // Không gửi lại cho người gửi
+              const memberSocket = getUser(memberId);
+              console.log("Member socket ID: ", memberSocket);
+              if (memberSocket) {
+                io.to(memberSocket.socketId).emit("receive_message", messageWithUser);
+              }
+            }
+          });
+        } else {
+          // Gửi tin nhắn tới receiver nếu online
+          const receiverOnline = getUser(IDReceiver);
+          if (receiverOnline) {
+            io.to(receiverOnline.socketId).emit("receive_message", messageWithUser);
+          }
         }
 
         io.to(IDConversation).emit("receive_message", messageWithUser);
@@ -2208,19 +2221,30 @@ const handlePromoteMemberToAdmin = (io, socket) => {
       }
 
       // Thông báo cho các thành viên khác
+      // conversation.groupMembers.forEach((member) => {
+      //   if (member !== IDUser && member !== IDMemberToPromote) {
+      //     const userSocket = getUser(member);
+      //     if (userSocket) {
+      //       io.to(userSocket.socketId).emit("member_promoted_notification", {
+      //         conversationId: IDConversation,
+      //         promotedMember: IDMemberToPromote,
+      //         promotedBy: IDUser,
+      //         systemMessage,
+      //       });
+      //     }
+      //   }
+      // });
       conversation.groupMembers.forEach((member) => {
-        if (member !== IDUser && member !== IDMemberToPromote) {
-          const userSocket = getUser(member);
-          if (userSocket) {
-            io.to(userSocket.socketId).emit("member_promoted_notification", {
-              conversationId: IDConversation,
-              promotedMember: IDMemberToPromote,
-              promotedBy: IDUser,
-              systemMessage,
-            });
-          }
-        }
-      });
+  const userSocket = getUser(member);
+  if (userSocket?.socketId) {
+    io.to(userSocket.socketId).emit("member_promoted_notification", {
+      conversationId: IDConversation,
+      promotedMember: IDMemberToPromote,
+      promotedBy: IDUser,
+      systemMessage,
+    });
+  }
+});
     } catch (error) {
       console.error("Error promoting member:", error);
       socket.emit("promote_member_response", {
@@ -2324,19 +2348,30 @@ const handleDemoteMember = (io, socket) => {
       }
 
       // Thông báo cho các thành viên khác
+      // conversation.groupMembers.forEach((member) => {
+      //   if (member !== IDUser && member !== IDMemberToDemote) {
+      //     const userSocket = getUser(member);
+      //     if (userSocket) {
+      //       io.to(userSocket.socketId).emit("member_demoted_notification", {
+      //         conversationId: IDConversation,
+      //         demotedMember: IDMemberToDemote,
+      //         demotedBy: IDUser,
+      //         systemMessage,
+      //       });
+      //     }
+      //   }
+      // });
       conversation.groupMembers.forEach((member) => {
-        if (member !== IDUser && member !== IDMemberToDemote) {
-          const userSocket = getUser(member);
-          if (userSocket) {
-            io.to(userSocket.socketId).emit("member_demoted_notification", {
-              conversationId: IDConversation,
-              demotedMember: IDMemberToDemote,
-              demotedBy: IDUser,
-              systemMessage,
-            });
-          }
-        }
-      });
+  const userSocket = getUser(member);
+  if (userSocket) {
+    io.to(userSocket.socketId).emit("member_demoted_notification", {
+      conversationId: IDConversation,
+      demotedMember: IDMemberToDemote,
+      demotedBy: IDUser,
+      systemMessage,
+    });
+  }
+});
     } catch (error) {
       console.error("Error demoting member:", error);
       socket.emit("demote_member_response", {
