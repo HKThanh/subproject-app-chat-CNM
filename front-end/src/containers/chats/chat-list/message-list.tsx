@@ -41,14 +41,12 @@ export default function MessageList({
       return true;
     });
 
-    console.log("After tab filtering:", filtered.length);
 
     // Remove duplicates by conversation ID
     filtered = Array.from(
       new Map(filtered.map(conv => [conv.idConversation, conv])).values()
     );
 
-    console.log("After removing duplicates:", filtered.length);
 
     // Then filter by search term if provided
     if ( searchTerm &&searchTerm.trim()) {
@@ -59,7 +57,6 @@ export default function MessageList({
         
         return name.toLowerCase().includes(searchTerm.toLowerCase());
       });
-      console.log("After search term filtering:", filtered.length);
     }
 
     // Sort conversations by lastChange date (most recent first)
