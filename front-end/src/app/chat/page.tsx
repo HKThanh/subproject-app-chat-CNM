@@ -30,7 +30,8 @@ export default function Home() {
     recallMessage,
     forwardMessage,
     addMembersToGroup,
-    removeMembersFromGroup
+    removeMembersFromGroup,
+    changeGroupOwner,
   } = useChatContext();
 
   // Tải danh sách cuộc trò chuyện khi component được mount
@@ -215,6 +216,7 @@ export default function Home() {
             }
             // addMembersToGroup={addMembersToGroup}
             removeMembersFromGroup={removeMembersFromGroup}
+            changeGroupOwner={changeGroupOwner}
           />
         </div>
       )}

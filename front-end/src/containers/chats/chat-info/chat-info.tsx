@@ -44,11 +44,13 @@ interface ChatInfoProps {
     conversationId: string,
     membersToRemove: string[]
   ) => void;
+  changeGroupOwner: (conversationId: string, newOwnerId: string) => void;
 }
 
 export default function ChatInfo({
   activeConversation,
   removeMembersFromGroup,
+  changeGroupOwner,
 }: ChatInfoProps) {
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
@@ -259,6 +261,8 @@ export default function ChatInfo({
     if (!activeConversation || !confirmationState.memberId) return;
 
     if (confirmationState.action === "remove") {
+      console.log("is remove member>> ", confirmationState.memberId);
+      
       removeMembersFromGroup(activeConversation.idConversation, [
         confirmationState.memberId,
       ]);
@@ -277,7 +281,15 @@ export default function ChatInfo({
 
       toast.success("Đang thăng cấp thành viên lên phó nhóm...");
     } else if (confirmationState.action === "transfer") {
-      handleTransferOwnership(confirmationState.memberId);
+      if (changeGroupOwner && activeConversation) {
+        changeGroupOwner(
+          activeConversation.idConversation,
+          confirmationState.memberId
+        );
+        toast.success("Đang chuyển quyền trưởng nhóm...");
+      } else {
+        toast.error("Không thể chuyển quyền trưởng nhóm");
+      }
     }
 
     // Close the modal
