@@ -19,24 +19,33 @@ export default function ChatHeader({
     <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50 p-4 ">
       <div className="flex items-center">
         <Image
-          src={conversation.otherUser?.urlavatar || `https://ui-avatars.com/api/?name=${conversation.otherUser?.fullname || "User"}`}
-          alt={conversation.otherUser?.fullname || "User"}
+          src={
+            conversation.isGroup 
+              ? conversation.groupAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(conversation.groupName || "Group")}`
+              : conversation.otherUser?.urlavatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(conversation.otherUser?.fullname || "User")}`
+          }
+          alt={conversation.isGroup ? conversation.groupName || "Group" : conversation.otherUser?.fullname || "User"}
           width={40}
           height={40}
           className="rounded-full"
         />
-
         <div className="ml-3">
           <h2 className="text-base font-medium text-gray-900">
-            {conversation.otherUser?.fullname || "Người dùng"}
+            {conversation.isGroup 
+              ? conversation.groupName || "Nhóm chat" 
+              : conversation.otherUser?.fullname || "Người dùng"}
           </h2>
           <div className="flex items-center">
-            {conversation.otherUser?.isOnline ? (
-            <div className="flex items-center">
-              <div className="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
-              <span className="text-xs text-gray-500">Trực tuyến</span>
-            </div>
-            ):(
+            {conversation.isGroup ? (
+              <span className="text-xs text-gray-500">
+                {conversation.groupMembers?.length || 0} thành viên
+              </span>
+            ) : conversation.otherUser?.isOnline ? (
+              <div className="flex items-center">
+                <div className="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
+                <span className="text-xs text-gray-500">Trực tuyến</span>
+              </div>
+            ) : (
               <div className="flex items-center">
                 <div className="w-2 h-2 rounded-full bg-gray-500 mr-1"></div>
                 <span className="text-xs text-gray-500">Không trực tuyến</span>

@@ -833,7 +833,7 @@ export const useChat = (userId: string) => {
       }
     }
   }, [dispatch, state.conversations]);
-  // Add this after the addMembersToGroup function
+  // after the addMembersToGroup function
   const removeMembersFromGroup = useCallback((
     conversationId: string,
     membersToRemove: string[]
@@ -903,7 +903,7 @@ export const useChat = (userId: string) => {
           isOwn: false
         };
 
-        // Add this message to the conversation
+        // message to the conversation
         dispatch({
           type: 'ADD_MESSAGE',
           payload: {
@@ -1096,7 +1096,7 @@ export const useChat = (userId: string) => {
       // });
     }
   }, [dispatch, state.conversations]);
-  // Add this handler for leave group response
+  // handler for leave group response
   const handleLeaveGroupResponse = useCallback((data: any) => {
     console.log("Leave group response:", data);
 
@@ -1125,7 +1125,7 @@ export const useChat = (userId: string) => {
       }
     }
   }, [dispatch]);
-  // Add this handler for member left group event
+  // handler for member left group event
   const handleMemberLeftGroup = useCallback((data: any) => {
     console.log("Member left group notification:", data);
 
@@ -1494,7 +1494,7 @@ export const useChat = (userId: string) => {
     }
   }, [dispatch, conversations]);
 
-  // Add this handler for group deleted notification (for other members)
+  // handler for group deleted notification (for other members)
   const handleGroupDeletedNotification = useCallback((data: any) => {
     console.log("Group deleted notification:", data);
 
@@ -1518,7 +1518,7 @@ export const useChat = (userId: string) => {
     }
   }, [dispatch, conversations]);
 
-  // Add this handler for owner change notification (for new owner)
+  // handler for owner change notification (for new owner)
   const handleOwnerChangeNotification = useCallback((data: any) => {
     console.log("Owner change notification:", data);
 
@@ -1623,7 +1623,7 @@ export const useChat = (userId: string) => {
       }
     }
   }, [dispatch, state.conversations]);
-  // Add this handler for owner change notification (for RegularMember)
+  // handler for owner change notification (for RegularMember)
   const handleOwnerChangeNotificationToRegularMember = useCallback((data: any) => {
     console.log("Owner change notification:", data);
 
@@ -1701,7 +1701,7 @@ export const useChat = (userId: string) => {
       IDNewOwner: newOwnerId
     });
   }, [socket, userId]);
-  // Add this handler for member demoted response
+  // handler for member demoted response
   const handleDemoteMemberResponse = useCallback((data: any) => {
     console.log("Demote member response:", data);
 
@@ -1799,7 +1799,7 @@ export const useChat = (userId: string) => {
     }
   }, []);
 
-  // Add this handler for member demoted notification (for the demoted member)
+  // handler for member demoted notification (for the demoted member)
   const handleMemberDemoted = useCallback((data: any) => {
     console.log("Member demoted notification:", data);
 
@@ -1855,7 +1855,7 @@ export const useChat = (userId: string) => {
     }
   }, [dispatch, state.conversations, userId]);
 
-  // Add this handler for member demoted notification (for other members)
+  // handler for member demoted notification (for other members)
   const handleMemberDemotedNotification = useCallback((data: any) => {
     console.log("Member demoted notification for others:", data);
 
@@ -1922,7 +1922,7 @@ export const useChat = (userId: string) => {
     }
   }, [dispatch, state.conversations]);
 
-  // Add this function to demote a member
+  // function to demote a member
   const demoteMember = useCallback((
     conversationId: string,
     memberToDemote: string
@@ -1938,6 +1938,145 @@ export const useChat = (userId: string) => {
       IDMemberToDemote: memberToDemote
     });
   }, [socket, userId]);
+
+  // handler for group info updates
+  const handleUpdateGroupInfoResponse = useCallback((data: any) => {
+    console.log("Update group info response:", data);
+    
+    if (data.success) {
+      // Find the conversation in state
+      const conversation = conversations.find(
+        c => c.idConversation === data.conversationId
+      );
+      
+      if (!conversation) {
+        console.error("Cannot find conversation in state:", data.conversationId);
+        return;
+      }
+      
+      // Update the conversation with new info
+      dispatch({
+        type: 'UPDATE_CONVERSATION',
+        payload: {
+          conversationId: data.conversationId,
+          updates: {
+            groupName: data.updates.groupName || conversation.groupName,
+            groupAvatar: data.updates.groupAvatar || conversation.groupAvatar,
+            lastChange: new Date().toISOString()
+          }
+        }
+      });
+      
+      // Add the system message if provided
+      if (data.systemMessage) {
+        dispatch({
+          type: 'ADD_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            message: {
+              ...data.systemMessage,
+              isOwn: false,
+              type: "system"
+            }
+          }
+        });
+        
+        // Update latest message
+        dispatch({
+          type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            latestMessage: {
+              idMessage: data.systemMessage.idMessage,
+              idConversation: data.systemMessage.idConversation,
+              content: data.systemMessage.content,
+              dateTime: data.systemMessage.dateTime,
+              isRead: false,
+              type: "system",
+              idSender: "system"
+            }
+          }
+        });
+      }
+      
+      // Show success toast
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.success(data.message || "Cập nhật thông tin nhóm thành công");
+        });
+      }
+    } else {
+      // Show error message
+      console.error("Failed to update group info:", data.message);
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.error(data.message || "Không thể cập nhật thông tin nhóm");
+        });
+      }
+    }
+  }, [dispatch, conversations]);
+  
+  // handler for group info update notification (for other members)
+  const handleGroupInfoUpdated = useCallback((data: any) => {
+    console.log("Group info updated notification:", data);
+    
+    if (data.conversationId) {
+      // Find the conversation in state
+      const conversation = conversations.find(
+        c => c.idConversation === data.conversationId
+      );
+      
+      if (!conversation) {
+        console.error("Cannot find conversation in state:", data.conversationId);
+        return;
+      }
+      
+      // Update the conversation with new info
+      dispatch({
+        type: 'UPDATE_CONVERSATION',
+        payload: {
+          conversationId: data.conversationId,
+          updates: {
+            groupName: data.updates.groupName || conversation.groupName,
+            groupAvatar: data.updates.groupAvatar || conversation.groupAvatar,
+            lastChange: new Date().toISOString()
+          }
+        }
+      });
+      
+      // Add the system message if provided
+      if (data.systemMessage) {
+        dispatch({
+          type: 'ADD_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            message: {
+              ...data.systemMessage,
+              isOwn: false,
+              type: "system"
+            }
+          }
+        });
+        
+        // Update latest message
+        dispatch({
+          type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            latestMessage: {
+              idMessage: data.systemMessage.idMessage,
+              idConversation: data.systemMessage.idConversation,
+              content: data.systemMessage.content,
+              dateTime: data.systemMessage.dateTime,
+              isRead: false,
+              type: "system",
+              idSender: "system"
+            }
+          }
+        });
+      }
+    }
+  }, [dispatch, conversations]);
   // Gộp các useEffect đăng ký sự kiện socket
   useEffect(() => {
     if (!socket) return;
@@ -1964,6 +2103,10 @@ export const useChat = (userId: string) => {
     socket.on("demote_member_response", handleDemoteMemberResponse);
     socket.on("member_demoted", handleMemberDemoted);
     socket.on("member_demoted_notification", handleMemberDemotedNotification);
+
+    // Add these new event listeners for group info update
+    socket.on("update_group_info_response", handleUpdateGroupInfoResponse);
+    socket.on("group_info_updated", handleGroupInfoUpdated);
     socket.on("error", handleError);
     const handleGroupConversationCreated = (data: any) => {
       console.log("Group conversation creation response:", data);
@@ -2423,6 +2566,10 @@ export const useChat = (userId: string) => {
       socket.off("demote_member_response", handleDemoteMemberResponse);
       socket.off("member_demoted", handleMemberDemoted);
       socket.off("member_demoted_notification", handleMemberDemotedNotification);
+
+      // Unregister the event listeners for change info group
+      socket.off("update_group_info_response", handleUpdateGroupInfoResponse);
+      socket.off("group_info_updated", handleGroupInfoUpdated);
       socket.offAny();
     };
   }, [socket, userId, messages, conversations, loadConversations, handleGroupDeletedResponse, handleGroupDeletedNotification,

@@ -54,6 +54,12 @@ export default function ChatInfo({
   changeGroupOwner,
   demoteMember,
 }: ChatInfoProps) {
+  const [isEditGroupModalOpen, setIsEditGroupModalOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupAvatar, setNewGroupAvatar] = useState<File | null>(null);
+  const [newGroupAvatarPreview, setNewGroupAvatarPreview] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
@@ -63,6 +69,7 @@ export default function ChatInfo({
   const [friends, setFriends] = useState<
     Array<{ id: string; fullname: string; urlavatar?: string }>
   >([]);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
   const [isLoading, setIsLoading] = useState(false);
   const [confirmationState, setConfirmationState] = useState({
     isOpen: false,
@@ -162,7 +169,7 @@ export default function ChatInfo({
       socket.off("message_from_server", handleNewGroupConversation);
     };
   }, [socket, isLoading, activeConversation]);
-  // Add this useEffect to handle promotion response
+  // useEffect to handle promotion response
   // useEffect(() => {
   //   if (!socket) return;
 
@@ -217,8 +224,8 @@ export default function ChatInfo({
   // Filter friends based on search query
   const filteredFriends = searchQuery
     ? friends.filter((friend) =>
-        friend.fullname.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      friend.fullname.toLowerCase().includes(searchQuery.toLowerCase())
+    )
     : friends;
   const toggleUserSelection = (userId: string) => {
     if (selectedUsers.includes(userId)) {
@@ -272,7 +279,7 @@ export default function ChatInfo({
       setIsMembersModalOpen(false);
       toast.success("Đang xóa thành viên khỏi nhóm...");
     } else if (confirmationState.action === "promote") {
-      // Add this section to handle promotion
+      // section to handle promotion
       if (!socket || !currentUser) return;
 
       socket.emit("promote_member_to_admin", {
@@ -399,7 +406,99 @@ export default function ChatInfo({
 
     toast.success("Đang xóa nhóm...");
   };
+  // function to handle the leave group confirmation dialog
+  const handleUpdateGroupInfo = async () => {
+    if (!activeConversation) return;
 
+    setIsUploading(true);
+
+    try {
+      let groupAvatarUrl = activeConversation.groupAvatar;
+
+      // Upload new avatar if selected
+      if (newGroupAvatar) {
+        const formData = new FormData();
+        formData.append("avatar-group", newGroupAvatar);
+
+        const token = await getAuthToken();
+        
+        const response = await fetch(`${apiUrl}/upload/avatar-group`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          toast.error(errorData.message || "Failed to upload avatar");
+          return;
+        }
+        const data = await response.json();
+        if (data.success) {
+          groupAvatarUrl = data.fileUrl;
+        } else {
+          throw new Error(data.message || "Failed to upload avatar");
+        }
+      }
+
+      // Send update to server
+      socket?.emit("update_group_info", {
+        IDConversation: activeConversation.idConversation,
+        IDUser: currentUser?.id,
+        groupName: newGroupName || activeConversation.groupName,
+        groupAvatarUrl: groupAvatarUrl,
+      });
+
+      // Close modal and reset state
+      setIsEditGroupModalOpen(false);
+      setNewGroupName("");
+      setNewGroupAvatar(null);
+      setNewGroupAvatarPreview("");
+
+      toast.success("Đang cập nhật thông tin nhóm...");
+    } catch (error) {
+      console.error("Error updating group info:", error);
+      toast.error("Lỗi khi cập nhật thông tin nhóm");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // function to handle avatar selection
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Kích thước file quá lớn. Vui lòng chọn file nhỏ hơn 5MB");
+        return;
+      }
+      
+      // Check file type
+      if (!file.type.startsWith("image/")) {
+        toast.error("Vui lòng chọn file hình ảnh");
+        return;
+      }
+      
+      setNewGroupAvatar(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewGroupAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  //useEffect to initialize the group name when opening the edit modal
+  useEffect(() => {
+    if (isEditGroupModalOpen && activeConversation) {
+      setNewGroupName(activeConversation.groupName || "");
+      setNewGroupAvatarPreview("");
+      setNewGroupAvatar(null);
+    }
+  }, [isEditGroupModalOpen, activeConversation]);
   return (
     <div className="h-full overflow-y-auto bg-gray-50 text-gray-900">
       {/* Header */}
@@ -428,8 +527,7 @@ export default function ChatInfo({
               <Image
                 src={
                   activeConversation?.otherUser?.urlavatar ||
-                  `https://ui-avatars.com/api/?name=${
-                    activeConversation?.otherUser?.fullname || "User"
+                  `https://ui-avatars.com/api/?name=${activeConversation?.otherUser?.fullname || "User"
                   }`
                 }
                 alt={activeConversation?.otherUser?.fullname || "User"}
@@ -451,7 +549,7 @@ export default function ChatInfo({
 
         {/* Action buttons */}
         <div className="flex justify-between w-full">
-          <div className="flex flex-col items-center">
+          {/* <div className="flex flex-col items-center">
             <button className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center mb-1">
               <Bell className="w-5 h-5 text-blue-900" />
             </button>
@@ -462,13 +560,27 @@ export default function ChatInfo({
               <Pin className="w-5 h-5 text-blue-900" />
             </button>
             <span className="text-xs text-center">Ghim hội thoại</span>
-          </div>
-          {!isGroup && (
+          </div> */}
+          {/* {!isGroup && (
             <div className="flex flex-col items-center">
               <button className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center mb-1">
                 <Users className="w-5 h-5 text-blue-900" />
               </button>
               <span className="text-xs text-center">Tạo nhóm</span>
+            </div>
+          )} */}
+          {/* Add this button in the Group Actions section, before the Leave Group button */}
+          {isGroup && (
+            <div className="p-4 space-y-2">
+              {isOwnerOrCoOwner && (
+                <button
+                  onClick={() => setIsEditGroupModalOpen(true)}
+                  className="w-full py-2 text-blue-600 text-sm font-medium flex items-center justify-center border border-blue-600 rounded-md mb-2"
+                >
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Chỉnh sửa thông tin nhóm
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -492,9 +604,8 @@ export default function ChatInfo({
                   {activeConversation?.groupMembers?.length} thành viên
                 </span>
                 <ChevronDown
-                  className={`w-4 h-4 transition-transform ${
-                    sectionsState.members ? "rotate-180" : ""
-                  }`}
+                  className={`w-4 h-4 transition-transform ${sectionsState.members ? "rotate-180" : ""
+                    }`}
                 />
               </div>
             </button>
@@ -534,9 +645,8 @@ export default function ChatInfo({
                   mục
                 </span>
                 <ChevronDown
-                  className={`w-4 h-4 transition-transform ${
-                    sectionsState.media ? "rotate-180" : ""
-                  }`}
+                  className={`w-4 h-4 transition-transform ${sectionsState.media ? "rotate-180" : ""
+                    }`}
                 />
               </div>
             </button>
@@ -574,13 +684,13 @@ export default function ChatInfo({
                 {(activeConversation?.listImage?.length || 0) +
                   (activeConversation?.listVideo?.length || 0) >
                   0 && (
-                  <button
-                    className="w-full py-2 text-gray-600 text-sm font-medium flex items-center justify-center bg-gray-100 rounded-md"
-                    onClick={() => setIsMediaModalOpen(true)}
-                  >
-                    Xem tất cả
-                  </button>
-                )}
+                    <button
+                      className="w-full py-2 text-gray-600 text-sm font-medium flex items-center justify-center bg-gray-100 rounded-md"
+                      onClick={() => setIsMediaModalOpen(true)}
+                    >
+                      Xem tất cả
+                    </button>
+                  )}
               </div>
             )}
           </div>
@@ -600,9 +710,8 @@ export default function ChatInfo({
                   {activeConversation?.listFile?.length || 0} mục
                 </span>
                 <ChevronDown
-                  className={`w-4 h-4 transition-transform ${
-                    sectionsState.files ? "rotate-180" : ""
-                  }`}
+                  className={`w-4 h-4 transition-transform ${sectionsState.files ? "rotate-180" : ""
+                    }`}
                 />
               </div>
             </button>
@@ -646,10 +755,10 @@ export default function ChatInfo({
                   {/* Show placeholder if no files */}
                   {(!activeConversation?.listFile ||
                     activeConversation.listFile.length === 0) && (
-                    <div className="py-4 text-center text-gray-500">
-                      Chưa có file nào
-                    </div>
-                  )}
+                      <div className="py-4 text-center text-gray-500">
+                        Chưa có file nào
+                      </div>
+                    )}
                 </div>
                 {(activeConversation?.listFile?.length || 0) > 0 && (
                   <button
@@ -961,11 +1070,10 @@ export default function ChatInfo({
                 filteredFriends.map((friend) => (
                   <div
                     key={friend.id}
-                    className={`flex items-center p-2 rounded-md cursor-pointer ${
-                      selectedUsers.includes(friend.id)
+                    className={`flex items-center p-2 rounded-md cursor-pointer ${selectedUsers.includes(friend.id)
                         ? "bg-blue-50"
                         : "hover:bg-gray-100"
-                    }`}
+                      }`}
                     onClick={() => toggleUserSelection(friend.id)}
                   >
                     <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
@@ -986,11 +1094,10 @@ export default function ChatInfo({
                       <p className="font-medium">{friend.fullname}</p>
                     </div>
                     <div
-                      className={`w-5 h-5 rounded-full border ${
-                        selectedUsers.includes(friend.id)
+                      className={`w-5 h-5 rounded-full border ${selectedUsers.includes(friend.id)
                           ? "bg-blue-500 border-blue-500"
                           : "border-gray-300"
-                      }`}
+                        }`}
                     >
                       {selectedUsers.includes(friend.id) && (
                         <span className="flex items-center justify-center text-white text-xs">
@@ -1157,10 +1264,10 @@ export default function ChatInfo({
               {/* Show placeholder if no files */}
               {(!activeConversation?.listFile ||
                 activeConversation.listFile.length === 0) && (
-                <div className="py-4 text-center text-gray-500">
-                  Chưa có file nào
-                </div>
-              )}
+                  <div className="py-4 text-center text-gray-500">
+                    Chưa có file nào
+                  </div>
+                )}
             </div>
           </div>
 
@@ -1201,7 +1308,7 @@ export default function ChatInfo({
                 "Bạn có chắc chắn muốn thăng cấp thành viên này lên phó nhóm?"}
               {confirmationState.action === "transfer" &&
                 "Bạn có chắc chắn muốn chuyển quyền trưởng nhóm cho thành viên này?"}
-                 {confirmationState.action === "demote" &&
+              {confirmationState.action === "demote" &&
                 "Bạn có chắc chắn muốn thu hồi quyền quản trị viên của thành viên này?"}
             </p>
 
@@ -1218,9 +1325,17 @@ export default function ChatInfo({
               >
                 Hủy
               </Button>
-              <Button 
-              variant={confirmationState.action === "demote" || confirmationState.action === "remove" ? "destructive" : "default"}
-              onClick={handleConfirmAction}>Xác nhận</Button>
+              <Button
+                variant={
+                  confirmationState.action === "demote" ||
+                    confirmationState.action === "remove"
+                    ? "destructive"
+                    : "default"
+                }
+                onClick={handleConfirmAction}
+              >
+                Xác nhận
+              </Button>
             </div>
           </div>
         </DialogContent>
@@ -1250,6 +1365,86 @@ export default function ChatInfo({
             </Button>
             <Button variant="destructive" onClick={handleConfirmLeaveGroup}>
               Rời nhóm
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add this Edit Group Modal */}
+      <Dialog open={isEditGroupModalOpen} onOpenChange={setIsEditGroupModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogTitle>Chỉnh sửa thông tin nhóm</DialogTitle>
+
+          <div className="mt-4 space-y-4">
+            <div className="flex flex-col items-center">
+              <div className="relative w-24 h-24 rounded-full overflow-hidden mb-2 border-2 border-gray-200">
+                <Image
+                  src={
+                    newGroupAvatarPreview ||
+                    activeConversation?.groupAvatar ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                      activeConversation?.groupName || "Group"
+                    )}`
+                  }
+                  alt="Group Avatar"
+                  width={96}
+                  height={96}
+                  className="object-cover"
+                />
+                <label
+                  htmlFor="group-avatar-upload"
+                  className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
+                >
+                  <Pencil className="w-6 h-6 text-white" />
+                </label>
+                <input
+                  id="group-avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                />
+              </div>
+              <label className="text-sm text-blue-600 cursor-pointer">
+                Thay đổi ảnh nhóm
+              </label>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">
+                Tên nhóm
+              </label>
+              <Input
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                placeholder="Nhập tên nhóm mới"
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditGroupModalOpen(false);
+                setNewGroupName("");
+                setNewGroupAvatar(null);
+                setNewGroupAvatarPreview("");
+              }}
+              disabled={isUploading}
+            >
+              Hủy
+            </Button>
+            <Button
+              onClick={handleUpdateGroupInfo}
+              disabled={
+                isUploading ||
+                (!newGroupName && !newGroupAvatar) ||
+                (newGroupName === activeConversation?.groupName && !newGroupAvatar)
+              }
+            >
+              {isUploading ? "Đang cập nhật..." : "Cập nhật"}
             </Button>
           </div>
         </DialogContent>
