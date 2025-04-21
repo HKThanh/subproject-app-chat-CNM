@@ -1696,7 +1696,7 @@ const handleChangeOwnerGroup = async (io, socket) => {
     const user = await User.findOne({ id: IDUser }).select("fullname");
     const newOwner = await User.findOne({ id: IDNewOwner }).select("id fullname urlavatar phone email");
     const oldOwner = await User.findOne({ id: IDUser }).select("fullname");
-    
+
     // Create formatted owner object with complete information
     const newOwnerInfo = {
       id: newOwner.id,
@@ -2103,6 +2103,8 @@ const handleUpdateGroupInfo = (io, socket) => {
           ...updates,
           lastChange: undefined, // Không cần trả về lastChange
         },
+        systemMessage,
+        conversationId: IDConversation,
       });
 
       // Thông báo cho tất cả thành viên trong nhóm
@@ -2116,6 +2118,7 @@ const handleUpdateGroupInfo = (io, socket) => {
                 ...updates,
                 lastChange: undefined,
               },
+              systemMessage,
               message: systemMessage,
             });
           }
