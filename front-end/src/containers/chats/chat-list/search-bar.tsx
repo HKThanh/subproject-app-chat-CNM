@@ -82,19 +82,38 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   const handleAddFriend = async (userId: string, userData: SearchResult) => {
     try {
       const token = await getAuthToken();
-      const response = await fetch(
-        `${END_POINT_URL}/user/send`,
+
+      // Kiểm tra danh sách yêu cầu đã gửi trước khi gửi yêu cầu mới
+      const sentResponse = await fetch(
+        `${END_POINT_URL}/user/get-sended-friend-requests`,
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ receiverId: userId }),
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
-      console.log("check response is add fr>> ", response);
-      
+      const sentData = await sentResponse.json();
+
+      if (sentData.success) {
+        // Kiểm tra xem đã có yêu cầu PENDING với user này chưa
+        const existingRequest = sentData.data.find(
+          (req: any) => req.receiver?.id === userId && req.status === "PENDING"
+        );
+
+        if (existingRequest) {
+          toast.info("Yêu cầu đã được gửi trước đó");
+          return;
+        }
+      }
+
+      // Tiếp tục gửi yêu cầu kết bạn nếu chưa có yêu cầu PENDING
+      const response = await fetch(`${END_POINT_URL}/user/send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ receiverId: userId }),
+      });
+
       const data = await response.json();
 
       if (data.code === 1) {
@@ -131,7 +150,6 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
         );
         const sentData = await sentResponse.json();
         if (sentData.success) {
-          // Dispatch event để cập nhật UI với dữ liệu mới nhất
           const refreshEvent = new CustomEvent("refreshSentRequests", {
             detail: sentData.data,
           });
