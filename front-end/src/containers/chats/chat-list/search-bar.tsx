@@ -82,23 +82,62 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   const handleAddFriend = async (userId: string, userData: SearchResult) => {
     try {
       const token = await getAuthToken();
-      const response = await fetch(
-        `${END_POINT_URL}/user/send`,
+
+      // Kiểm tra danh sách lời mời đã nhận trước
+      const receivedResponse = await fetch(
+        `${END_POINT_URL}/user/get-received-friend-requests`,
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ receiverId: userId }),
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
-      console.log("check response is add fr>> ", response);
-      
+      const receivedData = await receivedResponse.json();
+
+      if (receivedData.success) {
+        // Kiểm tra xem người này đã gửi lời mời cho mình chưa
+        const receivedRequest = receivedData.data.find(
+          (req: any) => req.sender?.id === userId && req.status === "PENDING"
+        );
+
+        if (receivedRequest) {
+          toast.info("Người này đã gửi lời mời kết bạn cho bạn rồi");
+          return;
+        }
+      }
+
+      // Kiểm tra danh sách yêu cầu đã gửi
+      const sentResponse = await fetch(
+        `${END_POINT_URL}/user/get-sended-friend-requests`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const sentData = await sentResponse.json();
+
+      if (sentData.success) {
+        const existingRequest = sentData.data.find(
+          (req: any) => req.receiver?.id === userId && req.status === "PENDING"
+        );
+
+        if (existingRequest) {
+          toast.info("Yêu cầu đã được gửi trước đó");
+          return;
+        }
+      }
+
+      // Tiếp tục code gửi yêu cầu kết bạn như cũ
+      const response = await fetch(`${END_POINT_URL}/user/send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ receiverId: userId }),
+      });
+
       const data = await response.json();
 
+      // Phần còn lại giữ nguyên...
       if (data.code === 1) {
-        // Tạo object mới cho lời mời vừa gửi
         const newRequest = {
           id: data.data.requestId,
           receiver: {
@@ -109,20 +148,17 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
           createdAt: new Date().toISOString(),
         };
 
-        // Emit socket event
         socket?.emit("send_friend_request", {
           senderId: JSON.parse(sessionStorage.getItem("user-session") || "{}")
             ?.state?.user?.id,
           receiverId: userId,
         });
 
-        // Dispatch event để cập nhật UI ngay lập tức
         const updateEvent = new CustomEvent("updateSentRequests", {
           detail: newRequest,
         });
         window.dispatchEvent(updateEvent);
 
-        // Fetch lại danh sách lời mời đã gửi để đảm bảo dữ liệu đồng bộ
         const sentResponse = await fetch(
           `${END_POINT_URL}/user/get-sended-friend-requests`,
           {
@@ -131,7 +167,6 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
         );
         const sentData = await sentResponse.json();
         if (sentData.success) {
-          // Dispatch event để cập nhật UI với dữ liệu mới nhất
           const refreshEvent = new CustomEvent("refreshSentRequests", {
             detail: sentData.data,
           });

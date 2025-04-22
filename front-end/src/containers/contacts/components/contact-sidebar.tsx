@@ -15,7 +15,7 @@ export default function ContactSidebar({
   };
 
   return (
-    <div className="w-[240px] border-r border-gray-200 bg-white">
+    <div className="w-2/44 border-r border-gray-200 bg-white">
       <div className="p-4">
         <SearchBar onSelectConversation={handleSelectConversation} />
       </div>
@@ -31,7 +31,7 @@ export default function ContactSidebar({
           <Users className="w-5 h-5" />
           <span>Danh sách bạn bè</span>
         </button>
-        <button
+        {/* <button
           className={`w-full px-4 py-2 text-left flex items-center gap-3 ${
             activeSection === "groups"
               ? "bg-blue-50 text-blue-600"
@@ -41,7 +41,7 @@ export default function ContactSidebar({
         >
           <UsersRound className="w-5 h-5" />
           <span>Danh sách nhóm và cộng đồng</span>
-        </button>
+        </button> */}
         <button
           className={`w-full px-4 py-2 text-left flex items-center gap-3 ${
             activeSection === "requests"
@@ -53,7 +53,7 @@ export default function ContactSidebar({
           <UserPlus className="w-5 h-5" />
           <span>Lời mời kết bạn</span>
         </button>
-        <button
+        {/* <button
           className={`w-full px-4 py-2 text-left flex items-center gap-3 ${
             activeSection === "group-invites"
               ? "bg-blue-50 text-blue-600"
@@ -63,7 +63,7 @@ export default function ContactSidebar({
         >
           <UsersRound className="w-5 h-5" />
           <span>Lời mời vào nhóm và cộng đồng</span>
-        </button>
+        </button> */}
       </div>
     </div>
   );
