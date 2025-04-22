@@ -15,7 +15,7 @@ export default function ContactSidebar({
   };
 
   return (
-    <div className="w-[240px] border-r border-gray-200 bg-white">
+    <div className="w-2/44 border-r border-gray-200 bg-white">
       <div className="p-4">
         <SearchBar onSelectConversation={handleSelectConversation} />
       </div>
