@@ -2365,18 +2365,29 @@ const handlePromoteMemberToAdmin = (io, socket) => {
       }
 
       // Thông báo cho các thành viên khác
+      // conversation.groupMembers.forEach((member) => {
+      //   if (member !== IDUser && member !== IDMemberToPromote) {
+      //     const userSocket = getUser(member);
+      //     if (userSocket) {
+      //       io.to(userSocket.socketId).emit("member_promoted_notification", {
+      //         conversationId: IDConversation,
+      //         promotedMember: IDMemberToPromote,
+      //         promotedBy: IDUser,
+      //         systemMessage,
+      //       });
+      //     }
+      //   }
+      // });
       conversation.groupMembers.forEach((member) => {
-        if (member !== IDUser && member !== IDMemberToPromote) {
-          const userSocket = getUser(member);
-          if (userSocket) {
-            io.to(userSocket.socketId).emit("member_promoted_notification", {
-              conversationId: IDConversation,
-              promotedMember: IDMemberToPromote,
-              promotedBy: IDUser,
-              systemMessage,
-              updatedRules: updatedConversation.rules
-            });
-          }
+        const userSocket = getUser(member);
+        if (userSocket?.socketId) {
+          io.to(userSocket.socketId).emit("member_promoted_notification", {
+            conversationId: IDConversation,
+            promotedMember: IDMemberToPromote,
+            promotedBy: IDUser,
+            systemMessage,
+            updatedRules: updatedConversation.rules
+          });
         }
       });
     } catch (error) {
@@ -2485,17 +2496,28 @@ const handleDemoteMember = (io, socket) => {
       }
 
       // Thông báo cho các thành viên khác
+      // conversation.groupMembers.forEach((member) => {
+      //   if (member !== IDUser && member !== IDMemberToDemote) {
+      //     const userSocket = getUser(member);
+      //     if (userSocket) {
+      //       io.to(userSocket.socketId).emit("member_demoted_notification", {
+      //         conversationId: IDConversation,
+      //         demotedMember: IDMemberToDemote,
+      //         demotedBy: IDUser,
+      //         systemMessage,
+      //       });
+      //     }
+      //   }
+      // });
       conversation.groupMembers.forEach((member) => {
-        if (member !== IDUser && member !== IDMemberToDemote) {
-          const userSocket = getUser(member);
-          if (userSocket) {
-            io.to(userSocket.socketId).emit("member_demoted_notification", {
-              conversationId: IDConversation,
-              demotedMember: IDMemberToDemote,
-              demotedBy: IDUser,
-              systemMessage,
-            });
-          }
+        const userSocket = getUser(member);
+        if (userSocket) {
+          io.to(userSocket.socketId).emit("member_demoted_notification", {
+            conversationId: IDConversation,
+            demotedMember: IDMemberToDemote,
+            demotedBy: IDUser,
+            systemMessage,
+          });
         }
       });
     } catch (error) {

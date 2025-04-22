@@ -64,7 +64,7 @@ const SearchUserScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState<'search' | 'friends' | 'received' | 'sent'>('search');
   const searchBarAnimation = useRef(new Animated.Value(0)).current;
   const [friends, setFriends] = useState<User[]>([]);
-  const [receivedRequests, setReceivedRequests] = useState<User[]>([]);  
+  const [receivedRequests, setReceivedRequests] = useState<User[]>([]);
   const [sentRequests, setSentRequests] = useState<User[]>([]);
   const [isFriendsLoading, setIsFriendsLoading] = useState(false);
   const [isRequestsLoading, setIsRequestsLoading] = useState(false);
@@ -82,17 +82,17 @@ const SearchUserScreen = ({ navigation }) => {
   const loadFriends = async () => {
     setIsFriendsLoading(true);
     try {
-      const response = await fetch('http://192.168.0.106:3000/user/friend/get-friends', {
+      const response = await fetch('http://192.168.0.104:3000/user/friend/get-friends', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
         }
       });
-      
+
       const data = await response.json();
-      
+
       // Lấy danh sách người dùng đã chặn để kiểm tra
-      const blockedResponse = await fetch('http://192.168.0.106:3000/user/blocked/get-blocked', {
+      const blockedResponse = await fetch('http://192.168.0.104:3000/user/blocked/get-blocked', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -100,7 +100,7 @@ const SearchUserScreen = ({ navigation }) => {
       });
       const blockedData = await blockedResponse.json();
       const blockedUserIds = blockedData.success ? blockedData.data.map(user => user.id) : [];
-      
+
       if (data.code === 0) {
         // Đánh dấu những người dùng đã bị chặn
         const friendsWithBlockStatus = (data.data || []).map(friend => ({
@@ -122,15 +122,15 @@ const SearchUserScreen = ({ navigation }) => {
   const loadReceivedRequests = async () => {
     setIsRequestsLoading(true);
     try {
-      const response = await fetch('http://192.168.0.106:3000/user/get-received-friend-requests', {
+      const response = await fetch('http://192.168.0.104:3000/user/get-received-friend-requests', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
         }
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         // API trả về thông tin người gửi đầy đủ trong trường sender, bao gồm cả phone và email
         const requests = data.data || [];
@@ -149,7 +149,7 @@ const SearchUserScreen = ({ navigation }) => {
               isPendingReceived: true
             };
           }
-          
+
           // Fallback nếu không có thông tin sender
           return {
             id: request.senderId,
@@ -160,7 +160,7 @@ const SearchUserScreen = ({ navigation }) => {
             isPendingReceived: true
           };
         });
-        
+
         setReceivedRequests(userRequests.filter(user => user !== null));
       } else {
         setReceivedRequests([]);
@@ -175,15 +175,15 @@ const SearchUserScreen = ({ navigation }) => {
   const loadSentRequests = async () => {
     setIsRequestsLoading(true);
     try {
-      const response = await fetch('http://192.168.0.106:3000/user/get-sended-friend-requests', {
+      const response = await fetch('http://192.168.0.104:3000/user/get-sended-friend-requests', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
         }
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         // API trả về thông tin người nhận đầy đủ trong trường receiver, bao gồm cả phone và email
         const requests = data.data || [];
@@ -201,7 +201,7 @@ const SearchUserScreen = ({ navigation }) => {
               isPendingSent: true
             };
           }
-          
+
           // Fallback nếu không có thông tin receiver
           return {
             id: request.receiverId,
@@ -212,7 +212,7 @@ const SearchUserScreen = ({ navigation }) => {
             isPendingSent: true
           };
         });
-        
+
         console.log('Yêu cầu kết bạn đã gửi:', userRequests);
         setSentRequests(userRequests.filter(user => user !== null));
       } else {
@@ -228,7 +228,7 @@ const SearchUserScreen = ({ navigation }) => {
   // Tải tất cả dữ liệu khi chuyển tab
   const loadTabData = (tab: 'search' | 'friends' | 'received' | 'sent') => {
     setActiveTab(tab);
-    
+
     // Khởi động animation khi chuyển tab
     if (tab === 'search') {
       // Nếu chuyển đến tab tìm kiếm, hiển thị thanh search với hiệu ứng trượt xuống
@@ -246,7 +246,7 @@ const SearchUserScreen = ({ navigation }) => {
         friction: 8
       }).start();
     }
-    
+
     if (tab === 'friends') {
       loadFriends();
     } else if (tab === 'received') {
@@ -255,19 +255,19 @@ const SearchUserScreen = ({ navigation }) => {
       loadSentRequests();
     }
   };
-  
+
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
       setError('Vui lòng nhập từ khóa tìm kiếm');
       setSearchResults([]);
       return;
     }
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      const response = await fetch('http://192.168.0.106:3000/user/search', {
+      const response = await fetch('http://192.168.0.104:3000/user/search', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -275,9 +275,9 @@ const SearchUserScreen = ({ navigation }) => {
         },
         body: JSON.stringify({ text: searchQuery })
       });
-      
+
       const data = await response.json();
-      
+
       if (data.code === 1) {
         // Process users to set relevant flags based on friendship status
         const processedUsers = await processUserFriendshipStatus(data.data);
@@ -294,12 +294,12 @@ const SearchUserScreen = ({ navigation }) => {
       setIsLoading(false);
     }
   };
-  
+
   // Fetch and determine friendship status for each user
   const processUserFriendshipStatus = async (users: User[]): Promise<User[]> => {
     try {
       // Get user's friends
-      const friendsResponse = await fetch('http://192.168.0.106:3000/user/friend/get-friends', {
+      const friendsResponse = await fetch('http://192.168.0.104:3000/user/friend/get-friends', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -307,9 +307,9 @@ const SearchUserScreen = ({ navigation }) => {
       });
       const friendsData = await friendsResponse.json();
       const friendIds = friendsData.code === 0 ? friendsData.data.map(friend => friend.id) : [];
-      
+
       // Get sent friend requests
-      const sentRequestsResponse = await fetch('http://192.168.0.106:3000/user/get-sended-friend-requests', {
+      const sentRequestsResponse = await fetch('http://192.168.0.104:3000/user/get-sended-friend-requests', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -317,9 +317,9 @@ const SearchUserScreen = ({ navigation }) => {
       });
       const sentRequestsData = await sentRequestsResponse.json();
       const sentRequests = sentRequestsData.success ? sentRequestsData.data : [];
-      
+
       // Get received friend requests
-      const receivedRequestsResponse = await fetch('http://192.168.0.106:3000/user/get-received-friend-requests', {
+      const receivedRequestsResponse = await fetch('http://192.168.0.104:3000/user/get-received-friend-requests', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -327,9 +327,9 @@ const SearchUserScreen = ({ navigation }) => {
       });
       const receivedRequestsData = await receivedRequestsResponse.json();
       const receivedRequests = receivedRequestsData.success ? receivedRequestsData.data : [];
-      
+
       // Get blocked users
-      const blockedUsersResponse = await fetch('http://192.168.0.106:3000/user/blocked/get-blocked', {
+      const blockedUsersResponse = await fetch('http://192.168.0.104:3000/user/blocked/get-blocked', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
@@ -337,25 +337,25 @@ const SearchUserScreen = ({ navigation }) => {
       });
       const blockedUsersData = await blockedUsersResponse.json();
       const blockedUsers = blockedUsersData.success ? blockedUsersData.data : [];
-      
+
       // Update each user with their friendship status
       return users.map(user => {
         // Check if user is a friend
         const isFriend = friendIds.includes(user.id);
-        
+
         // Check if there's a pending sent request
         const pendingSentRequest = sentRequests.find(
           req => req.receiverId === user.id && req.status === 'PENDING'
         );
-        
+
         // Check if there's a pending received request
         const pendingReceivedRequest = receivedRequests.find(
           req => req.senderId === user.id && req.status === 'PENDING'
         );
-        
+
         // Check if user is blocked
         const isBlocked = blockedUsers.some(blockedUser => blockedUser.id === user.id);
-        
+
         // Determine friendship status
         let friendshipStatus = FriendshipStatus.NONE;
         if (isFriend) {
@@ -367,7 +367,7 @@ const SearchUserScreen = ({ navigation }) => {
         } else if (isBlocked) {
           friendshipStatus = FriendshipStatus.BLOCKED;
         }
-        
+
         return {
           ...user,
           friendshipStatus,
@@ -388,23 +388,23 @@ const SearchUserScreen = ({ navigation }) => {
       Alert.alert('Thông báo', 'Đây là tài khoản của bạn');
       return;
     }
-    
+
     setSelectedUser(user);
     setIsActionModalVisible(true);
   };
-  
+
   // Navigate to chat with the selected user
   const navigateToChatWithUser = (user: User) => {
     if (user.friendshipStatus === FriendshipStatus.BLOCKED) {
       Alert.alert('Thông báo', 'Bạn đã chặn người dùng này. Vui lòng bỏ chặn để trò chuyện.');
       return;
     }
-    
+
     if (user.friendshipStatus === FriendshipStatus.BLOCKED_BY) {
       Alert.alert('Thông báo', 'Bạn đã bị người dùng này chặn.');
       return;
     }
-    
+
     navigation.navigate('ChatScreen', {
       receiverId: user.id,
       chatItem: {
@@ -417,28 +417,28 @@ const SearchUserScreen = ({ navigation }) => {
   // Set up socket connections
   useEffect(() => {
     // Connect to the socket server
-    socketRef.current = io('http://192.168.0.106:3000');
-    
+    socketRef.current = io('http://192.168.0.104:3000');
+
     // Join user's room to receive notifications
     if (global.userData?.id) {
       socketRef.current.emit('joinUserRoom', global.userData.id);
     }
-    
+
     // Listen for friend request events
     socketRef.current.on('newFriendRequest', (data) => {
       // Update search results if the sender is in the list
       refreshUserInResults(data.sender.id);
-      
+
       // Reload received requests if we're on that tab
       if (activeTab === 'received') {
         loadReceivedRequests();
       }
     });
-    
+
     socketRef.current.on('friendRequestAccepted', (data) => {
       // Update the status of the user in search results
       refreshUserInResults(data.userId);
-      
+
       // Reload relevant tabs based on the current tab
       if (activeTab === 'friends') {
         loadFriends();
@@ -446,34 +446,34 @@ const SearchUserScreen = ({ navigation }) => {
         loadSentRequests();
       }
     });
-    
+
     socketRef.current.on('friendRequestDeclined', (data) => {
       // Update the status of the user in search results
       refreshUserInResults(data.userId);
-      
+
       // Reload sent requests if we're on that tab
       if (activeTab === 'sent') {
         loadSentRequests();
       }
     });
-    
+
     // Listen for block events
     socketRef.current.on('blockedByUser', (data) => {
       refreshUserInResults(data.blockerId);
     });
-      socketRef.current.on('unblockedByUser', (data) => {
+    socketRef.current.on('unblockedByUser', (data) => {
       refreshUserInResults(data.blockerId);
     });
 
     // Lắng nghe sự kiện hủy kết bạn
     socketRef.current.on('unfriend', (data) => {
       console.log('Unfriend event received:', data);
-      
+
       // Xóa người dùng khỏi danh sách bạn bè nếu đang ở tab bạn bè
       if (data.friendId) {
         setFriends(prev => prev.filter(friend => friend.id !== data.friendId));
       }
-      
+
       // Cập nhật người dùng trong kết quả tìm kiếm (nếu có)
       if (data.friendId) {
         updateUserInSearchResults(data.friendId, {
@@ -481,16 +481,16 @@ const SearchUserScreen = ({ navigation }) => {
           isFriend: false
         });
       }
-      
+
       // Hiển thị thông báo
       if (data.message) {
         Alert.alert('Thông báo', data.message);
       }
     });
-    
+
     // Load initial data for the active tab
     loadTabData(activeTab);
-    
+
     return () => {
       // Clean up socket connection
       if (socketRef.current) {
@@ -502,7 +502,7 @@ const SearchUserScreen = ({ navigation }) => {
   // Helper function to refresh a specific user in search results
   const refreshUserInResults = async (userId: string) => {
     if (!searchResults.some(user => user.id === userId)) return;
-    
+
     // Re-run the search to update the results
     if (searchQuery.trim()) {
       handleSearch();
@@ -511,14 +511,14 @@ const SearchUserScreen = ({ navigation }) => {
   // Handle sending a friend request
   const handleSendFriendRequest = async (userId: string) => {
     if (isProcessing) return;
-    
+
     setProcessingUserId(userId);
     setIsProcessing(true);
-    
+
     try {
       // Kiểm tra trạng thái yêu cầu kết bạn trước
       const requestStatus = await checkFriendRequestExists(userId);
-      
+
       if (requestStatus.code === 2) {
         // Đã là bạn bè
         Alert.alert('Thông báo', requestStatus.message);
@@ -540,8 +540,8 @@ const SearchUserScreen = ({ navigation }) => {
         setProcessingUserId(null);
         return;
       }
-        // Gửi yêu cầu kết bạn mới
-      const response = await fetch('http://192.168.0.106:3000/user/send', {
+      // Gửi yêu cầu kết bạn mới
+      const response = await fetch('http://192.168.0.104:3000/user/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -549,22 +549,22 @@ const SearchUserScreen = ({ navigation }) => {
         },
         body: JSON.stringify({ receiverId: userId })
       });
-      
+
       const data = await response.json();
-        if (data.code === 1) {
+      if (data.code === 1) {
         // Success
         Alert.alert('Thành công', 'Đã gửi lời mời kết bạn');
-        
+
         // Lấy friendRequestId từ response nếu có
         const friendRequestId = data.data?.id;
-        
+
         // Update user in search results
         updateUserInSearchResults(userId, {
           friendshipStatus: FriendshipStatus.PENDING_SENT,
           isPendingSent: true,
           friendRequestId: friendRequestId // Cập nhật friendRequestId
         });
-        
+
         // Join the friend request socket room for real-time updates
         socketRef.current?.emit('joinFriendRequest', userId);
       } else if (data.code === 2 || data.code === 3) {
@@ -584,24 +584,25 @@ const SearchUserScreen = ({ navigation }) => {
     } finally {
       setIsProcessing(false);
       setProcessingUserId(null);
-    }  };  
-    // Handle canceling a friend request
+    }
+  };
+  // Handle canceling a friend request
   const handleCancelFriendRequest = async (userId: string, requestId: string) => {
     if (isProcessing) return;
-    
+
     setProcessingUserId(userId);
     setIsProcessing(true);
-    
+
     try {
       // Kiểm tra lại ID yêu cầu kết bạn mới nhất trước khi hủy
-      const sentResponse = await fetch('http://192.168.0.106:3000/user/get-sended-friend-requests', {
+      const sentResponse = await fetch('http://192.168.0.104:3000/user/get-sended-friend-requests', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
         }
       });
       const sentData = await sentResponse.json();
-      
+
       // Nếu tìm thấy yêu cầu kết bạn cập nhật, sử dụng ID đó thay vì ID cũ
       let actualRequestId = requestId;
       if (sentData.success) {
@@ -610,15 +611,15 @@ const SearchUserScreen = ({ navigation }) => {
           actualRequestId = latestRequest.id;
         }
       }
-      
+
       // Sử dụng URL chính xác theo tài liệu API với ID yêu cầu mới nhất
-      const response = await fetch(`http://192.168.0.106:3000/user/cancel/${actualRequestId}`, {
+      const response = await fetch(`http://192.168.0.104:3000/user/cancel/${actualRequestId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
         }
       });
-      
+
       // Kiểm tra kiểu nội dung trước khi parse JSON
       const contentType = response.headers.get('content-type');
       let data;
@@ -630,18 +631,18 @@ const SearchUserScreen = ({ navigation }) => {
         console.error('Server trả về không phải JSON:', text);
         throw new Error('Phản hồi từ server không phải định dạng JSON');
       }
-      
+
       if (data.code === 1) {
         // Success
         Alert.alert('Thành công', 'Đã hủy lời mời kết bạn');
-        
+
         // Update user in search results
         updateUserInSearchResults(userId, {
           friendshipStatus: FriendshipStatus.NONE,
           isPendingSent: false,
           friendRequestId: undefined
         });
-        
+
         // Reload sent requests tab if active
         if (activeTab === 'sent') {
           loadSentRequests();
@@ -658,33 +659,33 @@ const SearchUserScreen = ({ navigation }) => {
       setProcessingUserId(null);
     }
   };
-  
+
   // Handle accepting a friend request
   const handleAcceptFriendRequest = async (userId: string, requestId: string) => {
     if (isProcessing) return;
-    
+
     setProcessingUserId(userId);
     setIsProcessing(true);
-    
+
     try {
-      const response = await fetch('http://192.168.0.106:3000/user/handle', {
+      const response = await fetch('http://192.168.0.104:3000/user/handle', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${global.accessToken}`
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           id: requestId,
           type: 'ACCEPTED'
         })
       });
-      
+
       const data = await response.json();
-      
+
       if (data.code === 2) {
         // Success
         Alert.alert('Thành công', 'Đã chấp nhận lời mời kết bạn');
-        
+
         // Update user in search results
         updateUserInSearchResults(userId, {
           friendshipStatus: FriendshipStatus.FRIEND,
@@ -692,7 +693,7 @@ const SearchUserScreen = ({ navigation }) => {
           isFriend: true,
           friendRequestId: undefined
         });
-        
+
         // Join the friend request socket room for real-time updates
         socketRef.current?.emit('joinFriendRequest', userId);
       } else {
@@ -707,33 +708,33 @@ const SearchUserScreen = ({ navigation }) => {
       setProcessingUserId(null);
     }
   };
-  
+
   // Handle declining a friend request
   const handleDeclineFriendRequest = async (userId: string, requestId: string) => {
     if (isProcessing) return;
-    
+
     setProcessingUserId(userId);
     setIsProcessing(true);
-    
+
     try {
-      const response = await fetch('http://192.168.0.106:3000/user/handle', {
+      const response = await fetch('http://192.168.0.104:3000/user/handle', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${global.accessToken}`
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           id: requestId,
           type: 'DECLINED'
         })
       });
-      
+
       const data = await response.json();
-      
+
       if (data.code === 1) {
         // Success
         Alert.alert('Thành công', 'Đã từ chối lời mời kết bạn');
-        
+
         // Update user in search results
         updateUserInSearchResults(userId, {
           friendshipStatus: FriendshipStatus.NONE,
@@ -755,21 +756,21 @@ const SearchUserScreen = ({ navigation }) => {
   // Handle blocking a user
   const handleBlockUser = async (userId: string) => {
     if (isProcessing) return;
-    
+
     setProcessingUserId(userId);
     setIsProcessing(true);
-    
+
     try {
       // Lưu trạng thái trước khi chặn để sử dụng khi bỏ chặn
       const user = searchResults.find(u => u.id === userId) || selectedUser;
       const wasFriend = user?.isFriend || false;
-      
+
       // Hủy lời mời kết bạn nếu có
       if (user?.friendRequestId) {
         try {
           if (user.isPendingSent) {
             // Hủy lời mời đã gửi
-            await fetch(`http://192.168.0.106:3000/user/cancel/${user.friendRequestId}`, {
+            await fetch(`http://192.168.0.104:3000/user/cancel/${user.friendRequestId}`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${global.accessToken}`
@@ -777,13 +778,13 @@ const SearchUserScreen = ({ navigation }) => {
             });
           } else if (user.isPendingReceived) {
             // Từ chối lời mời đã nhận
-            await fetch('http://192.168.0.106:3000/user/handle', {
+            await fetch('http://192.168.0.104:3000/user/handle', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${global.accessToken}`
               },
-              body: JSON.stringify({ 
+              body: JSON.stringify({
                 id: user.friendRequestId,
                 type: 'DECLINED'
               })
@@ -793,9 +794,9 @@ const SearchUserScreen = ({ navigation }) => {
           console.error('Error canceling friend request before blocking:', error);
         }
       }
-      
+
       // Thực hiện chặn người dùng
-      const response = await fetch('http://192.168.0.106:3000/user/blocked/block', {
+      const response = await fetch('http://192.168.0.104:3000/user/blocked/block', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -803,13 +804,13 @@ const SearchUserScreen = ({ navigation }) => {
         },
         body: JSON.stringify({ userId })
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         // Success
         Alert.alert('Thành công', 'Đã chặn người dùng');
-        
+
         // Update user in search results
         updateUserInSearchResults(userId, {
           friendshipStatus: FriendshipStatus.BLOCKED,
@@ -819,21 +820,21 @@ const SearchUserScreen = ({ navigation }) => {
           isPendingReceived: false,
           wasFriendBeforeBlocking: wasFriend // Lưu trạng thái bạn bè trước khi chặn
         });
-        
+
         // Cập nhật danh sách bạn bè nếu đang ở tab Bạn bè
         if (activeTab === 'friends') {
-          setFriends(prev => 
-            prev.map(friend => 
-              friend.id === userId 
-                ? { ...friend, isBlocked: true, wasFriendBeforeBlocking: true } 
+          setFriends(prev =>
+            prev.map(friend =>
+              friend.id === userId
+                ? { ...friend, isBlocked: true, wasFriendBeforeBlocking: true }
                 : friend
             )
           );
-          
+
           // Ẩn modal sau khi chặn thành công
           setIsActionModalVisible(false);
         }
-        
+
         // Emit socket event
         socketRef.current?.emit('joinUserRoom', userId);
       } else {
@@ -850,19 +851,19 @@ const SearchUserScreen = ({ navigation }) => {
   };    // Handle unblocking a user
   const handleUnblockUser = async (userId: string) => {
     if (isProcessing) return;
-    
+
     setProcessingUserId(userId);
     setIsProcessing(true);
-    
+
     try {
       // Lấy thông tin người dùng để kiểm tra trạng thái trước khi chặn
-      const user = searchResults.find(u => u.id === userId) || 
-                   friends.find(f => f.id === userId) || 
-                   selectedUser;
-      
+      const user = searchResults.find(u => u.id === userId) ||
+        friends.find(f => f.id === userId) ||
+        selectedUser;
+
       const wasFriend = user?.wasFriendBeforeBlocking || false;
-      
-      const response = await fetch('http://192.168.0.106:3000/user/blocked/unblock', {
+
+      const response = await fetch('http://192.168.0.104:3000/user/blocked/unblock', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -870,13 +871,13 @@ const SearchUserScreen = ({ navigation }) => {
         },
         body: JSON.stringify({ userId })
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         // Success
         Alert.alert('Thành công', 'Đã bỏ chặn người dùng');
-        
+
         // Update user in search results - restore to friend status if was a friend before blocking
         if (wasFriend) {
           updateUserInSearchResults(userId, {
@@ -892,25 +893,25 @@ const SearchUserScreen = ({ navigation }) => {
             wasFriendBeforeBlocking: undefined
           });
         }
-        
+
         // Cập nhật danh sách bạn bè nếu đang ở tab Bạn bè
         if (activeTab === 'friends') {
-          setFriends(prev => 
-            prev.map(friend => 
-              friend.id === userId 
-                ? { 
-                    ...friend, 
-                    isBlocked: false,
-                    wasFriendBeforeBlocking: undefined 
-                  } 
+          setFriends(prev =>
+            prev.map(friend =>
+              friend.id === userId
+                ? {
+                  ...friend,
+                  isBlocked: false,
+                  wasFriendBeforeBlocking: undefined
+                }
                 : friend
             )
           );
-          
+
           // Ẩn modal sau khi bỏ chặn thành công
           setIsActionModalVisible(false);
         }
-        
+
         // Emit socket event
         socketRef.current?.emit('joinUserRoom', userId);
       } else {
@@ -925,11 +926,11 @@ const SearchUserScreen = ({ navigation }) => {
       setProcessingUserId(null);
     }
   };
-  
+
   // Handle unfriending a user
   const handleUnfriend = async (userId: string) => {
     if (isProcessing) return;
-    
+
     // Hiển thị hộp thoại xác nhận trước khi hủy kết bạn
     Alert.alert(
       'Xác nhận hủy kết bạn',
@@ -945,9 +946,9 @@ const SearchUserScreen = ({ navigation }) => {
           onPress: async () => {
             setProcessingUserId(userId);
             setIsProcessing(true);
-            
+
             try {
-              const response = await fetch('http://192.168.0.106:3000/user/friend/unfriend', {
+              const response = await fetch('http://192.168.0.104:3000/user/friend/unfriend', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -955,22 +956,22 @@ const SearchUserScreen = ({ navigation }) => {
                 },
                 body: JSON.stringify({ friendId: userId })
               });
-              
+
               const data = await response.json();
-              
+
               if (data.code === 1) {
                 // Hủy kết bạn thành công
                 Alert.alert('Thành công', data.message || 'Đã hủy kết bạn thành công');
-                
+
                 // Xóa người dùng khỏi danh sách bạn bè
                 setFriends(prev => prev.filter(friend => friend.id !== userId));
-                
+
                 // Cập nhật người dùng trong kết quả tìm kiếm (nếu có)
                 updateUserInSearchResults(userId, {
                   friendshipStatus: FriendshipStatus.NONE,
                   isFriend: false
                 });
-                
+
                 // Đóng modal
                 setIsActionModalVisible(false);
               } else {
@@ -989,11 +990,11 @@ const SearchUserScreen = ({ navigation }) => {
       ]
     );
   };
-  
+
   // Helper function to update a user in the search results
   const updateUserInSearchResults = (userId: string, updates: Partial<User>) => {
-    setSearchResults(prevResults => 
-      prevResults.map(user => 
+    setSearchResults(prevResults =>
+      prevResults.map(user =>
         user.id === userId ? { ...user, ...updates } : user
       )
     );
@@ -1003,58 +1004,58 @@ const SearchUserScreen = ({ navigation }) => {
   const checkFriendRequestExists = async (userId: string) => {
     try {
       // Kiểm tra xem người dùng đã là bạn bè hay chưa
-      const friendResponse = await fetch('http://192.168.0.106:3000/user/friend/get-friends', {
+      const friendResponse = await fetch('http://192.168.0.104:3000/user/friend/get-friends', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
         }
       });
       const friendData = await friendResponse.json();
-      
+
       if (friendData.code === 0) {
         const isFriend = friendData.data.some(friend => friend.id === userId);
         if (isFriend) {
           return { code: 2, message: 'Hai bạn đã là bạn bè' };
         }
       }
-      
+
       // Kiểm tra yêu cầu kết bạn đã gửi
-      const sentResponse = await fetch('http://192.168.0.106:3000/user/get-sended-friend-requests', {
+      const sentResponse = await fetch('http://192.168.0.104:3000/user/get-sended-friend-requests', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
         }
       });
       const sentData = await sentResponse.json();
-      
+
       if (sentData.success) {
         const existingRequest = sentData.data.find(
           req => req.receiverId === userId && req.status === 'PENDING'
         );
-        
+
         if (existingRequest) {
           return { code: 0, message: 'Bạn đã gửi lời mời kết bạn cho người này rồi', requestId: existingRequest.id };
         }
       }
-      
+
       // Kiểm tra yêu cầu kết bạn đã nhận
-      const receivedResponse = await fetch('http://192.168.0.106:3000/user/get-received-friend-requests', {
+      const receivedResponse = await fetch('http://192.168.0.104:3000/user/get-received-friend-requests', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${global.accessToken}`
         }
       });
       const receivedData = await receivedResponse.json();
-        if (receivedData.success) {
+      if (receivedData.success) {
         const existingRequest = receivedData.data.find(
           req => req.senderId === userId && req.status === 'PENDING'
         );
-        
+
         if (existingRequest) {
           return { code: 1, message: 'Người này đã gửi cho bạn lời mời kết bạn', requestId: existingRequest.id };
         }
       }
-      
+
       return { code: -1, message: 'Không tìm thấy yêu cầu kết bạn' };
     } catch (error) {
       console.error('Lỗi kiểm tra yêu cầu kết bạn:', error);
@@ -1080,7 +1081,7 @@ const SearchUserScreen = ({ navigation }) => {
           </View>
           {selectedUser && (
             <View style={styles.userInfoModal}>
-              <Image 
+              <Image
                 source={{ uri: selectedUser.urlavatar || 'https://via.placeholder.com/80' }}
                 style={styles.modalAvatar}
               />
@@ -1089,10 +1090,11 @@ const SearchUserScreen = ({ navigation }) => {
                 {selectedUser.phone || selectedUser.email || 'Không có thông tin liên hệ'}
               </Text>
             </View>
-          )}          <View style={styles.actionButtons}>
+          )}     
+               <View style={styles.actionButtons}>
             {/* Hiển thị nút "Bỏ chặn" nếu người dùng đã bị chặn */}
             {selectedUser?.isBlocked ? (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.actionButton, styles.secondaryButton]}
                 onPress={() => handleUnblockUser(selectedUser.id)}
               >
@@ -1103,13 +1105,13 @@ const SearchUserScreen = ({ navigation }) => {
                 {/* Hiện các nút tương tác dựa vào trạng thái kết bạn */}
                 {selectedUser?.friendshipStatus === FriendshipStatus.NONE && (
                   <>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[styles.actionButton, styles.primaryButton]}
                       onPress={() => handleSendFriendRequest(selectedUser.id)}
                     >
                       <Text style={styles.actionButtonText}>Kết bạn</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[styles.actionButton, styles.warningButton]}
                       onPress={() => handleBlockUser(selectedUser.id)}
                     >
@@ -1119,13 +1121,13 @@ const SearchUserScreen = ({ navigation }) => {
                 )}
                 {selectedUser?.friendshipStatus === FriendshipStatus.PENDING_SENT && (
                   <>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[styles.actionButton, styles.cancelButton]}
                       onPress={() => handleCancelFriendRequest(selectedUser.id, selectedUser.friendRequestId!)}
                     >
                       <Text style={styles.actionButtonText}>Hủy lời mời</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[styles.actionButton, styles.warningButton]}
                       onPress={() => handleBlockUser(selectedUser.id)}
                     >
@@ -1135,41 +1137,36 @@ const SearchUserScreen = ({ navigation }) => {
                 )}
                 {selectedUser?.friendshipStatus === FriendshipStatus.PENDING_RECEIVED && (
                   <>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[styles.actionButton, styles.primaryButton]}
                       onPress={() => handleAcceptFriendRequest(selectedUser.id, selectedUser.friendRequestId!)}
                     >
                       <Text style={styles.actionButtonText}>Đồng ý</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[styles.actionButton, styles.declineButton]}
                       onPress={() => handleDeclineFriendRequest(selectedUser.id, selectedUser.friendRequestId!)}
                     >
                       <Text style={styles.actionButtonText}>Từ chối</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[styles.actionButton, styles.warningButton]}
                       onPress={() => handleBlockUser(selectedUser.id)}
                     >
                       <Text style={styles.actionButtonText}>Chặn</Text>
                     </TouchableOpacity>
                   </>
-                )}                {selectedUser?.friendshipStatus === FriendshipStatus.FRIEND && (
+                )}           
+                     {selectedUser?.friendshipStatus === FriendshipStatus.FRIEND && (
                   <>
-                    <TouchableOpacity 
-                      style={[styles.actionButton, styles.primaryButton]}
-                      onPress={() => navigateToChatWithUser(selectedUser)}
-                      disabled={selectedUser.isBlocked}
-                    >
-                      <Text style={styles.actionButtonText}>Nhắn tin</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
+
+                    <TouchableOpacity
                       style={[styles.actionButton, styles.declineButton]}
                       onPress={() => handleUnfriend(selectedUser.id)}
                     >
                       <Text style={styles.actionButtonText}>Hủy kết bạn</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[styles.actionButton, styles.warningButton]}
                       onPress={() => handleBlockUser(selectedUser.id)}
                     >
@@ -1187,18 +1184,18 @@ const SearchUserScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1FAEEB" />
-      
+
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
           <Ionicons name="arrow-back" size={24} color="#FDF8F8" />
         </TouchableOpacity>
-        
+
         <Text style={styles.headerTitle}>Tìm người dùng</Text>
       </View>
-      
+
       {/* Chỉ hiển thị thanh tìm kiếm khi ở tab tìm kiếm */}
       {activeTab === 'search' && (
         <View style={styles.searchContainer}>
@@ -1206,13 +1203,13 @@ const SearchUserScreen = ({ navigation }) => {
             style={styles.searchInput}
             placeholder="Nhập tên, email hoặc số điện thoại"
             value={searchQuery}
-            placeholderTextColor="gray" 
+            placeholderTextColor="gray"
             onChangeText={setSearchQuery}
             returnKeyType="search"
             onSubmitEditing={handleSearch}
           />
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={styles.searchButton}
             onPress={handleSearch}
           >
@@ -1220,66 +1217,66 @@ const SearchUserScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       )}
-      
+
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tabButton, activeTab === 'search' && styles.activeTabButton]}
           onPress={() => loadTabData('search')}
         >
-          <Ionicons 
-            name="search" 
-            size={20} 
-            color={activeTab === 'search' ? '#1FAEEB' : '#999'} 
+          <Ionicons
+            name="search"
+            size={20}
+            color={activeTab === 'search' ? '#1FAEEB' : '#999'}
           />
           <Text style={[styles.tabText, activeTab === 'search' && styles.activeTabText]}>
             Tìm kiếm
           </Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={[styles.tabButton, activeTab === 'friends' && styles.activeTabButton]}
           onPress={() => loadTabData('friends')}
         >
-          <Ionicons 
-            name="people" 
-            size={20} 
-            color={activeTab === 'friends' ? '#1FAEEB' : '#999'} 
+          <Ionicons
+            name="people"
+            size={20}
+            color={activeTab === 'friends' ? '#1FAEEB' : '#999'}
           />
           <Text style={[styles.tabText, activeTab === 'friends' && styles.activeTabText]}>
             Bạn bè
           </Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={[styles.tabButton, activeTab === 'received' && styles.activeTabButton]}
           onPress={() => loadTabData('received')}
         >
-          <Ionicons 
-            name="person-add" 
-            size={20} 
-            color={activeTab === 'received' ? '#1FAEEB' : '#999'} 
+          <Ionicons
+            name="person-add"
+            size={20}
+            color={activeTab === 'received' ? '#1FAEEB' : '#999'}
           />
           <Text style={[styles.tabText, activeTab === 'received' && styles.activeTabText]}>
             Lời mời
           </Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={[styles.tabButton, activeTab === 'sent' && styles.activeTabButton]}
           onPress={() => loadTabData('sent')}
         >
-          <Ionicons 
-            name="paper-plane" 
-            size={20} 
-            color={activeTab === 'sent' ? '#1FAEEB' : '#999'} 
+          <Ionicons
+            name="paper-plane"
+            size={20}
+            color={activeTab === 'sent' ? '#1FAEEB' : '#999'}
           />
           <Text style={[styles.tabText, activeTab === 'sent' && styles.activeTabText]}>
             Đã gửi
           </Text>
         </TouchableOpacity>
       </View>
-      
+
       {/* Tab Content based on activeTab */}
       {activeTab === 'search' ? (
         // Search Results Content
@@ -1295,96 +1292,98 @@ const SearchUserScreen = ({ navigation }) => {
           <FlatList
             data={searchResults}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (              <View style={styles.userItemWithActions}>
-                <TouchableOpacity 
-                  style={styles.userItemMain}
-                  onPress={() => handleUserSelect(item)}
-                >
-                  <Image 
-                    source={{ uri: item.urlavatar || 'https://via.placeholder.com/50' }}
-                    style={styles.avatar}
-                    defaultSource={require('../assets/Welo_image.png')}
-                  />
-                  <View style={styles.userInfo}>
-                    <Text style={styles.userName}>{item.fullname}</Text>
-                    <Text style={styles.userDetails}>
-                      {item.phone || item.email || 'Không có thông tin liên hệ'}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={24} color="#999" />
-                </TouchableOpacity>
-                
-                {/* Hiển thị nút dựa trên trạng thái kết bạn */}
-                {item.id !== global.userData?.id && (
-                  <View style={styles.searchResultActions}>                    {item.isBlocked && (
-                      <View style={[styles.statusBadge, styles.blockedBadge]}>
-                        <Text style={styles.blockedStatusText}>Đã chặn</Text>
-                      </View>
-                    )}
-                    
-                    {!item.isBlocked && item.friendshipStatus === FriendshipStatus.NONE && (
-                      <TouchableOpacity 
-                        style={[styles.inlineButton, styles.acceptButton]}
-                        onPress={() => handleSendFriendRequest(item.id)}
-                        disabled={processingUserId === item.id}
-                      >
-                        {processingUserId === item.id ? (
-                          <ActivityIndicator size="small" color="#FFF" />
-                        ) : (
-                          <Text style={styles.inlineButtonText}>Kết bạn</Text>
-                        )}
-                      </TouchableOpacity>
-                    )}
-                    
-                    {!item.isBlocked && item.friendshipStatus === FriendshipStatus.PENDING_SENT && (
-                      <TouchableOpacity 
-                        style={[styles.inlineButton, styles.cancelButton]}
-                        onPress={() => handleCancelFriendRequest(item.id, item.friendRequestId!)}
-                        disabled={processingUserId === item.id}
-                      >
-                        {processingUserId === item.id ? (
-                          <ActivityIndicator size="small" color="#FFF" />
-                        ) : (
-                          <Text style={styles.inlineButtonText}>Hủy lời mời</Text>
-                        )}
-                      </TouchableOpacity>
-                    )}
-                    
-                    {!item.isBlocked && item.friendshipStatus === FriendshipStatus.PENDING_RECEIVED && (
-                      <View style={styles.actionButtonsInline}>
-                        <TouchableOpacity 
-                          style={[styles.inlineButton, styles.acceptButton]}
-                          onPress={() => handleAcceptFriendRequest(item.id, item.friendRequestId!)}
-                          disabled={processingUserId === item.id}
-                        >
-                          {processingUserId === item.id ? (
-                            <ActivityIndicator size="small" color="#FFF" />
-                          ) : (
-                            <Text style={styles.inlineButtonText}>Đồng ý</Text>
-                          )}
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={[styles.inlineButton, styles.declineButton]}
-                          onPress={() => handleDeclineFriendRequest(item.id, item.friendRequestId!)}
-                          disabled={processingUserId === item.id}
-                        >
-                          {processingUserId === item.id ? (
-                            <ActivityIndicator size="small" color="#FFF" />
-                          ) : (
-                            <Text style={styles.inlineButtonText}>Từ chối</Text>
-                          )}
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                    
-                    {!item.isBlocked && item.friendshipStatus === FriendshipStatus.FRIEND && (
-                      <View style={styles.statusBadge}>
-                        <Text style={styles.statusText}>Bạn bè</Text>
-                      </View>
-                    )}
+            renderItem={({ item }) => (
+            <View style={styles.userItemWithActions}>
+              <TouchableOpacity
+                style={styles.userItemMain}
+                onPress={() => handleUserSelect(item)}
+              >
+                <Image
+                  source={{ uri: item.urlavatar || 'https://via.placeholder.com/50' }}
+                  style={styles.avatar}
+                  defaultSource={require('../assets/Welo_image.png')}
+                />
+                <View style={styles.userInfo}>
+                  <Text style={styles.userName}>{item.fullname}</Text>
+                  <Text style={styles.userDetails}>
+                    {item.phone || item.email || 'Không có thông tin liên hệ'}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color="#999" />
+              </TouchableOpacity>
+
+              {/* Hiển thị nút dựa trên trạng thái kết bạn */}
+              {item.id !== global.userData?.id && (
+                <View style={styles.searchResultActions}>               
+                     {item.isBlocked && (
+                  <View style={[styles.statusBadge, styles.blockedBadge]}>
+                    <Text style={styles.blockedStatusText}>Đã chặn</Text>
                   </View>
                 )}
-              </View>
+
+                  {!item.isBlocked && item.friendshipStatus === FriendshipStatus.NONE && (
+                    <TouchableOpacity
+                      style={[styles.inlineButton, styles.acceptButton]}
+                      onPress={() => handleSendFriendRequest(item.id)}
+                      disabled={processingUserId === item.id}
+                    >
+                      {processingUserId === item.id ? (
+                        <ActivityIndicator size="small" color="#FFF" />
+                      ) : (
+                        <Text style={styles.inlineButtonText}>Kết bạn</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+
+                  {!item.isBlocked && item.friendshipStatus === FriendshipStatus.PENDING_SENT && (
+                    <TouchableOpacity
+                      style={[styles.inlineButton, styles.cancelButton]}
+                      onPress={() => handleCancelFriendRequest(item.id, item.friendRequestId!)}
+                      disabled={processingUserId === item.id}
+                    >
+                      {processingUserId === item.id ? (
+                        <ActivityIndicator size="small" color="#FFF" />
+                      ) : (
+                        <Text style={styles.inlineButtonText}>Hủy lời mời</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+
+                  {!item.isBlocked && item.friendshipStatus === FriendshipStatus.PENDING_RECEIVED && (
+                    <View style={styles.actionButtonsInline}>
+                      <TouchableOpacity
+                        style={[styles.inlineButton, styles.acceptButton]}
+                        onPress={() => handleAcceptFriendRequest(item.id, item.friendRequestId!)}
+                        disabled={processingUserId === item.id}
+                      >
+                        {processingUserId === item.id ? (
+                          <ActivityIndicator size="small" color="#FFF" />
+                        ) : (
+                          <Text style={styles.inlineButtonText}>Đồng ý</Text>
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.inlineButton, styles.declineButton]}
+                        onPress={() => handleDeclineFriendRequest(item.id, item.friendRequestId!)}
+                        disabled={processingUserId === item.id}
+                      >
+                        {processingUserId === item.id ? (
+                          <ActivityIndicator size="small" color="#FFF" />
+                        ) : (
+                          <Text style={styles.inlineButtonText}>Từ chối</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {!item.isBlocked && item.friendshipStatus === FriendshipStatus.FRIEND && (
+                    <View style={styles.statusBadge}>
+                      <Text style={styles.statusText}>Bạn bè</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
             )}
             ListEmptyComponent={
               searchQuery.length > 0 && !error ? (
@@ -1405,11 +1404,12 @@ const SearchUserScreen = ({ navigation }) => {
           <FlatList
             data={friends}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (              <TouchableOpacity 
+            renderItem={({ item }) => (
+              <TouchableOpacity
                 style={styles.userItem}
-                onPress={() => handleUserSelect({...item, friendshipStatus: FriendshipStatus.FRIEND, isBlocked: item.isBlocked})}
+                onPress={() => handleUserSelect({ ...item, friendshipStatus: FriendshipStatus.FRIEND, isBlocked: item.isBlocked })}
               >
-                <Image 
+                <Image
                   source={{ uri: item.urlavatar || 'https://via.placeholder.com/50' }}
                   style={styles.avatar}
                   defaultSource={require('../assets/Welo_image.png')}
@@ -1421,7 +1421,7 @@ const SearchUserScreen = ({ navigation }) => {
                   </Text>
                 </View>
                 <View style={[
-                  styles.statusBadge, 
+                  styles.statusBadge,
                   item.isBlocked && styles.blockedBadge
                 ]}>
                   <Text style={[
@@ -1452,11 +1452,11 @@ const SearchUserScreen = ({ navigation }) => {
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <View style={styles.userItemWithActions}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.userItemMain}
-                  onPress={() => handleUserSelect({...item, friendshipStatus: FriendshipStatus.PENDING_RECEIVED})}
+                  onPress={() => handleUserSelect({ ...item, friendshipStatus: FriendshipStatus.PENDING_RECEIVED })}
                 >
-                  <Image 
+                  <Image
                     source={{ uri: item.urlavatar || 'https://via.placeholder.com/50' }}
                     style={styles.avatar}
                     defaultSource={require('../assets/Welo_image.png')}
@@ -1469,7 +1469,7 @@ const SearchUserScreen = ({ navigation }) => {
                   </View>
                 </TouchableOpacity>
                 <View style={styles.actionButtonsInline}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.inlineButton, styles.acceptButton]}
                     onPress={() => handleAcceptFriendRequest(item.id, item.friendRequestId!)}
                     disabled={processingUserId === item.id}
@@ -1480,7 +1480,7 @@ const SearchUserScreen = ({ navigation }) => {
                       <Text style={styles.inlineButtonText}>Đồng ý</Text>
                     )}
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.inlineButton, styles.declineButton]}
                     onPress={() => handleDeclineFriendRequest(item.id, item.friendRequestId!)}
                     disabled={processingUserId === item.id}
@@ -1511,35 +1511,35 @@ const SearchUserScreen = ({ navigation }) => {
           <FlatList
             data={sentRequests}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (              <View style={styles.userItemWithActions}>
-                <TouchableOpacity 
-                  style={styles.userItemMain}
-                  onPress={() => handleUserSelect({...item, friendshipStatus: FriendshipStatus.PENDING_SENT})}
-                >
-                  <Image 
-                    source={{ uri: item.urlavatar || 'https://via.placeholder.com/50' }}
-                    style={styles.avatar}
-                    defaultSource={require('../assets/Welo_image.png')}
-                  />
-                  <View style={styles.userInfo}>
-                    <Text style={styles.userName}>{item.fullname || 'Người dùng không xác định'}</Text>
-                    <Text style={styles.userDetails}>
-                      {item.phone || item.email || 'Không có thông tin liên hệ'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>      
-                          <TouchableOpacity 
-                  style={[styles.inlineButton, styles.declineButton, styles.smallButton]}
-                  onPress={() => handleCancelFriendRequest(item.id, item.friendRequestId!)}
-                  disabled={processingUserId === item.id}
-                >
-                  {processingUserId === item.id ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <Text style={styles.inlineButtonText}>Hủy</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
+            renderItem={({ item }) => (<View style={styles.userItemWithActions}>
+              <TouchableOpacity
+                style={styles.userItemMain}
+                onPress={() => handleUserSelect({ ...item, friendshipStatus: FriendshipStatus.PENDING_SENT })}
+              >
+                <Image
+                  source={{ uri: item.urlavatar || 'https://via.placeholder.com/50' }}
+                  style={styles.avatar}
+                  defaultSource={require('../assets/Welo_image.png')}
+                />
+                <View style={styles.userInfo}>
+                  <Text style={styles.userName}>{item.fullname || 'Người dùng không xác định'}</Text>
+                  <Text style={styles.userDetails}>
+                    {item.phone || item.email || 'Không có thông tin liên hệ'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.inlineButton, styles.declineButton, styles.smallButton]}
+                onPress={() => handleCancelFriendRequest(item.id, item.friendRequestId!)}
+                disabled={processingUserId === item.id}
+              >
+                {processingUserId === item.id ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Text style={styles.inlineButtonText}>Hủy</Text>
+                )}
+              </TouchableOpacity>
+            </View>
             )}
             ListEmptyComponent={
               <View style={styles.centerContainer}>
@@ -1551,7 +1551,7 @@ const SearchUserScreen = ({ navigation }) => {
       )}
 
       {renderActionModal()}
-      
+
       {/* Footer Component */}
       <FooterComponent activeTab="contacts" onTabPress={handleTabPress} />
     </SafeAreaView>
@@ -1690,12 +1690,12 @@ const styles = StyleSheet.create({
     color: '#1FAEEB',
     fontSize: 12,
     fontWeight: '500'
-  },  actionButtonsInline: {
+  }, actionButtonsInline: {
     flexDirection: 'row',
     justifyContent: 'flex-end'
   },
   searchResultActions: {
-    flexDirection: 'row', 
+    flexDirection: 'row',
     justifyContent: 'flex-end',
     marginTop: 8
   },
@@ -1716,7 +1716,7 @@ const styles = StyleSheet.create({
   },
   declineButton: {
     backgroundColor: '#FF3B30',
-  },  
+  },
   cancelButton: {
     backgroundColor: '#999',
   },
@@ -1794,7 +1794,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     color: '#FFF',
     marginLeft: 5
-  },  blockedText: {
+  }, blockedText: {
     color: '#FF3B30',
     textAlign: 'center',
     marginVertical: 10
