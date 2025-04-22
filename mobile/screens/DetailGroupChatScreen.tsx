@@ -23,7 +23,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 
 // API URL
-const API_URL = 'http://192.168.0.105:3000';
+const API_URL = 'http://192.168.0.104:3000';
 
 // Get device dimensions
 const { width, height } = Dimensions.get('window');

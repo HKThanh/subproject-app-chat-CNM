@@ -35,7 +35,7 @@ import { pickDocument, getDocumentIcon, createDocumentFileData } from '../compon
 import useAuthInit, { useSafeSocket } from '../hooks/useAuthInit';
 
 // API URL
-const API_URL = 'http://192.168.0.105:3000';
+const API_URL = 'http://192.168.0.104:3000';
 
 // Define allowed file types
 const allowedTypes = {

@@ -95,7 +95,7 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
         let response;
         
         if (isPasswordReset) {
-          response = await fetch('http://192.168.0.105:3000/auth/reset-password-request', {
+          response = await fetch('http://192.168.0.104:3000/auth/reset-password-request', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -105,7 +105,7 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
             }),
           });
         } else {
-          response = await fetch('http://192.168.0.105:3000/auth/register-phone', {
+          response = await fetch('http://192.168.0.104:3000/auth/register-phone', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -159,7 +159,7 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
         let response;
         
         if (isPasswordReset) {
-          response = await fetch(`http://192.168.0.105:3000/auth/reset-password/${resetId}`, {
+          response = await fetch(`http://192.168.0.104:3000/auth/reset-password/${resetId}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -170,7 +170,7 @@ const OTPScreen = ({ navigation, route }: OTPScreenProps) => {
             }),
           });
         } else {
-          response = await fetch('http://192.168.0.105:3000/auth/verify-otp', {
+          response = await fetch('http://192.168.0.104:3000/auth/verify-otp', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

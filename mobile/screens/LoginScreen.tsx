@@ -81,7 +81,7 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
   // Function to logout a user
   const logoutUser = async (userEmail: string, userPassword: string) => {
     try {
-      const response = await fetch('http://192.168.0.105:3000/auth/logout/mobile', {
+      const response = await fetch('http://192.168.0.104:3000/auth/logout/mobile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -217,7 +217,7 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
               setIsLoading(true);
               try {
                 // Make API call to login endpoint
-                const response = await fetch('http://192.168.0.105:3000/auth/login', {
+                const response = await fetch('http://192.168.0.104:3000/auth/login', {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
@@ -270,7 +270,7 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
                     setTimeout(async () => {
                       try {
                         // Send registration info to API
-                        const registerResponse = await fetch('http://192.168.0.105:3000/auth/register-phone',
+                        const registerResponse = await fetch('http://192.168.0.104:3000/auth/register-phone',
                           {
                           method: 'POST',
                           headers: {

@@ -86,7 +86,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
             });
 
             // Make the API call to upload the cover photo
-            const response = await fetch('http://192.168.0.105:3000/user/cover/upload', {
+            const response = await fetch('http://192.168.0.104:3000/user/cover/upload', {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -154,7 +154,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
             });
 
             // Make the API call to upload the avatar photo
-            const response = await fetch('http://192.168.0.105:3000/user/avatar/upload', {
+            const response = await fetch('http://192.168.0.104:3000/user/avatar/upload', {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -254,7 +254,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
 
             try {
                 console.log('Fetching user data with token:', accessToken);
-                const response = await fetch('http://192.168.0.105:3000/user', {
+                const response = await fetch('http://192.168.0.104:3000/user', {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
@@ -463,7 +463,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                                             }
 
                                             // Make the API call to update bio
-                                            const response = await fetch('http://192.168.0.105:3000/user/bio', {
+                                            const response = await fetch('http://192.168.0.104:3000/user/bio', {
                                                 method: 'PUT',
                                                 headers: {
                                                     'Authorization': `Bearer ${accessToken}`,
