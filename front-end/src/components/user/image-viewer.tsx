@@ -57,7 +57,7 @@ export default function ImageViewer({
     try {
       // Lấy token xác thực
       const token = await getAuthToken()
-
+      console.log("token>>>", token);
       if (!token) {
         throw new Error('Không tìm thấy token xác thực')
       }

@@ -316,7 +316,6 @@ const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
   }
 }; ``
 export const useChat = (userId: string) => {
-  console.log("useChat được gọi với userId:", userId);
 
   const { socket, isConnected } = useSocketContext();
   const [state, dispatch] = useReducer(chatReducer, {
@@ -493,8 +492,57 @@ export const useChat = (userId: string) => {
       );
 
       if (!currentConversation) {
-        // is create conversation group
-        // console.error("Cannot find conversation in state:", updatedConversation.idConversation);
+        // This is a new conversation for this user (they were just added to it)
+        console.log("New conversation received - user was added to a new group");
+        console.log("data.owner ", data.owner)
+        // Format the conversation data properly for our state
+        const newConversation: Conversation = {
+          ...updatedConversation,
+          // Ensure all required fields are present
+          listImage: updatedConversation.listImage || [],
+          listFile: updatedConversation.listFile || [],
+          listVideo: updatedConversation.listVideo || [],
+          regularMembers: data.members || [],
+          // Ensure we have the owner information
+          owner: data.owner || {
+            id: data.owner.id || updatedConversation.rules?.IDOwner,
+            fullname: data.owner.fullname||"Group Owner"
+          },
+          // Ensure we have coOwners information
+          coOwners: data.coOwners || 
+                   (updatedConversation.rules?.listIDCoOwner || []).map((id: string) => {
+                     return { id, fullname: "Co-Owner" };
+                   }),
+          // Set default latestMessage if not provided
+          
+          latestMessage: updatedConversation.latestMessage || {
+            content: data.systemMessage?.content || "You were added to this group",
+            dateTime: data.systemMessage?.dateTime || new Date().toISOString(),
+            isRead: false,
+            type: "text"
+          }
+        };
+        
+        // Add the new conversation to state
+        dispatch({
+          type: 'ADD_GROUP_CONVERSATION',
+          payload: newConversation
+        });
+        
+        // If there's a system message, add it to the conversation
+        if (data.systemMessage) {
+          dispatch({
+            type: 'ADD_MESSAGE',
+            payload: {
+              conversationId: updatedConversation.idConversation,
+              message: {
+                ...data.systemMessage,
+                isOwn: false
+              }
+            }
+          });
+        }
+        
         return;
       }
 
@@ -833,7 +881,7 @@ export const useChat = (userId: string) => {
       }
     }
   }, [dispatch, state.conversations]);
-  // Add this after the addMembersToGroup function
+  // after the addMembersToGroup function
   const removeMembersFromGroup = useCallback((
     conversationId: string,
     membersToRemove: string[]
@@ -903,7 +951,7 @@ export const useChat = (userId: string) => {
           isOwn: false
         };
 
-        // Add this message to the conversation
+        // message to the conversation
         dispatch({
           type: 'ADD_MESSAGE',
           payload: {
@@ -1096,7 +1144,7 @@ export const useChat = (userId: string) => {
       // });
     }
   }, [dispatch, state.conversations]);
-  // Add this handler for leave group response
+  // handler for leave group response
   const handleLeaveGroupResponse = useCallback((data: any) => {
     console.log("Leave group response:", data);
 
@@ -1125,7 +1173,7 @@ export const useChat = (userId: string) => {
       }
     }
   }, [dispatch]);
-  // Add this handler for member left group event
+  // handler for member left group event
   const handleMemberLeftGroup = useCallback((data: any) => {
     console.log("Member left group notification:", data);
 
@@ -1151,6 +1199,7 @@ export const useChat = (userId: string) => {
     const currentConversation = conversations.find(c => c.idConversation === data.conversationId);
 
     if (!currentConversation) {
+      console.error("Cannot find conversation in currentConversation:", currentConversation);
       console.error("Cannot find conversation in state:", data.conversationId);
       return;
     }
@@ -1494,7 +1543,7 @@ export const useChat = (userId: string) => {
     }
   }, [dispatch, conversations]);
 
-  // Add this handler for group deleted notification (for other members)
+  // handler for group deleted notification (for other members)
   const handleGroupDeletedNotification = useCallback((data: any) => {
     console.log("Group deleted notification:", data);
 
@@ -1518,7 +1567,7 @@ export const useChat = (userId: string) => {
     }
   }, [dispatch, conversations]);
 
-  // Add this handler for owner change notification (for new owner)
+  // handler for owner change notification (for new owner)
   const handleOwnerChangeNotification = useCallback((data: any) => {
     console.log("Owner change notification:", data);
 
@@ -1623,7 +1672,7 @@ export const useChat = (userId: string) => {
       }
     }
   }, [dispatch, state.conversations]);
-  // Add this handler for owner change notification (for RegularMember)
+  // handler for owner change notification (for RegularMember)
   const handleOwnerChangeNotificationToRegularMember = useCallback((data: any) => {
     console.log("Owner change notification:", data);
 
@@ -1701,15 +1750,16 @@ export const useChat = (userId: string) => {
       IDNewOwner: newOwnerId
     });
   }, [socket, userId]);
-  // Add this handler for member demoted response
+  // handler for member demoted response
   const handleDemoteMemberResponse = useCallback((data: any) => {
     console.log("Demote member response:", data);
 
     if (data.success) {
       if (data.conversationId && data.memberId && data.systemMessage) {
         // Find the conversation
-        const conversation = conversations.find(c => c.idConversation === data.conversationId);
-
+        const conversation = state.conversations.find(
+          c => c.idConversation === data.conversationId
+        );
         if (!conversation) {
           console.error("Cannot find conversation in state:", data.conversationId);
           return;
@@ -1732,7 +1782,8 @@ export const useChat = (userId: string) => {
         const updatedCoOwners = (conversation.coOwners || []).filter(
           coOwner => coOwner.id !== data.memberId
         );
-
+        console.log("Updated coOwners:", updatedCoOwners);
+        
         // Create updated rules without the demoted member ID
         const updatedRules = {
           ...conversation.rules,
@@ -1740,6 +1791,16 @@ export const useChat = (userId: string) => {
             id => id !== data.memberId
           )
         };
+        console.log("Updated rules:", updatedRules);
+        // Update the regularMembers list to reflect the demotion
+        const updatedRegularMembers = conversation.regularMembers.map(member => {
+          if (member.id === data.memberId) {
+            return {
+              ...member,
+            };
+          }
+          return member;
+        });
 
         // Update the conversation
         dispatch({
@@ -1748,6 +1809,7 @@ export const useChat = (userId: string) => {
             conversationId: data.conversationId,
             updates: {
               coOwners: updatedCoOwners,
+              regularMembers: updatedRegularMembers,
               rules: updatedRules,
               lastChange: new Date().toISOString()
             }
@@ -1760,10 +1822,10 @@ export const useChat = (userId: string) => {
           payload: {
             conversationId: data.conversationId,
             latestMessage: {
-              idMessage: data.systemMessage.idMessage,
+              idMessage: data.systemMessage.idMessage || `system-${Date.now()}`,
               idConversation: data.systemMessage.idConversation,
               content: data.systemMessage.content,
-              dateTime: data.systemMessage.dateTime,
+              dateTime: data.systemMessage.dateTime || new Date().toISOString(),
               isRead: false,
               type: "system",
               idSender: "system"
@@ -1788,7 +1850,7 @@ export const useChat = (userId: string) => {
     }
   }, []);
 
-  // Add this handler for member demoted notification (for the demoted member)
+  // handler for member demoted notification (for the demoted member)
   const handleMemberDemoted = useCallback((data: any) => {
     console.log("Member demoted notification:", data);
 
@@ -1802,7 +1864,18 @@ export const useChat = (userId: string) => {
         console.error("Cannot find conversation in state:", data.conversationId);
         return;
       }
-
+      // Add the system message to the conversation
+      dispatch({
+        type: 'ADD_MESSAGE',
+        payload: {
+          conversationId: data.conversationId,
+          message: {
+           ...data.systemMessage,
+            isOwn: false,
+            type: "system"
+          }
+        }
+      });
       // Update the conversation with the new co-owners list
       dispatch({
         type: 'UPDATE_CONVERSATION',
@@ -1821,6 +1894,22 @@ export const useChat = (userId: string) => {
           }
         }
       });
+      // Update the latest message in the conversation
+      dispatch({
+        type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+        payload: {
+          conversationId: data.conversationId,
+          latestMessage: {
+            idMessage: data.systemMessage.idMessage || `system-${Date.now()}`,
+            idConversation: data.systemMessage.idConversation,
+            content: data.systemMessage.content,
+            dateTime: data.systemMessage.dateTime || new Date().toISOString(),
+            isRead: false,
+            type: "system",
+            idSender: "system"
+          }
+        }
+      });
 
       // Show notification
       if (typeof window !== 'undefined') {
@@ -1833,7 +1922,7 @@ export const useChat = (userId: string) => {
     }
   }, [dispatch, state.conversations, userId]);
 
-  // Add this handler for member demoted notification (for other members)
+  // handler for member demoted notification (for other members)
   const handleMemberDemotedNotification = useCallback((data: any) => {
     console.log("Member demoted notification for others:", data);
 
@@ -1900,7 +1989,7 @@ export const useChat = (userId: string) => {
     }
   }, [dispatch, state.conversations]);
 
-  // Add this function to demote a member
+  // function to demote a member
   const demoteMember = useCallback((
     conversationId: string,
     memberToDemote: string
@@ -1916,6 +2005,145 @@ export const useChat = (userId: string) => {
       IDMemberToDemote: memberToDemote
     });
   }, [socket, userId]);
+
+  // handler for group info updates
+  const handleUpdateGroupInfoResponse = useCallback((data: any) => {
+    console.log("Update group info response:", data);
+    
+    if (data.success) {
+      // Find the conversation in state
+      const conversation = conversations.find(
+        c => c.idConversation === data.conversationId
+      );
+      
+      if (!conversation) {
+        console.error("Cannot find conversation in state:", data.conversationId);
+        return;
+      }
+      
+      // Update the conversation with new info
+      dispatch({
+        type: 'UPDATE_CONVERSATION',
+        payload: {
+          conversationId: data.conversationId,
+          updates: {
+            groupName: data.updates.groupName || conversation.groupName,
+            groupAvatar: data.updates.groupAvatar || conversation.groupAvatar,
+            lastChange: new Date().toISOString()
+          }
+        }
+      });
+      
+      // Add the system message if provided
+      if (data.systemMessage) {
+        dispatch({
+          type: 'ADD_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            message: {
+              ...data.systemMessage,
+              isOwn: false,
+              type: "system"
+            }
+          }
+        });
+        
+        // Update latest message
+        dispatch({
+          type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            latestMessage: {
+              idMessage: data.systemMessage.idMessage,
+              idConversation: data.systemMessage.idConversation,
+              content: data.systemMessage.content,
+              dateTime: data.systemMessage.dateTime,
+              isRead: false,
+              type: "system",
+              idSender: "system"
+            }
+          }
+        });
+      }
+      
+      // Show success toast
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.success(data.message || "Cập nhật thông tin nhóm thành công");
+        });
+      }
+    } else {
+      // Show error message
+      console.error("Failed to update group info:", data.message);
+      if (typeof window !== 'undefined') {
+        import('sonner').then(({ toast }) => {
+          toast.error(data.message || "Không thể cập nhật thông tin nhóm");
+        });
+      }
+    }
+  }, [dispatch, conversations]);
+  
+  // handler for group info update notification (for other members)
+  const handleGroupInfoUpdated = useCallback((data: any) => {
+    console.log("Group info updated notification:", data);
+    
+    if (data.conversationId) {
+      // Find the conversation in state
+      const conversation = conversations.find(
+        c => c.idConversation === data.conversationId
+      );
+      
+      if (!conversation) {
+        console.error("Cannot find conversation in state:", data.conversationId);
+        return;
+      }
+      
+      // Update the conversation with new info
+      dispatch({
+        type: 'UPDATE_CONVERSATION',
+        payload: {
+          conversationId: data.conversationId,
+          updates: {
+            groupName: data.updates.groupName || conversation.groupName,
+            groupAvatar: data.updates.groupAvatar || conversation.groupAvatar,
+            lastChange: new Date().toISOString()
+          }
+        }
+      });
+      
+      // Add the system message if provided
+      if (data.systemMessage) {
+        dispatch({
+          type: 'ADD_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            message: {
+              ...data.systemMessage,
+              isOwn: false,
+              type: "system"
+            }
+          }
+        });
+        
+        // Update latest message
+        dispatch({
+          type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            latestMessage: {
+              idMessage: data.systemMessage.idMessage,
+              idConversation: data.systemMessage.idConversation,
+              content: data.systemMessage.content,
+              dateTime: data.systemMessage.dateTime,
+              isRead: false,
+              type: "system",
+              idSender: "system"
+            }
+          }
+        });
+      }
+    }
+  }, [dispatch, conversations]);
   // Gộp các useEffect đăng ký sự kiện socket
   useEffect(() => {
     if (!socket) return;
@@ -1942,6 +2170,10 @@ export const useChat = (userId: string) => {
     socket.on("demote_member_response", handleDemoteMemberResponse);
     socket.on("member_demoted", handleMemberDemoted);
     socket.on("member_demoted_notification", handleMemberDemotedNotification);
+
+    // Add these new event listeners for group info update
+    socket.on("update_group_info_response", handleUpdateGroupInfoResponse);
+    socket.on("group_info_updated", handleGroupInfoUpdated);
     socket.on("error", handleError);
     const handleGroupConversationCreated = (data: any) => {
       console.log("Group conversation creation response:", data);
@@ -2268,10 +2500,46 @@ export const useChat = (userId: string) => {
           }
         });
       }
+      // Update conversation with new file/image lists if available
+      if (data.conversationUpdates) {
+        dispatch({
+          type: 'UPDATE_CONVERSATION',
+          payload: {
+            conversationId,
+            updates: {
+              listImage: data.conversationUpdates.listImage,
+              listFile: data.conversationUpdates.listFile,
+              listVideo: data.conversationUpdates.listVideo,
+              lastChange: data.conversationUpdates.lastChange
+            }
+          }
+        });
+      }
     };
 
     socket.on("send_message_success", handleSendMessageSuccess);
-
+    //handler for conversation updates
+    const handleConversationUpdated = (data: any) => {
+      console.log("Conversation updated:", data);
+      
+      if (data.conversationId && data.updates) {
+        dispatch({
+          type: 'UPDATE_CONVERSATION',
+          payload: {
+            conversationId: data.conversationId,
+            updates: {
+              listImage: data.updates.listImage,
+              listFile: data.updates.listFile,
+              listVideo: data.updates.listVideo,
+              lastChange: data.updates.lastChange
+            }
+          }
+        });
+      }
+    };
+    
+    // Xử lý sự kiện cập nhật cuộc trò chuyện
+    socket.on("conversation_updated", handleConversationUpdated);
     // Xử lý sự kiện xóa tin nhắn thành công
     const handleDeleteMessageSuccess = (data: { messageId: string, updatedMessage: Message }) => {
       console.log("Tin nhắn đã được xóa:", data);
@@ -2347,7 +2615,6 @@ export const useChat = (userId: string) => {
 
     // Xử lý phản hồi trạng thái từ server
     const handleUsersStatus = (data: { statuses: Record<string, boolean> }) => {
-      console.log('Nhận trạng thái người dùng:', data.statuses);
 
       if (!data?.statuses) {
         console.error('Dữ liệu trạng thái không hợp lệ:', data);
@@ -2372,6 +2639,7 @@ export const useChat = (userId: string) => {
       socket.off("error", handleError);
       socket.off("load_messages_response", handleLoadMessagesResponseDirect);
       socket.off("receive_message", handleReceiveMessage);
+      socket.off("conversation_updated", handleConversationUpdated);
       socket.off("send_message_success", handleSendMessageSuccess);
       socket.off("delete_message_success", handleDeleteMessageSuccess);
       socket.off("forward_message_success", handleForwardMessageSuccess);
@@ -2401,10 +2669,14 @@ export const useChat = (userId: string) => {
       socket.off("demote_member_response", handleDemoteMemberResponse);
       socket.off("member_demoted", handleMemberDemoted);
       socket.off("member_demoted_notification", handleMemberDemotedNotification);
+
+      // Unregister the event listeners for change info group
+      socket.off("update_group_info_response", handleUpdateGroupInfoResponse);
+      socket.off("group_info_updated", handleGroupInfoUpdated);
       socket.offAny();
     };
-  }, [socket, userId, messages, conversations, loadConversations, handleGroupDeletedResponse, handleGroupDeletedNotification, 
-    handleDemoteMemberResponse, handleMemberDemoted,handleMemberDemotedNotification]);
+  }, [socket, userId, messages, conversations, loadConversations, handleGroupDeletedResponse, handleGroupDeletedNotification,
+    handleDemoteMemberResponse, handleMemberDemoted, handleMemberDemotedNotification]);
 
   // Kết nối người dùng khi socket sẵn sàng
   useEffect(() => {
