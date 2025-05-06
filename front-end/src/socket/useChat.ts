@@ -506,15 +506,15 @@ export const useChat = (userId: string) => {
           // Ensure we have the owner information
           owner: data.owner || {
             id: data.owner.id || updatedConversation.rules?.IDOwner,
-            fullname: data.owner.fullname||"Group Owner"
+            fullname: data.owner.fullname || "Group Owner"
           },
           // Ensure we have coOwners information
-          coOwners: data.coOwners || 
-                   (updatedConversation.rules?.listIDCoOwner || []).map((id: string) => {
-                     return { id, fullname: "Co-Owner" };
-                   }),
+          coOwners: data.coOwners ||
+            (updatedConversation.rules?.listIDCoOwner || []).map((id: string) => {
+              return { id, fullname: "Co-Owner" };
+            }),
           // Set default latestMessage if not provided
-          
+
           latestMessage: updatedConversation.latestMessage || {
             content: data.systemMessage?.content || "You were added to this group",
             dateTime: data.systemMessage?.dateTime || new Date().toISOString(),
@@ -522,13 +522,13 @@ export const useChat = (userId: string) => {
             type: "text"
           }
         };
-        
+
         // Add the new conversation to state
         dispatch({
           type: 'ADD_GROUP_CONVERSATION',
           payload: newConversation
         });
-        
+
         // If there's a system message, add it to the conversation
         if (data.systemMessage) {
           dispatch({
@@ -542,7 +542,7 @@ export const useChat = (userId: string) => {
             }
           });
         }
-        
+
         return;
       }
 
@@ -1292,37 +1292,46 @@ export const useChat = (userId: string) => {
       return;
     }
 
-    // Create updated coOwners array with the new coOwner
-    const updatedCoOwners = [
-      ...(currentConversation.coOwners || []),
-      {
-        id: promotedMember.id,
-        fullname: promotedMember.fullname,
-        urlavatar: promotedMember.urlavatar
-      }
-    ];
+   // Check if the member is already a co-owner to prevent duplicates
+   const isAlreadyCoOwner = (currentConversation.coOwners || []).some(
+    coOwner => coOwner.id === promotedMemberId
+  );
 
-    // Create updated rules with the new coOwner ID
-    const updatedRules = {
-      ...currentConversation.rules,
-      listIDCoOwner: [
-        ...(currentConversation.rules?.listIDCoOwner || []),
-        promotedMemberId
-      ]
-    };
-
-    // Update the conversation
-    dispatch({
-      type: 'UPDATE_CONVERSATION',
-      payload: {
-        conversationId: data.conversationId,
-        updates: {
-          coOwners: updatedCoOwners,
-          rules: updatedRules,
-          lastChange: new Date().toISOString()
+  // Create updated coOwners array with the new coOwner (only if not already a co-owner)
+  const updatedCoOwners = isAlreadyCoOwner 
+    ? [...(currentConversation.coOwners || [])]
+    : [
+        ...(currentConversation.coOwners || []),
+        {
+          id: promotedMember.id,
+          fullname: promotedMember.fullname,
+          urlavatar: promotedMember.urlavatar
         }
+      ];
+
+  // Check if the member ID is already in the listIDCoOwner
+  const isIdAlreadyInList = (currentConversation.rules?.listIDCoOwner || []).includes(promotedMemberId);
+
+  // Create updated rules with the new coOwner ID (only if not already in the list)
+  const updatedRules = {
+    ...currentConversation.rules,
+    listIDCoOwner: isIdAlreadyInList
+      ? [...(currentConversation.rules?.listIDCoOwner || [])]
+      : [...(currentConversation.rules?.listIDCoOwner || []), promotedMemberId]
+  };
+
+  // Update the conversation
+  dispatch({
+    type: 'UPDATE_CONVERSATION',
+    payload: {
+      conversationId: data.conversationId,
+      updates: {
+        coOwners: updatedCoOwners,
+        rules: updatedRules,
+        lastChange: new Date().toISOString()
       }
-    });
+    }
+  });
 
     // Update the latest message in the conversation
     dispatch({
@@ -1377,23 +1386,32 @@ export const useChat = (userId: string) => {
           }
         });
 
-        // Create updated coOwners array with the new coOwner
-        const updatedCoOwners = [
-          ...(conversation.coOwners || []),
-          {
-            id: promotedMember.id,
-            fullname: promotedMember.fullname,
-            urlavatar: promotedMember.urlavatar || ""
-          }
-        ];
+        // Check if the member is already a co-owner to prevent duplicates
+        const isAlreadyCoOwner = (conversation.coOwners || []).some(
+          coOwner => coOwner.id === data.memberId
+        );
 
-        // Create updated rules with the new coOwner ID
+        // Create updated coOwners array with the new coOwner (only if not already a co-owner)
+        const updatedCoOwners = isAlreadyCoOwner
+          ? [...(conversation.coOwners || [])]
+          : [
+              ...(conversation.coOwners || []),
+              {
+                id: promotedMember.id,
+                fullname: promotedMember.fullname,
+                urlavatar: promotedMember.urlavatar || ""
+              }
+            ];
+
+        // Check if the member ID is already in the listIDCoOwner
+        const isIdAlreadyInList = (conversation.rules?.listIDCoOwner || []).includes(data.memberId);
+
+        // Create updated rules with the new coOwner ID (only if not already in the list)
         const updatedRules = {
           ...conversation.rules,
-          listIDCoOwner: [
-            ...(conversation.rules?.listIDCoOwner || []),
-            data.memberId
-          ]
+          listIDCoOwner: isIdAlreadyInList
+            ? [...(conversation.rules?.listIDCoOwner || [])]
+            : [...(conversation.rules?.listIDCoOwner || []), data.memberId]
         };
 
         // Update the conversation
@@ -1474,24 +1492,33 @@ export const useChat = (userId: string) => {
         return;
       }
 
-      // Create updated coOwners array with the current user
-      const updatedCoOwners = [
-        ...(conversation.coOwners || []),
-        {
-          id: currentUserInfo.id,
-          fullname: currentUserInfo.fullname,
-          urlavatar: currentUserInfo.urlavatar
-        }
-      ];
+      // Check if the current user is already a co-owner to prevent duplicates
+      const isAlreadyCoOwner = (conversation.coOwners || []).some(
+        coOwner => coOwner.id === userId
+      );
 
-      // Create updated rules with the current user ID
+      // Create updated coOwners array with the current user (only if not already a co-owner)
+      const updatedCoOwners = isAlreadyCoOwner
+        ? [...(conversation.coOwners || [])]
+        : [
+          ...(conversation.coOwners || []),
+          {
+            id: currentUserInfo.id,
+            fullname: currentUserInfo.fullname,
+            urlavatar: currentUserInfo.urlavatar
+          }
+        ];
+
+      const isIdAlreadyInList = (conversation.rules?.listIDCoOwner || []).includes(userId);
+
+      // Create updated rules with the current user ID (only if not already in the list)
       const updatedRules = {
         ...conversation.rules,
-        listIDCoOwner: [
-          ...(conversation.rules?.listIDCoOwner || []),
-          userId
-        ]
+        listIDCoOwner: isIdAlreadyInList
+          ? [...(conversation.rules?.listIDCoOwner || [])]
+          : [...(conversation.rules?.listIDCoOwner || []), userId]
       };
+
 
       // Update the conversation
       dispatch({
@@ -1757,7 +1784,7 @@ export const useChat = (userId: string) => {
     if (data.success) {
       if (data.conversationId && data.memberId && data.systemMessage) {
         // Find the conversation
-        const conversation = state.conversations.find(
+        const conversation = conversations.find(
           c => c.idConversation === data.conversationId
         );
         if (!conversation) {
@@ -1783,7 +1810,7 @@ export const useChat = (userId: string) => {
           coOwner => coOwner.id !== data.memberId
         );
         console.log("Updated coOwners:", updatedCoOwners);
-        
+
         // Create updated rules without the demoted member ID
         const updatedRules = {
           ...conversation.rules,
@@ -1792,15 +1819,26 @@ export const useChat = (userId: string) => {
           )
         };
         console.log("Updated rules:", updatedRules);
-        // Update the regularMembers list to reflect the demotion
-        const updatedRegularMembers = conversation.regularMembers.map(member => {
-          if (member.id === data.memberId) {
-            return {
-              ...member,
-            };
-          }
-          return member;
-        });
+        // Find the demoted member in coOwners to ensure we have their complete info
+        // Find the demoted member in coOwners to ensure we have their complete info
+        const demotedMember = conversation.coOwners?.find(
+          coOwner => coOwner.id === data.memberId
+        );
+
+        // Update the regularMembers list to ensure the demoted member is included
+        let updatedRegularMembers = [...conversation.regularMembers];
+
+        // Check if the demoted member is already in regularMembers
+        const memberExists = updatedRegularMembers.some(member => member.id === data.memberId);
+
+        // If not in regularMembers and we have their info from coOwners, add them
+        if (!memberExists && demotedMember) {
+          updatedRegularMembers.push({
+            id: demotedMember.id,
+            fullname: demotedMember.fullname,
+            urlavatar: demotedMember.urlavatar || "",
+          });
+        }
 
         // Update the conversation
         dispatch({
@@ -1848,7 +1886,7 @@ export const useChat = (userId: string) => {
         });
       }
     }
-  }, []);
+  }, [conversations, dispatch]);
 
   // handler for member demoted notification (for the demoted member)
   const handleMemberDemoted = useCallback((data: any) => {
@@ -1870,12 +1908,37 @@ export const useChat = (userId: string) => {
         payload: {
           conversationId: data.conversationId,
           message: {
-           ...data.systemMessage,
+            ...data.systemMessage,
             isOwn: false,
             type: "system"
           }
         }
       });
+      // Find the current user in the members list to ensure we have the correct data
+      let currentUserInfo = currentConversation.regularMembers.find(
+        member => member.id === userId
+      );
+      
+      // If not found in regularMembers, check in coOwners
+      if (!currentUserInfo) {
+        currentUserInfo = currentConversation.coOwners?.find(
+          coOwner => coOwner.id === userId
+        );
+      }
+      
+      // If not found in coOwners, check if user is the owner
+      if (!currentUserInfo && currentConversation.owner?.id === userId) {
+        currentUserInfo = currentConversation.owner;
+      }
+      
+      // If still not found, use default info
+      if (!currentUserInfo) {
+        currentUserInfo = {
+          id: userId,
+          fullname: "Current User",
+          urlavatar: ""
+        };
+      }
       // Update the conversation with the new co-owners list
       dispatch({
         type: 'UPDATE_CONVERSATION',
@@ -1885,12 +1948,17 @@ export const useChat = (userId: string) => {
             coOwners: (currentConversation.coOwners || []).filter(
               coOwner => coOwner.id !== userId
             ),
+            regularMembers: [
+              ...currentConversation.regularMembers.filter(member => member.id !== userId),
+              currentUserInfo
+            ],
             rules: {
               ...currentConversation.rules,
               listIDCoOwner: (currentConversation.rules?.listIDCoOwner || []).filter(
                 id => id !== userId
               )
-            }
+            },
+            lastChange: new Date().toISOString()
           }
         }
       });
@@ -2009,18 +2077,18 @@ export const useChat = (userId: string) => {
   // handler for group info updates
   const handleUpdateGroupInfoResponse = useCallback((data: any) => {
     console.log("Update group info response:", data);
-    
+
     if (data.success) {
       // Find the conversation in state
       const conversation = conversations.find(
         c => c.idConversation === data.conversationId
       );
-      
+
       if (!conversation) {
         console.error("Cannot find conversation in state:", data.conversationId);
         return;
       }
-      
+
       // Update the conversation with new info
       dispatch({
         type: 'UPDATE_CONVERSATION',
@@ -2033,7 +2101,7 @@ export const useChat = (userId: string) => {
           }
         }
       });
-      
+
       // Add the system message if provided
       if (data.systemMessage) {
         dispatch({
@@ -2047,7 +2115,7 @@ export const useChat = (userId: string) => {
             }
           }
         });
-        
+
         // Update latest message
         dispatch({
           type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
@@ -2065,7 +2133,7 @@ export const useChat = (userId: string) => {
           }
         });
       }
-      
+
       // Show success toast
       if (typeof window !== 'undefined') {
         import('sonner').then(({ toast }) => {
@@ -2082,22 +2150,22 @@ export const useChat = (userId: string) => {
       }
     }
   }, [dispatch, conversations]);
-  
+
   // handler for group info update notification (for other members)
   const handleGroupInfoUpdated = useCallback((data: any) => {
     console.log("Group info updated notification:", data);
-    
+
     if (data.conversationId) {
       // Find the conversation in state
       const conversation = conversations.find(
         c => c.idConversation === data.conversationId
       );
-      
+
       if (!conversation) {
         console.error("Cannot find conversation in state:", data.conversationId);
         return;
       }
-      
+
       // Update the conversation with new info
       dispatch({
         type: 'UPDATE_CONVERSATION',
@@ -2110,7 +2178,7 @@ export const useChat = (userId: string) => {
           }
         }
       });
-      
+
       // Add the system message if provided
       if (data.systemMessage) {
         dispatch({
@@ -2124,7 +2192,7 @@ export const useChat = (userId: string) => {
             }
           }
         });
-        
+
         // Update latest message
         dispatch({
           type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
@@ -2521,7 +2589,7 @@ export const useChat = (userId: string) => {
     //handler for conversation updates
     const handleConversationUpdated = (data: any) => {
       console.log("Conversation updated:", data);
-      
+
       if (data.conversationId && data.updates) {
         dispatch({
           type: 'UPDATE_CONVERSATION',
@@ -2537,7 +2605,7 @@ export const useChat = (userId: string) => {
         });
       }
     };
-    
+
     // Xử lý sự kiện cập nhật cuộc trò chuyện
     socket.on("conversation_updated", handleConversationUpdated);
     // Xử lý sự kiện xóa tin nhắn thành công
