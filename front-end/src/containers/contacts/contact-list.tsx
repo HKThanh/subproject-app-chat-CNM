@@ -5,6 +5,7 @@ import { MoreHorizontal, Search } from "lucide-react";
 import { getAuthToken } from "@/utils/auth-utils";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
+import { useSocket } from "@/socket/useSocket";
 
 interface Contact {
   id: string;
@@ -36,18 +37,72 @@ export default function ContactList({
     top: 0,
     right: 0,
   });
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const { socket } = useSocket(); // Sử dụng socket hook
+
+  // Kiểm tra socket khi component mount
+  useEffect(() => {
+    if (socket) {
+      console.log("Socket connected:", socket.connected);
+    } else {
+      console.log("Socket not initialized");
+    }
+  }, [socket]);
 
   // Xử lý sự kiện khi người dùng nhấn ra ngoài dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (activeDropdown !== null) {
+      if (activeDropdown !== null && !isProcessing) {
         setActiveDropdown(null);
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [activeDropdown]);
+  }, [activeDropdown, isProcessing]);
+
+  // Lắng nghe sự kiện unfriend từ socket
+  useEffect(() => {
+    if (!socket) {
+      console.log("Socket is not connected");
+      return;
+    }
+
+    console.log("Setting up unFriend listener");
+
+    const handleUnfriend = (data: { friendId: string; message: string }) => {
+      console.log("Unfriend event received:", data);
+      toast.info(data.message);
+
+      // Cập nhật danh sách bạn bè
+      setContacts((prevGroups) => {
+        const newGroups = prevGroups
+          .map((group) => ({
+            ...group,
+            contacts: group.contacts.filter(
+              (contact) => contact.id !== data.friendId
+            ),
+          }))
+          .filter((group) => group.contacts.length > 0);
+
+        return newGroups;
+      });
+
+      // Cập nhật tổng số bạn bè
+      setTotalFriends((prev) => prev - 1);
+    };
+
+    socket.on("unFriend", handleUnfriend);
+
+    // Kiểm tra xem socket có đang lắng nghe sự kiện unFriend không
+    console.log("Socket listeners:", socket.listeners("unFriend"));
+
+    return () => {
+      console.log("Cleaning up unFriend listener");
+      socket.off("unFriend", handleUnfriend);
+    };
+  }, [socket]);
 
   const fetchFriendList = async () => {
     try {
@@ -119,6 +174,124 @@ export default function ContactList({
       );
     };
   }, []);
+
+  // Hàm mở dropdown
+  const openDropdown = (e: React.MouseEvent, contact: Contact) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDropdownPosition({
+      top: rect.bottom + window.scrollY,
+      right: window.innerWidth - rect.right,
+    });
+
+    setSelectedContact(contact);
+    setActiveDropdown(contact.id);
+  };
+
+  // Đơn giản hóa cách xử lý dropdown và xóa bạn
+  const handleRemoveFriend = async (friendId: string) => {
+    console.log("Removing friend:", friendId);
+
+    // Đóng dropdown trước
+    // setActiveDropdown(null);
+
+    try {
+      const token = await getAuthToken();
+      console.log("Unfriend token:", token);
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/user/friend/unfriend`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ friendId }),
+        }
+      );
+      console.log("Unfriend response:", response);
+
+      const result = await response.json();
+      console.log("Unfriend result:", result);
+
+      if (result.code === 1) {
+        toast.success("Đã xóa bạn thành công");
+
+        // Cập nhật UI
+        setContacts((prevGroups) => {
+          const newGroups = prevGroups
+            .map((group) => ({
+              ...group,
+              contacts: group.contacts.filter(
+                (contact) => contact.id !== friendId
+              ),
+            }))
+            .filter((group) => group.contacts.length > 0);
+
+          return newGroups;
+        });
+
+        setTotalFriends((prev) => prev - 1);
+      } else {
+        toast.error(result.message || "Không thể xóa bạn");
+      }
+    } catch (error) {
+      console.error("Error removing friend:", error);
+      toast.error("Đã xảy ra lỗi khi xóa bạn");
+    }
+  };
+
+  // Xử lý chặn người dùng
+  const handleBlockUser = async (userId: string) => {
+    try {
+      const token = await getAuthToken();
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/user/blocked/block`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ blockedId: userId }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success("Đã chặn người dùng này");
+
+        // Cập nhật UI bằng cách xóa người dùng đã bị chặn khỏi danh sách bạn bè
+        setContacts((prevGroups) => {
+          const newGroups = prevGroups
+            .map((group) => ({
+              ...group,
+              contacts: group.contacts.filter(
+                (contact) => contact.id !== userId
+              ),
+            }))
+            .filter((group) => group.contacts.length > 0);
+
+          return newGroups;
+        });
+
+        // Cập nhật tổng số bạn bè
+        setTotalFriends((prev) => prev - 1);
+      } else {
+        toast.error(result.message || "Không thể chặn người dùng");
+      }
+    } catch (error) {
+      console.error("Error blocking user:", error);
+      toast.error("Đã xảy ra lỗi khi chặn người dùng");
+    }
+
+    // Đóng dropdown
+    setActiveDropdown(null);
+  };
 
   // Lọc danh sách theo searchQuery
   const filteredContacts = contacts
@@ -234,59 +407,9 @@ export default function ContactList({
                       <div className="font-medium">{contact.fullname}</div>
                     </div>
                     <div className="relative">
-                      <button
-                        className="p-2 hover:bg-gray-200 rounded-full"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Lưu vị trí của button để định vị dropdown
-                          if (activeDropdown !== contact.id) {
-                            const rect =
-                              e.currentTarget.getBoundingClientRect();
-                            setDropdownPosition({
-                              top: rect.bottom + window.scrollY,
-                              right: window.innerWidth - rect.right,
-                            });
-                          }
-                          setActiveDropdown(
-                            activeDropdown === contact.id ? null : contact.id
-                          );
-                        }}
-                      >
+                      <button className="p-2 hover:bg-gray-200 rounded-full">
                         <MoreHorizontal className="w-5 h-5 text-gray-500" />
                       </button>
-
-                      {activeDropdown === contact.id &&
-                        createPortal(
-                          <div
-                            className="fixed bg-white rounded-md shadow-lg z-50 border border-gray-200 w-48"
-                            style={{
-                              top: `${dropdownPosition.top}px`,
-                              right: `${dropdownPosition.right}px`,
-                            }}
-                          >
-                            <div className="py-1">
-                              <button
-                                className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100"
-                                // onClick={(e) => {
-                                //   e.stopPropagation();
-                                //   handleBlockUser(contact.id);
-                                // }}
-                              >
-                                Chặn người này
-                              </button>
-                              <button
-                                className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-gray-100"
-                                // onClick={(e) => {
-                                //   e.stopPropagation();
-                                //   handleRemoveFriend(contact.id);
-                                // }}
-                              >
-                                Xóa bạn
-                              </button>
-                            </div>
-                          </div>,
-                          document.body
-                        )}
                     </div>
                   </div>
                 ))}
