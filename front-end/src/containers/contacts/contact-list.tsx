@@ -1,11 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MoreHorizontal, Search } from "lucide-react";
+import { MoreHorizontal, Search, UserX, Shield } from "lucide-react";
 import { getAuthToken } from "@/utils/auth-utils";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import { useSocket } from "@/socket/useSocket";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Contact {
   id: string;
@@ -381,36 +387,55 @@ export default function ContactList({
             {searchQuery ? "Không tìm thấy bạn bè" : "Chưa có bạn bè nào"}
           </div>
         ) : (
-          filteredContacts.map((section) => (
-            <div key={section.letter} className="mb-6">
-              <div className="text-sm font-medium mb-2">{section.letter}</div>
-              <div className="space-y-1">
-                {section.contacts.map((contact) => (
+          filteredContacts.map((group) => (
+            <div key={group.letter} className="mb-4">
+              <h3 className="text-sm font-medium text-gray-500 mb-2">
+                {group.letter}
+              </h3>
+              <div className="space-y-2">
+                {group.contacts.map((contact) => (
                   <div
                     key={contact.id}
-                    className="flex items-center justify-between py-2 px-3 hover:bg-gray-100 rounded-lg"
+                    className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden">
-                        {contact.urlavatar ? (
-                          <img
-                            src={contact.urlavatar}
-                            alt={contact.fullname}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-500">
-                            {contact.fullname[0]}
-                          </div>
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
+                        <img
+                          src={contact.urlavatar}
+                          alt={contact.fullname}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div>
+                        <h4 className="font-medium">{contact.fullname}</h4>
+                        {contact.email && (
+                          <p className="text-sm text-gray-500">
+                            {contact.email}
+                          </p>
                         )}
                       </div>
-                      <div className="font-medium">{contact.fullname}</div>
                     </div>
-                    <div className="relative">
-                      <button className="p-2 hover:bg-gray-200 rounded-full">
-                        <MoreHorizontal className="w-5 h-5 text-gray-500" />
-                      </button>
-                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="p-2 hover:bg-gray-200 rounded-full">
+                          <MoreHorizontal className="w-5 h-5 text-gray-500" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => handleBlockUser(contact.id)}
+                        >
+                          <Shield className="w-4 h-4 mr-2" />
+                          <span>Chặn người này</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleRemoveFriend(contact.id)}
+                        >
+                          <UserX className="w-4 h-4 mr-2" />
+                          <span>Xóa bạn</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 ))}
               </div>
