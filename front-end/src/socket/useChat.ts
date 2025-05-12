@@ -1030,7 +1030,10 @@ export const useChat = (userId: string) => {
   }, [dispatch, state.conversations]);
   const handleMemberRemovedNotification = useCallback((data: any) => {
     console.log("Member removed notification:", data);
-
+  if(data.newOwner || data.oldOwner){
+    console.log("Member change owner notification");
+    return;
+  }
     if (data.success && data.conversationId) {
       // Find the current conversation in state
       const currentConversation = state.conversations.find(
@@ -1064,7 +1067,6 @@ export const useChat = (userId: string) => {
           }
         });
       }
-
       // Update the conversation members list
       if (data.removedMembers && Array.isArray(data.removedMembers)) {
         const removedIds = data.removedMembers.map((member: any) => member.id);
@@ -1700,44 +1702,30 @@ export const useChat = (userId: string) => {
     }
   }, [dispatch, state.conversations]);
   // handler for owner change notification (for RegularMember)
-  const handleOwnerChangeNotificationToRegularMember = useCallback((data: any) => {
-    console.log("Owner change notification:", data);
+  const handleGroupOwnerChangedNotification = useCallback((data: any) => {
+    console.log("Group owner changed notification:", data);
 
-    if (data.success && data.conversation) {
+    if (data.success && data.conversationId) {
       // Find the current conversation in state
       const currentConversation = state.conversations.find(
-        c => c.idConversation === data.idConversation
+        c => c.idConversation === data.conversationId
       );
 
       if (!currentConversation) {
-        console.error("Cannot find conversation in state:", data.idConversation);
+        console.error("Cannot find conversation in state:", data.conversationId);
         return;
       }
-
-      // Update the conversation with the new owner
-      dispatch({
-        type: 'UPDATE_CONVERSATION',
-        payload: {
-          conversationId: data.idConversation,
-          updates: {
-            owner: data.newOwner,
-            rules: {
-              ...currentConversation.rules,
-              IDOwner: data.newOwner.id
-            }
-          }
-        }
-      });
 
       // Add the system message to the conversation
       if (data.systemMessage) {
         dispatch({
           type: 'ADD_MESSAGE',
           payload: {
-            conversationId: data.idConversation,
+            conversationId: data.conversationId,
             message: {
               ...data.systemMessage,
-              isOwn: false
+              isOwn: false,
+              type: "system"
             }
           }
         });
@@ -1746,18 +1734,56 @@ export const useChat = (userId: string) => {
         dispatch({
           type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
           payload: {
-            conversationId: data.idConversation,
-            latestMessage: data.systemMessage
+            conversationId: data.conversationId,
+            latestMessage: {
+              idMessage: data.systemMessage.idMessage,
+              idConversation: data.systemMessage.idConversation,
+              content: data.systemMessage.content,
+              dateTime: data.systemMessage.dateTime,
+              isRead: false,
+              type: "system",
+              idSender: "system"
+            }
           }
         });
       }
 
-      // Show notification
-      if (typeof window !== 'undefined') {
-        import('sonner').then(({ toast }) => {
-          toast.info(data.message || "Nhóm đã có trưởng nhóm mới", {
-            duration: 5000
+      // Update the conversation with the new owner
+      if (data.newOwner) {
+        const oldOwnerId = currentConversation.owner?.id;
+        const oldOwner = currentConversation.owner;
+
+        // Create updated regularMembers array that includes the old owner if needed
+        let updatedRegularMembers = [...currentConversation.regularMembers];
+
+        // If old owner exists and is not already in regularMembers, add them
+        if (oldOwner && !updatedRegularMembers.some(m => m.id === oldOwnerId)) {
+          updatedRegularMembers.push({
+            id: oldOwner.id,
+            fullname: oldOwner.fullname,
+            urlavatar: oldOwner.urlavatar || "",
           });
+        }
+
+        // If new owner is in regularMembers, remove them
+        updatedRegularMembers = updatedRegularMembers.filter(
+          member => member.id !== data.newOwner.id
+        );
+
+        dispatch({
+          type: 'UPDATE_CONVERSATION',
+          payload: {
+            conversationId: data.conversationId,
+            updates: {
+              owner: data.newOwner,
+              regularMembers: updatedRegularMembers,
+              rules: {
+                ...currentConversation.rules,
+                IDOwner: data.newOwner.id
+              },
+              lastChange: new Date().toISOString()
+            }
+          }
         });
       }
     }
@@ -2004,7 +2030,46 @@ export const useChat = (userId: string) => {
         console.error("Cannot find conversation in state:", data.conversationId);
         return;
       }
+      let demotedMemberInfo;
+      
+      // If the backend provided the demoted member info, use it
+      if (data.demotedMemberInfo) {
+        demotedMemberInfo = data.demotedMemberInfo;
+      } else {
+        // Otherwise, try to find it in the current conversation
+        demotedMemberInfo = currentConversation.coOwners?.find(
+          coOwner => coOwner.id === data.demotedMember
+        );
+      }
 
+      if (!demotedMemberInfo) {
+        console.error("Cannot find demoted member info:", data.demotedMember);
+        return;
+      }
+
+      // Create updated regularMembers array with the demoted member
+      const isAlreadyRegularMember = (currentConversation.regularMembers || []).some(
+        member => member.id === data.demotedMember
+      );
+
+      const updatedRegularMembers = isAlreadyRegularMember
+        ? [...currentConversation.regularMembers]
+        : [
+            ...currentConversation.regularMembers,
+            {
+              id: demotedMemberInfo.id,
+              fullname: demotedMemberInfo.fullname,
+              urlavatar: demotedMemberInfo.urlavatar || ""
+            }
+          ];
+
+      // Use the updated rules from the notification if available
+      const updatedRules = data.updatedRules || {
+        ...currentConversation.rules,
+        listIDCoOwner: (currentConversation.rules?.listIDCoOwner || []).filter(
+          id => id !== data.demotedMember
+        )
+      };
       // Update the conversation with the new co-owners list
       dispatch({
         type: 'UPDATE_CONVERSATION',
@@ -2014,12 +2079,9 @@ export const useChat = (userId: string) => {
             coOwners: (currentConversation.coOwners || []).filter(
               coOwner => coOwner.id !== data.demotedMember
             ),
-            rules: {
-              ...currentConversation.rules,
-              listIDCoOwner: (currentConversation.rules?.listIDCoOwner || []).filter(
-                id => id !== data.demotedMember
-              )
-            }
+            regularMembers: updatedRegularMembers,
+            rules: updatedRules,
+            lastChange: new Date().toISOString()
           }
         }
       });
@@ -2032,7 +2094,8 @@ export const useChat = (userId: string) => {
             conversationId: data.conversationId,
             message: {
               ...data.systemMessage,
-              isOwn: false
+              isOwn: false,
+              type: "system"
             }
           }
         });
@@ -2232,7 +2295,7 @@ export const useChat = (userId: string) => {
     socket.on("member_promoted", handleCurrentUserPromoted);
     // Add these new event listeners for owner change
     socket.on("new_group_owner_noti", handleOwnerChangeNotification);
-    socket.on("member_removed_notification", handleOwnerChangeNotificationToRegularMember);
+    socket.on("group_owner_changed_notification", handleGroupOwnerChangedNotification);
 
     // Add these new event listeners for demote member
     socket.on("demote_member_response", handleDemoteMemberResponse);
@@ -2731,7 +2794,7 @@ export const useChat = (userId: string) => {
       socket.off("member_promoted", handleCurrentUserPromoted);
 
       socket.off("new_group_owner_noti", handleOwnerChangeNotification);
-      socket.off("member_removed_notification", handleOwnerChangeNotificationToRegularMember);
+      socket.off("group_owner_changed_notification", handleGroupOwnerChangedNotification);
 
       // Unregister the event listeners for member demotion
       socket.off("demote_member_response", handleDemoteMemberResponse);
