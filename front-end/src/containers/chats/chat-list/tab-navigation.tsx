@@ -17,6 +17,7 @@ import { useChatContext } from "@/socket/ChatContext";
 import { toast } from "sonner";
 import { getAuthToken } from "@/utils/auth-utils";
 import MessageList from "./message-list";
+import { useRouter } from "next/navigation";
 
 export default function TabNavigation({
   onSelectConversation,
@@ -33,43 +34,48 @@ export default function TabNavigation({
   const [isLoading, setIsLoading] = useState(false);
   // Add state for active tab
   const [activeTab, setActiveTab] = useState<"DIRECT" | "GROUPS">("DIRECT");
-  
+
   // Get socket, current user, and chat context
   const { socket } = useSocketContext();
   const currentUser = useUserStore((state) => state.user);
   const { conversations, loading, createGroupConversation } = useChatContext(); // Add createGroupConversation
-  
+
   // Use a ref for API_URL to keep it stable between renders
-  const API_URL = useRef(process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000").current;
-  
+  const API_URL = useRef(
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+  ).current;
+
   // State for friends list
   const [friends, setFriends] = useState<
     Array<{ id: string; fullname: string; urlavatar?: string }>
   >([]);
-  
+
   // Memoize the group creation response handler
-  const handleGroupCreationResponse = useCallback((data: any) => {
-    setIsLoading(false);
-    
-    if (data.success) {
-      toast.success("Tạo nhóm thành công");
-      setIsModalOpen(false);
-      setGroupName("");
-      setSearchQuery("");
-      setSelectedUsers([]);
-      
-      // Switch to GROUPS tab after successful group creation
-      setActiveTab("GROUPS");
-      
-      // Select the newly created conversation
-      if (data.conversation && data.conversation.idConversation) {
-        onSelectConversation(data.conversation.idConversation);
+  const handleGroupCreationResponse = useCallback(
+    (data: any) => {
+      setIsLoading(false);
+
+      if (data.success) {
+        toast.success("Tạo nhóm thành công");
+        setIsModalOpen(false);
+        setGroupName("");
+        setSearchQuery("");
+        setSelectedUsers([]);
+
+        // Switch to GROUPS tab after successful group creation
+        setActiveTab("GROUPS");
+
+        // Select the newly created conversation
+        if (data.conversation && data.conversation.idConversation) {
+          onSelectConversation(data.conversation.idConversation);
+        }
+      } else {
+        toast.error(data.message || "Không thể tạo nhóm");
       }
-    } else {
-      toast.error(data.message || "Không thể tạo nhóm");
-    }
-  }, [onSelectConversation]);
-  
+    },
+    [onSelectConversation]
+  );
+
   // Fetch friends when modal opens
   useEffect(() => {
     // Only fetch friends when the modal is actually open
@@ -78,15 +84,15 @@ export default function TabNavigation({
         try {
           // Get token only when needed
           const token = await getAuthToken();
-          
+
           const response = await fetch(`${API_URL}/user/friend/get-friends`, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
           });
-          
+
           const data = await response.json();
-          
+
           if (data.code === 0) {
             setFriends(data.data);
             console.log("data friends>>>> ", data.data);
@@ -100,12 +106,18 @@ export default function TabNavigation({
       };
 
       fetchFriends();
-      
+
       // Add listener for group creation response
-      socket?.on("create_group_conversation_response", handleGroupCreationResponse);
-      
+      socket?.on(
+        "create_group_conversation_response",
+        handleGroupCreationResponse
+      );
+
       return () => {
-        socket?.off("create_group_conversation_response", handleGroupCreationResponse);
+        socket?.off(
+          "create_group_conversation_response",
+          handleGroupCreationResponse
+        );
       };
     }
   }, [isModalOpen, currentUser, socket, handleGroupCreationResponse]);
@@ -163,14 +175,14 @@ export default function TabNavigation({
     setIsLoading(true);
 
     console.log("Creating group with members:", selectedUsers);
-    
+
     // Use the createGroupConversation function from useChat
     createGroupConversation(
       groupName.trim(),
       selectedUsers,
       undefined // groupAvatar
     );
-    
+
     // Add a timeout to handle cases where the server doesn't respond
     setTimeout(() => {
       if (isLoading) {
@@ -178,6 +190,35 @@ export default function TabNavigation({
         toast.error("Tạo nhóm không nhận được phản hồi, vui lòng thử lại sau");
       }
     }, 10000);
+  };
+
+  const router = useRouter();
+
+  const handleUserClick = (friend: any) => {
+    if (!socket) {
+      console.error("Socket is not initialized");
+      return;
+    }
+
+    // Lấy thông tin người dùng từ sessionStorage
+    const userSession = sessionStorage.getItem("user-session");
+    const currentUserId = userSession
+      ? JSON.parse(userSession).state.user.id
+      : null;
+
+    if (!currentUserId) {
+      console.error("User ID not found in session storage");
+      return;
+    }
+
+    // Emit sự kiện tạo conversation
+    socket.emit("create_conversation", {
+      IDSender: currentUserId,
+      IDReceiver: friend.id,
+    });
+
+    // Chuyển hướng đến trang chat
+    router.push("/chat");
   };
 
   return (
@@ -202,20 +243,20 @@ export default function TabNavigation({
       </div>
 
       <div className="flex space-x-1 px-4 pb-3">
-        <button 
+        <button
           className={`px-3 py-1 text-sm font-medium rounded-full ${
-            activeTab === "DIRECT" 
-              ? "text-gray-900 bg-gray-100" 
+            activeTab === "DIRECT"
+              ? "text-gray-900 bg-gray-100"
               : "text-gray-500 hover:bg-gray-100"
           }`}
           onClick={() => setActiveTab("DIRECT")}
         >
           DIRECT
         </button>
-        <button 
+        <button
           className={`px-3 py-1 text-sm font-medium rounded-full ${
-            activeTab === "GROUPS" 
-              ? "text-gray-900 bg-gray-100" 
+            activeTab === "GROUPS"
+              ? "text-gray-900 bg-gray-100"
               : "text-gray-500 hover:bg-gray-100"
           }`}
           onClick={() => setActiveTab("GROUPS")}
@@ -225,13 +266,10 @@ export default function TabNavigation({
       </div>
 
       <div className="px-4 pb-3">
-        <SearchBar 
-          onSearch={setSearchTerm} 
-          activeTab={activeTab} 
-        />
+        <SearchBar onSelectConversation={onSelectConversation} />
       </div>
 
-      <MessageList 
+      <MessageList
         conversations={conversations || []}
         activeConversationId={activeConversationId || null}
         onSelectConversation={onSelectConversation}
@@ -243,7 +281,9 @@ export default function TabNavigation({
       {/* Create Group Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-md">
-          <DialogTitle className="text-lg font-semibold border-b pb-2">Tạo nhóm</DialogTitle>
+          <DialogTitle className="text-lg font-semibold border-b pb-2">
+            Tạo nhóm
+          </DialogTitle>
           <div className="space-y-4 py-2">
             <div className="flex items-center">
               {/* <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mr-3">
@@ -257,7 +297,7 @@ export default function TabNavigation({
                 className="flex-1"
               />
             </div>
-            
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -268,10 +308,12 @@ export default function TabNavigation({
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            
+
             <div className="max-h-[400px] overflow-y-auto">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Trò chuyện gần đây</h3>
-              
+              <h3 className="text-sm font-medium text-gray-500 mb-2">
+                Trò chuyện gần đây
+              </h3>
+
               {filteredFriends.length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-4">
                   {searchQuery ? "Không tìm thấy bạn bè" : "Không có bạn bè"}
@@ -281,17 +323,9 @@ export default function TabNavigation({
                   {filteredFriends.map((friend) => (
                     <div
                       key={friend.id}
-                      className="flex items-center py-2 cursor-pointer"
-                      onClick={() => toggleUserSelection(friend.id)}
+                      className="flex items-center py-2 cursor-pointer hover:bg-gray-100 px-3 rounded-lg"
+                      onClick={() => handleUserClick(friend)}
                     >
-                      <div className="mr-3 flex-shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={selectedUsers.includes(friend.id)}
-                          onChange={() => {}}
-                          className="h-5 w-5 rounded-full border-gray-300"
-                        />
-                      </div>
                       <Avatar className="h-10 w-10 mr-3 rounded-full">
                         {friend.urlavatar ? (
                           <img
@@ -307,14 +341,16 @@ export default function TabNavigation({
                           </div>
                         )}
                       </Avatar>
-                      <span className="text-sm font-medium">{friend.fullname}</span>
+                      <div className="flex-1">
+                        <p className="font-medium">{friend.fullname}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
           </div>
-          
+
           <div className="flex justify-end gap-2 mt-4 border-t pt-3">
             <Button
               variant="outline"
@@ -326,7 +362,9 @@ export default function TabNavigation({
             </Button>
             <Button
               onClick={handleCreateGroup}
-              disabled={isLoading || !groupName.trim() || selectedUsers.length === 0}
+              disabled={
+                isLoading || !groupName.trim() || selectedUsers.length === 0
+              }
               className="rounded-md bg-blue-400 hover:bg-blue-500 px-6"
             >
               {isLoading ? (

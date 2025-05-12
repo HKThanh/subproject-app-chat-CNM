@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { MoreHorizontal, Search } from "lucide-react";
 import { getAuthToken } from "@/utils/auth-utils";
 import { toast } from "sonner";
+import { createPortal } from "react-dom";
 
 interface Contact {
   id: string;
@@ -30,6 +31,23 @@ export default function ContactList({
   const [contacts, setContacts] = useState<ContactGroup[]>([]);
   const [totalFriends, setTotalFriends] = useState(0);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({
+    top: 0,
+    right: 0,
+  });
+
+  // Xử lý sự kiện khi người dùng nhấn ra ngoài dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (activeDropdown !== null) {
+        setActiveDropdown(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [activeDropdown]);
 
   const fetchFriendList = async () => {
     try {
@@ -215,9 +233,61 @@ export default function ContactList({
                       </div>
                       <div className="font-medium">{contact.fullname}</div>
                     </div>
-                    <button className="p-2 hover:bg-gray-200 rounded-full">
-                      <MoreHorizontal className="w-5 h-5 text-gray-500" />
-                    </button>
+                    <div className="relative">
+                      <button
+                        className="p-2 hover:bg-gray-200 rounded-full"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Lưu vị trí của button để định vị dropdown
+                          if (activeDropdown !== contact.id) {
+                            const rect =
+                              e.currentTarget.getBoundingClientRect();
+                            setDropdownPosition({
+                              top: rect.bottom + window.scrollY,
+                              right: window.innerWidth - rect.right,
+                            });
+                          }
+                          setActiveDropdown(
+                            activeDropdown === contact.id ? null : contact.id
+                          );
+                        }}
+                      >
+                        <MoreHorizontal className="w-5 h-5 text-gray-500" />
+                      </button>
+
+                      {activeDropdown === contact.id &&
+                        createPortal(
+                          <div
+                            className="fixed bg-white rounded-md shadow-lg z-50 border border-gray-200 w-48"
+                            style={{
+                              top: `${dropdownPosition.top}px`,
+                              right: `${dropdownPosition.right}px`,
+                            }}
+                          >
+                            <div className="py-1">
+                              <button
+                                className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100"
+                                // onClick={(e) => {
+                                //   e.stopPropagation();
+                                //   handleBlockUser(contact.id);
+                                // }}
+                              >
+                                Chặn người này
+                              </button>
+                              <button
+                                className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-gray-100"
+                                // onClick={(e) => {
+                                //   e.stopPropagation();
+                                //   handleRemoveFriend(contact.id);
+                                // }}
+                              >
+                                Xóa bạn
+                              </button>
+                            </div>
+                          </div>,
+                          document.body
+                        )}
+                    </div>
                   </div>
                 ))}
               </div>
