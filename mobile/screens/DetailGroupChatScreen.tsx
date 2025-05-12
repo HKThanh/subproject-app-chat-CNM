@@ -23,7 +23,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 
 // API URL
-const API_URL = 'http://192.168.0.106:3000';
+const API_URL = 'http://192.168.0.104:3000';
 
 // Get device dimensions
 const { width, height } = Dimensions.get('window');
@@ -604,22 +604,22 @@ const DetailGroupChatScreen: React.FC<DetailGroupChatScreenProps> = ({ navigatio
 
             // Send remove member request
             console.log('Sending remove_member_from_group with:', removeMemberData);
-            socket.emit('remove_member_from_group', removeMemberData);
-
-            // Listen for removal response
+            socket.emit('remove_member_from_group', removeMemberData);            // Listen for removal response
             socket.once('remove_member_response', (response) => {
               console.log('remove_member_response:', response);
               setIsLoading(false);
 
               if (response.success) {
-                // If the current user is being removed, navigate back
+                // If the current user is being removed, navigate back without params
                 if (isLeavingGroup) {
-                  navigation.goBack();
+                  navigation.navigate('HomeScreen');
                   return;
                 }
 
-                // Update the group info
+                // Update the group info by fetching fresh data from API
                 loadGroupDetails();
+                
+                // Show success message
                 Alert.alert('Thành công', 'Đã xóa thành viên khỏi nhóm');
               } else {
                 Alert.alert('Lỗi', response.message || 'Không thể xóa thành viên');
@@ -763,15 +763,13 @@ const DetailGroupChatScreen: React.FC<DetailGroupChatScreenProps> = ({ navigatio
 
             // Send promotion request
             console.log('Sending promote_member_to_admin with:', promoteMemberData);
-            socket.emit('promote_member_to_admin', promoteMemberData);
-
-            // Listen for response
+            socket.emit('promote_member_to_admin', promoteMemberData);            // Listen for response
             socket.once('promote_member_response', (response) => {
               console.log('promote_member_response:', response);
               setIsLoading(false);
 
               if (response.success) {
-                // Update the group info
+                // Update the group info without navigation params
                 loadGroupDetails();
                 Alert.alert('Thành công', 'Đã bổ nhiệm phó nhóm thành công');
               } else {
@@ -834,15 +832,13 @@ const DetailGroupChatScreen: React.FC<DetailGroupChatScreenProps> = ({ navigatio
 
             // Send demotion request
             console.log('Sending demote_member with:', demoteMemberData);
-            socket.emit('demote_member', demoteMemberData);
-
-            // Listen for response
+            socket.emit('demote_member', demoteMemberData);            // Listen for response
             socket.once('demote_member_response', (response) => {
               console.log('demote_member_response:', response);
               setIsLoading(false);
 
               if (response.success) {
-                // Update the group info
+                // Update the group info without navigation params
                 loadGroupDetails();
                 Alert.alert('Thành công', 'Đã thu hồi quyền phó nhóm thành công');
               } else {

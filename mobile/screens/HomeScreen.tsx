@@ -21,7 +21,7 @@ import SocketService from '../services/SocketService';
 import SearchUserScreen from './SearchUserScreen';
 
 // Socket.IO server URL
-const SOCKET_URL = 'http://192.168.0.106:3000';
+const SOCKET_URL = 'http://192.168.0.104:3000';
 
 // Global state for persisting conversations between screen navigations
 if (!global.socketInstance) {
@@ -165,13 +165,14 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
   // Get user data from route params or SocketService if route params are not available
   const [userData, setUserData] = useState(route?.params?.user);
   const [userId, setUserId] = useState(route?.params?.user?.id);
-  
+
   // Group chat creation modal state
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [groupName, setGroupName] = useState('');
-  const [selectedMembers, setSelectedMembers] = useState<SearchUserResult[]>([]);
-  const [friendsList, setFriendsList] = useState<SearchUserResult[]>([]);
+  const [selectedMembers, setSelectedMembers] = useState<SearchUserResult[]>([]); const [friendsList, setFriendsList] = useState<SearchUserResult[]>([]);
   const [isFetchingFriends, setIsFetchingFriends] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState<SearchUserResult[]>([]);
+
 
   // Load user data from SocketService if not available in route params
   useEffect(() => {
@@ -192,24 +193,49 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
 
     loadUser();
   }, []);
-  
   // Function to fetch friends list for group creation
   const fetchFriendsList = async () => {
     try {
       setIsFetchingFriends(true);
-      
+
       // Get authentication token
       const authService = require('../services/AuthService').default.getInstance();
       const token = await authService.getAccessToken();
-      
+
       if (!token) {
         console.error('No access token available');
-        Alert.alert('Error', 'Please log in again');
+        Alert.alert('Lỗi', 'Vui lòng đăng nhập lại');
         setIsFetchingFriends(false);
         return;
       }
-      
-    // Call the API to get friends list
+      // Fetch blocked users list first
+      let blockedUsersList: SearchUserResult[] = [];
+      try {
+        const blockedResponse = await fetch(`${SOCKET_URL}/user/blocked/get-blocked`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        const blockedResult = await blockedResponse.json();
+
+        if (blockedResult.success && blockedResult.data) {
+          console.log('Blocked users list received:', blockedResult.data.length);
+          blockedUsersList = blockedResult.data;
+          setBlockedUsers(blockedResult.data);
+        } else {
+          console.log('No blocked users or failed to get blocked users list');
+          setBlockedUsers([]);
+        }
+      } catch (blockError) {
+        console.error('Error fetching blocked users:', blockError);
+        // Continue with empty blocked users list
+        setBlockedUsers([]);
+      }
+
+      // Call the API to get friends list
       const response = await fetch(`${SOCKET_URL}/user/friend/get-friends`, {
         method: 'GET',
         headers: {
@@ -217,29 +243,39 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       const result = await response.json();
-      
+
       if (result.code === 0 && result.data) {
         console.log('Friends list received:', result.data.length);
-        setFriendsList(result.data);
+
+        // Get the blocked user IDs for filtering using local variable instead of state
+        const blockedUserIds = blockedUsersList.map(user => user.id);
+
+        // Filter out blocked users from friends list
+        const filteredFriends = result.data.filter(friend =>
+          !blockedUserIds.includes(friend.id)
+        );
+
+        console.log(`Displaying ${filteredFriends.length} friends (filtered out ${result.data.length - filteredFriends.length} blocked users)`);
+        setFriendsList(filteredFriends);
       } else {
         console.log('Failed to get friends list:', result.message);
         setFriendsList([]);
       }
     } catch (error) {
       console.error('Error fetching friends:', error);
-      Alert.alert('Error', 'Failed to fetch friends list');
+      Alert.alert('Lỗi', 'Không thể tải danh sách bạn bè');
     } finally {
       setIsFetchingFriends(false);
     }
   };
-  
+
   // Function to toggle member selection for group
   const toggleMemberSelection = (friend: SearchUserResult) => {
     setSelectedMembers(prevSelected => {
       const isAlreadySelected = prevSelected.some(item => item.id === friend.id);
-      
+
       if (isAlreadySelected) {
         return prevSelected.filter(item => item.id !== friend.id);
       } else {
@@ -247,36 +283,36 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
       }
     });
   };
-    // Function to create a group conversation
+  // Function to create a group conversation
   const createGroupConversation = () => {
     if (!socket || !userId) {
       Alert.alert('Lỗi', 'Không thể kết nối với máy chủ chat');
       return;
     }
-    
+
     if (groupName.trim() === '') {
       Alert.alert('Lỗi', 'Vui lòng nhập tên nhóm');
       return;
     }
-    
+
     // Nhóm phải có ít nhất 2 thành viên được chọn (tổng cộng 3 người khi tính cả người tạo)
     if (selectedMembers.length < 2) {
       Alert.alert('Lỗi', 'Vui lòng chọn ít nhất 2 thành viên để tạo nhóm (tổng cộng 3 người khi tính cả bạn)');
       return;
     }
-    
+
     // Emit group creation event
     const memberIds = selectedMembers.map(member => member.id);
-    
+
     console.log(`Đang tạo nhóm trò chuyện "${groupName}" với các thành viên:`, memberIds);
     console.log(`Người tạo nhóm: ${userId}`);
-    
+
     socket.emit('create_group_conversation', {
       IDOwner: userId,
       groupName: groupName.trim(),
       groupMembers: memberIds
     });
-    
+
     // Reset state and close modal
     setGroupName('');
     setSelectedMembers([]);
@@ -390,21 +426,21 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
 
     // Add event listener for create_conversation_response
     socket.on('create_conversation_response', handleCreateConversationResponse);
-    
+
     // Add event listener for group conversation creation response
     const handleGroupCreateResponse = (data: any) => {
       console.log('Group creation response:', data);
-      
+
       if (data.success) {
         Alert.alert('Thành công', 'Đã tạo nhóm trò chuyện mới');
-        
+
         // Reload conversations to show the new group
         socket.emit('load_conversations', { IDUser: userId });
       } else {
         Alert.alert('Lỗi', data.message || 'Không thể tạo nhóm trò chuyện');
       }
     };
-    
+
     socket.on('create_group_conversation_response', handleGroupCreateResponse);
 
     // Cleanup
@@ -426,7 +462,8 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
     // Function to run when the screen comes into focus
     const handleScreenFocus = () => {
       console.log('HomeScreen in focus, refreshing data');
-      onRefresh();
+      // Directly implement refresh logic here instead of calling onRefresh
+      refreshConversations();
     };
 
     // Subscribe to focus events
@@ -436,7 +473,9 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
     return () => {
       unsubscribe();
     };
-  }, [navigation, onRefresh, userId]);  // Connect to Socket.IO server and fetch conversations
+  }, [navigation, userId, socket]);  // Remove onRefresh from dependencies
+
+  // Connect to Socket.IO server and fetch conversations
   useEffect(() => {
     if (!userId) {
       console.warn('No user ID available, cannot fetch conversations');
@@ -464,9 +503,7 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
     }
 
     setSocket(socketInstance);
-    setupSocketListeners(socketInstance);
-
-    // Clean up only event handlers when component unmounts, but keep socket alive
+    setupSocketListeners(socketInstance);    // Clean up only event handlers when component unmounts, but keep socket alive
     return () => {
       if (socketInstance) {
         socketInstance.off('load_conversations_response');
@@ -475,10 +512,15 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
         socketInstance.off('unread_messages');
         socketInstance.off('users_status');
         socketInstance.off('receive_message');
+
+        // Remove group-related event handlers
+        socketInstance.off('group_deleted');
+        socketInstance.off('removed_from_group');
+        socketInstance.off('leave_group_response');
+        socketInstance.off('new_group_conversation');
       }
     };
   }, [userId]);
-
   // Setup all socket event listeners
   const setupSocketListeners = (socketInstance) => {    // Remove any existing listeners to avoid duplicates
     socketInstance.off('load_conversations_response');
@@ -488,6 +530,10 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
     socketInstance.off('unread_messages');
     socketInstance.off('users_status');
     socketInstance.off('receive_message');
+    // Remove group-related event listeners
+    socketInstance.off('group_deleted');
+    socketInstance.off('removed_from_group');
+    socketInstance.off('leave_group_response');
 
     // Function to handle received conversations
     const handleConversationsResponse = (data: {
@@ -499,10 +545,10 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
       if (data && data.Items && data.Items.length > 0) {
         // Store personal conversations
         const personalConversations = data.Items;
-        
+
         // Now request group conversations
         socketInstance.emit('load_group_conversations', { IDUser: userId });
-        
+
         setConversations(personalConversations);
         // Save to global state (will be updated again when group conversations arrive)
         global.conversations = personalConversations;
@@ -522,14 +568,14 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
         }
       }
     };
-      // Function to handle received group conversations
+    // Function to handle received group conversations
     const handleGroupConversationsResponse = (data: {
       Items: any[],
       LastEvaluatedKey: any,
       total: number
     }) => {
       console.log('Group conversations received:', data.Items?.length || 0);
-      
+
       if (data && data.Items && data.Items.length > 0) {
         // Merge group conversations with existing conversations
         setConversations(prevConversations => {
@@ -538,27 +584,27 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
           prevConversations.forEach(conv => {
             existingConversationsMap.set(conv.idConversation, conv);
           });
-          
+
           // Filter out duplicates from new group conversations
-          const newGroupConversations = data.Items.filter(groupConv => 
+          const newGroupConversations = data.Items.filter(groupConv =>
             !existingConversationsMap.has(groupConv.idConversation)
           );
-          
+
           console.log(`Adding ${newGroupConversations.length} unique group conversations`);
-          
+
           // Only add unique conversations
           const updatedConversations = [...prevConversations, ...newGroupConversations];
-          
+
           // Sort by lastChange (most recent first)
           updatedConversations.sort((a, b) => {
             const dateA = new Date(a.lastChange);
             const dateB = new Date(b.lastChange);
             return dateB.getTime() - dateA.getTime();
           });
-          
+
           // Update global state
           global.conversations = updatedConversations;
-          
+
           return updatedConversations;
         });
       }
@@ -645,44 +691,99 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
     socketInstance.on('users_status', handleUsersStatus);
     socketInstance.on('receive_message', handleRealTimeMessage);
 
-    // Handle connection errors
-    socketInstance.on('connect_error', (error: any) => {
-      console.error('Socket.IO connection error:', error);
-      Alert.alert('Connection Error', 'Failed to connect to the chat server');
+    // Define types for group event responses
+    interface GroupEventResponse {
+      success: boolean;
+      conversationId: string;
+      message?: string;
+      status?: string;
+    }
+
+    // Handle group deletion event
+    socketInstance.on('group_deleted', (data: GroupEventResponse) => {
+      console.log('Group deleted event received in HomeScreen:', data);
+      if (data && data.success && data.conversationId) {
+        // Remove the deleted group conversation from the list
+        setConversations(prevConversations => {
+          const updatedConversations = prevConversations.filter(
+            conv => conv.idConversation !== data.conversationId
+          );
+          // Update global state with type assertion
+          (global as any).conversations = updatedConversations;
+          return updatedConversations;
+        });
+
+        // Show notification to user
+        Alert.alert('Thông báo', 'Nhóm trò chuyện đã bị xóa bởi trưởng nhóm');
+      }
     });
 
-    // Handle connection events
-    if (socketInstance.connected) {
-      console.log('Using existing connection - Socket already connected');
-      socketInstance.emit('load_conversations', { IDUser: userId });
-      // Connect with new_user_connect event
-      socketInstance.emit('new_user_connect', { id: userId });
-      console.log('Sent new_user_connect with ID:', userId);
-    } else {
-      // Set up connect event
-      socketInstance.on('connect', () => {
-        console.log('Connected to Socket.IO server');
+    // Handle being removed from a group
+    socketInstance.on('removed_from_group', (data: GroupEventResponse) => {
+      console.log('User removed from group event received in HomeScreen:', data);
+      if (data && data.success && data.conversationId) {
+        // Remove the conversation the user was removed from
+        setConversations(prevConversations => {
+          const updatedConversations = prevConversations.filter(
+            conv => conv.idConversation !== data.conversationId
+          );
+          // Update global state with type assertion
+          (global as any).conversations = updatedConversations;
+          return updatedConversations;
+        });
 
-        // Request conversations
-        socketInstance.emit('load_conversations', { IDUser: userId });
-        console.log('Requested conversations for user ID:', userId);
+        // Show notification to user
+        Alert.alert('Thông báo', 'Bạn đã bị xóa khỏi nhóm trò chuyện');
+      }
+    });
 
-        // Connect with new_user_connect event
-        socketInstance.emit('new_user_connect', { id: userId });
-        console.log('Sent new_user_connect with ID:', userId);
-      });
-    }
+    // Handle leaving a group response
+    socketInstance.on('leave_group_response', (data: GroupEventResponse) => {
+      console.log('Leave group response received in HomeScreen:', data);
+      if (data && data.success && data.conversationId) {
+        // Remove the group conversation after leaving
+        setConversations(prevConversations => {
+          const updatedConversations = prevConversations.filter(
+            conv => conv.idConversation !== data.conversationId
+          );
+          // Update global state with type assertion
+          (global as any).conversations = updatedConversations;
+          return updatedConversations;
+        });
+
+        // Show notification to user
+        Alert.alert('Thông báo', 'Bạn đã rời khỏi nhóm trò chuyện');
+      }
+    });
+
+    // Listen for new_group_conversation with status "deleted" (can also indicate deletion)
+    socketInstance.on('new_group_conversation', (data: GroupEventResponse) => {
+      console.log('New group conversation event in HomeScreen:', data);
+
+      // Check if this is a group deletion notification
+      if (data && data.status === 'deleted' && data.conversationId) {
+        // Remove the deleted group conversation from the list
+        setConversations(prevConversations => {
+          const updatedConversations = prevConversations.filter(
+            conv => conv.idConversation !== data.conversationId
+          );
+          // Update global state with type assertion
+          (global as any).conversations = updatedConversations;
+          return updatedConversations;
+        });
+      }
+    });
   };
 
   // No more hardcoded chat data - we'll use only data from Socket.IO
   const handleChatPress = (conversationId: string) => {
     const selectedConversation = conversations.find(conversation => conversation.idConversation === conversationId);
-    
+
     if (!selectedConversation) return;
 
     if (selectedConversation.isGroup) {
       // Navigate to GroupChatScreen for group conversations
-      navigation?.navigate('GroupChatScreen', { 
+      navigation?.navigate('GroupChatScreen', {
         conversationId: selectedConversation?.idConversation,
         idConversation: selectedConversation?.idConversation,
         groupInfo: {
@@ -694,7 +795,7 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
       });
     } else {
       // Navigate to regular ChatScreen for 1-on-1 conversations
-      navigation?.navigate('ChatScreen', { 
+      navigation?.navigate('ChatScreen', {
         conversationId: selectedConversation?.idConversation,
         idConversation: selectedConversation?.idConversation,
         idSender: selectedConversation?.idSender,
@@ -714,73 +815,80 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
     if (tabName === 'contacts') {
       navigation?.navigate('SearchUserScreen');
     }
-  };  // Function to handle pull-to-refresh
-  const onRefresh = async () => {
+  };  // Function to refresh conversations explicitly
+  const refreshConversations = async () => {
+    console.log('Executing refreshConversations function');
     setRefreshing(true);
-    console.log('Refreshing conversations...');
 
-    // Clear existing online statuses to avoid showing stale data
-    setOnlineUsers({});
-
-    // Make sure we have the latest user ID by checking SocketService first
-    let currentUserId = userId;
-
-    if (!currentUserId) {
-      try {
+    try {
+      // Make sure we have the latest user ID
+      let currentUserId = userId;
+      if (!currentUserId) {
         const socketService = SocketService.getInstance();
         const savedUserData = await socketService.loadUserData();
-
         if (savedUserData && savedUserData.id) {
-          console.log('Retrieved user data during refresh:', savedUserData.id);
           setUserData(savedUserData);
           setUserId(savedUserData.id);
           currentUserId = savedUserData.id;
         } else {
-          console.warn('No user data available for refresh');
+          console.warn('Không có dữ liệu người dùng để làm mới');
         }
-      } catch (error) {
-        console.error('Error loading user data during refresh:', error);
       }
-    }
 
-    // Get or initialize the socket
-    let socketToUse = socket;
-    if (!socketToUse) {
-      const socketService = SocketService.getInstance();
-      socketToUse = socketService.getSocket();
-
+      // Get or initialize socket
+      let socketToUse = socket;
       if (!socketToUse) {
-        await socketService.initialize();
+        const socketService = SocketService.getInstance();
         socketToUse = socketService.getSocket();
-        setSocket(socketToUse);
+
+        if (!socketToUse) {
+          await socketService.initialize();
+          socketToUse = socketService.getSocket();
+          setSocket(socketToUse);
+        }
       }
-    }
 
-    if (socketToUse && currentUserId) {      // Request fresh conversations data
-      socketToUse.emit('load_conversations', { IDUser: currentUserId });
-      // Also request fresh group conversations
-      socketToUse.emit('load_group_conversations', { IDUser: currentUserId });
+      if (socketToUse && currentUserId) {
+        console.log('Đang tải lại cuộc trò chuyện cho:', currentUserId);
 
-      // Get user IDs from current conversations to check their status
-      const userIds = conversations.map((conversation) => {
-        return conversation.idSender === currentUserId
-          ? conversation.idReceiver
-          : conversation.idSender;
-      }).filter(Boolean);
+        // Ensure we clear existing conversations to force a full reload
+        // This ensures changes from other screens will appear
+        setConversations([]);
 
-      // Update online status
-      if (userIds.length > 0) {
-        console.log('Refreshing online status for users:', userIds);
-        socketToUse.emit('check_users_status', { userIds });
+        // Request fresh conversations data
+        socketToUse.emit('load_conversations', { IDUser: currentUserId });
+
+        // Also request fresh group conversations
+        socketToUse.emit('load_group_conversations', { IDUser: currentUserId });
+
+        // Update online status
+        const userIds = conversations.map((conversation) => {
+          return conversation.idSender === currentUserId
+            ? conversation.idReceiver
+            : conversation.idSender;
+        }).filter(Boolean);
+
+        if (userIds.length > 0) {
+          console.log('Đang làm mới trạng thái hoạt động cho người dùng:', userIds);
+          socketToUse.emit('check_users_status', { userIds });
+        }
+      } else {
+        console.warn('Không thể làm mới: socket hoặc userId không khả dụng');
       }
-    } else {
-      console.warn('Cannot refresh: socket or userId unavailable');
+    } catch (error) {
+      console.error('Lỗi khi làm mới cuộc trò chuyện:', error);
+    } finally {
+      // End refreshing after a short delay to show the spinner
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 1000);
     }
+  };
 
-    // End refreshing after a short delay to show the spinner
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+  // Function to handle pull-to-refresh
+  const onRefresh = () => {
+    console.log('onRefresh triggered');
+    refreshConversations();
   };
 
   return (
@@ -819,9 +927,7 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
         >
           <Ionicons name="person-add-outline" size={20} color="rgba(242, 228, 228, 0.7)" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.headerIconButton}>
-          <Ionicons name="qr-code-outline" size={20} color="rgba(251, 242, 242, 0.7)" />
-        </TouchableOpacity>
+
       </View>
 
       {/* Search Results */}
@@ -868,10 +974,10 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
         {conversations.length > 0 ? (
           conversations.map((conversation) => {            // Xác định tên hiển thị cho cuộc trò chuyện
             const otherUserInfo = conversation.otherUser || {};
-            const chatName = conversation.isGroup 
-              ? conversation.groupName || `Nhóm ${conversation.idConversation.substring(0, 8)}` 
-              : (otherUserInfo.fullname || 
-                  (conversation.idSender === userId ? conversation.idReceiver : conversation.idSender));
+            const chatName = conversation.isGroup
+              ? conversation.groupName || `Nhóm ${conversation.idConversation.substring(0, 8)}`
+              : (otherUserInfo.fullname ||
+                (conversation.idSender === userId ? conversation.idReceiver : conversation.idSender));
             // Lấy tin nhắn mới nhất nếu có
             const latestMessage = conversation.latestMessage || {};
             // Format message content based on message type and sender
@@ -910,75 +1016,79 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
 
             const messageTime = latestMessage.dateTime ?
               new Date(latestMessage.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) :
-              new Date(conversation.lastChange).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });            return (
-              <TouchableOpacity key={conversation._id}
-                style={styles.chatItem}
-                onPress={() => {
-                  // Check if this is a group conversation
-                  if (conversation.isGroup) {
-                    navigation?.navigate('GroupChatScreen', {
-                      conversationId: conversation.idConversation,
-                      idConversation: conversation.idConversation,
-                      groupInfo: {
-                        name: conversation.groupName || chatName,
-                        avatar: conversation.groupAvatar,
-                        members: conversation.groupMembers || [],
-                        rules: conversation.rules || {}
-                      }
-                    });
-                  } else {
-                    navigation?.navigate('ChatScreen', {
-                      idConversation: conversation.idConversation,
-                      idSender: conversation.idSender,
-                      idReceiver: conversation.idReceiver,
-                      chatItem: {
-                        name: chatName,
-                        avatar: otherUserInfo.urlavatar || null
-                      }
-                    });
-                  }
-                }}
-              >
-                <View style={styles.avatarContainer}>
-                  <Image
-                    source={
-                      otherUserInfo.urlavatar
-                        ? { uri: otherUserInfo.urlavatar }
-                        : require('../assets/Welo_image.png')
+              new Date(conversation.lastChange).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); return (
+                <TouchableOpacity key={conversation._id}
+                  style={styles.chatItem}
+                  onPress={() => {
+                    // Check if this is a group conversation
+                    if (conversation.isGroup) {
+                      navigation?.navigate('GroupChatScreen', {
+                        conversationId: conversation.idConversation,
+                        idConversation: conversation.idConversation,
+                        groupInfo: {
+                          name: conversation.groupName || chatName,
+                          avatar: conversation.groupAvatar,
+                          members: conversation.groupMembers || [],
+                          rules: conversation.rules || {}
+                        }
+                      });
+                    } else {
+                      navigation?.navigate('ChatScreen', {
+                        idConversation: conversation.idConversation,
+                        idSender: conversation.idSender,
+                        idReceiver: conversation.idReceiver,
+                        chatItem: {
+                          name: chatName,
+                          avatar: otherUserInfo.urlavatar || null
+                        }
+                      });
                     }
-                    style={styles.avatar}
-                  />
-                  {conversation.unreadCount > 0 && (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadCount}>
-                        {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
+                  }}
+                >
+                  <View style={styles.avatarContainer}>
+                    <Image
+                      source={
+                        conversation.isGroup
+                          ? conversation.groupAvatar
+                            ? { uri: conversation.groupAvatar }
+                            : require('../assets/Welo_image.png')
+                          : otherUserInfo.urlavatar
+                            ? { uri: otherUserInfo.urlavatar }
+                            : require('../assets/Welo_image.png')
+                      }
+                      style={styles.avatar}
+                    />
+                    {conversation.unreadCount > 0 && (
+                      <View style={styles.unreadBadge}>
+                        <Text style={styles.unreadCount}>
+                          {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
+                        </Text>
+                      </View>
+                    )}
+                    {/* Display online status dot for users who are online - only for 1:1 conversations */}
+                    {!conversation.isGroup && onlineUsers[conversation.idSender === userId ? conversation.idReceiver : conversation.idSender] && (
+                      <View style={styles.onlineDot} />
+                    )}
+                  </View>
+
+                  <View style={styles.chatInfo}>
+                    <View style={styles.chatNameTimeRow}>
+                      <Text style={styles.chatName}>{chatName}</Text>
+                      <Text style={styles.chatTime}>{messageTime}</Text>
+                    </View>
+                    <View style={styles.chatMessageContainer}>
+                      <Text style={[
+                        styles.chatMessage,
+                        latestMessage.isRecall && styles.recalledMessage,
+                        !latestMessage.isRead && styles.unreadMessage
+                      ]}
+                        numberOfLines={1}>
+                        {latestMessage.isRecall ? 'Tin nhắn đã bị thu hồi' : messageContent}
                       </Text>
                     </View>
-                  )}
-                  {/* Display online status dot for users who are online */}
-                  {onlineUsers[conversation.idSender === userId ? conversation.idReceiver : conversation.idSender] && (
-                    <View style={styles.onlineDot} />
-                  )}
-                </View>
-
-                <View style={styles.chatInfo}>
-                  <View style={styles.chatNameTimeRow}>
-                    <Text style={styles.chatName}>{chatName}</Text>
-                    <Text style={styles.chatTime}>{messageTime}</Text>
                   </View>
-                  <View style={styles.chatMessageContainer}>
-                    <Text style={[
-                      styles.chatMessage,
-                      latestMessage.isRecall && styles.recalledMessage,
-                      !latestMessage.isRead && styles.unreadMessage
-                    ]}
-                      numberOfLines={1}>
-                      {latestMessage.isRecall ? 'Tin nhắn đã bị thu hồi' : messageContent}
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            );
+                </TouchableOpacity>
+              );
           })
         ) : (
           <View style={styles.emptyStateContainer}>
@@ -1016,7 +1126,7 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
             </View>
 
             <Text style={styles.sectionTitle}>Chọn thành viên</Text>
-            
+
             {isFetchingFriends ? (
               <View style={styles.loadingContainer}>
                 <Text>Đang tải danh sách bạn bè...</Text>
@@ -1029,8 +1139,8 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
                 renderItem={({ item }) => {
                   const isSelected = selectedMembers.some(member => member.id === item.id);
                   return (
-                    <TouchableOpacity 
-                      style={[styles.friendItem, isSelected && styles.friendItemSelected]} 
+                    <TouchableOpacity
+                      style={[styles.friendItem, isSelected && styles.friendItemSelected]}
                       onPress={() => toggleMemberSelection(item)}
                     >
                       <Image
@@ -1271,7 +1381,7 @@ const styles = StyleSheet.create({
     color: '#645C5C',
     textAlign: 'center',
   },
-  
+
   // Group creation modal styles
   modalOverlay: {
     flex: 1,

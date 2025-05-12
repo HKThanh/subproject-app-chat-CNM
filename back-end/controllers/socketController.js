@@ -1829,6 +1829,29 @@ const handleChangeOwnerGroup = async (io, socket) => {
             conversationId: IDConversation,
             systemMessage,
             newOwner: newOwnerInfo,
+            oldOwner: {
+              id: IDUser,
+              fullname: oldOwner?.fullname || IDUser
+            },
+            message: `${oldOwner?.fullname || IDUser} đã chuyển quyền chủ nhóm cho ${newOwner?.fullname || IDNewOwner}`,
+          });
+        }
+      }
+    });
+    // Thông báo cho các thành viên còn lại với emit group_owner_changed_notification
+    conversation.groupMembers.forEach(member => {
+      if (member !== IDUser && member !== IDNewOwner) {
+        const userSocket = getUser(member);
+        if (userSocket) {
+          io.to(userSocket.socketId).emit("group_owner_changed_notification", {
+            success: true,
+            conversationId: IDConversation,
+            systemMessage,
+            newOwner: newOwnerInfo,
+            oldOwner: {
+              id: IDUser,
+              fullname: oldOwner?.fullname || IDUser
+            },
             message: `${oldOwner?.fullname || IDUser} đã chuyển quyền chủ nhóm cho ${newOwner?.fullname || IDNewOwner}`,
           });
         }
@@ -2365,18 +2388,29 @@ const handlePromoteMemberToAdmin = (io, socket) => {
       }
 
       // Thông báo cho các thành viên khác
+      // conversation.groupMembers.forEach((member) => {
+      //   if (member !== IDUser && member !== IDMemberToPromote) {
+      //     const userSocket = getUser(member);
+      //     if (userSocket) {
+      //       io.to(userSocket.socketId).emit("member_promoted_notification", {
+      //         conversationId: IDConversation,
+      //         promotedMember: IDMemberToPromote,
+      //         promotedBy: IDUser,
+      //         systemMessage,
+      //       });
+      //     }
+      //   }
+      // });
       conversation.groupMembers.forEach((member) => {
-        if (member !== IDUser && member !== IDMemberToPromote) {
-          const userSocket = getUser(member);
-          if (userSocket) {
-            io.to(userSocket.socketId).emit("member_promoted_notification", {
-              conversationId: IDConversation,
-              promotedMember: IDMemberToPromote,
-              promotedBy: IDUser,
-              systemMessage,
-              updatedRules: updatedConversation.rules
-            });
-          }
+        const userSocket = getUser(member);
+        if (userSocket?.socketId) {
+          io.to(userSocket.socketId).emit("member_promoted_notification", {
+            conversationId: IDConversation,
+            promotedMember: IDMemberToPromote,
+            promotedBy: IDUser,
+            systemMessage,
+            updatedRules: updatedConversation.rules
+          });
         }
       });
     } catch (error) {
@@ -2438,13 +2472,20 @@ const handleDemoteMember = (io, socket) => {
             .format("YYYY-MM-DDTHH:mm:ss.SSS"),
         }
       );
+      const updatedConversation = await Conversation.findOne({
+        idConversation: IDConversation
+      });
 
       // Lấy thông tin người dùng
       const [demoter, demoted] = await Promise.all([
         User.findOne({ id: IDUser }).select("fullname"),
         User.findOne({ id: IDMemberToDemote }).select("fullname"),
       ]);
-
+      const demotedMemberInfo = {
+        id: demoted.id,
+        fullname: demoted.fullname,
+        urlavatar: demoted.urlavatar || ""
+      };
       // Tạo thông báo hệ thống
       const systemMessage = await MessageDetail.create({
         idMessage: uuidv4(),
@@ -2471,6 +2512,8 @@ const handleDemoteMember = (io, socket) => {
         message: "Thu hồi quyền quản trị viên thành công",
         memberId: IDMemberToDemote,
         systemMessage: systemMessage,
+        updatedRules: updatedConversation.rules,
+        demotedMember: demotedMemberInfo
       });
 
       // Thông báo cho người bị giáng cấp
@@ -2481,21 +2524,35 @@ const handleDemoteMember = (io, socket) => {
           demotedBy: IDUser,
           message: "Bạn đã bị thu hồi quyền quản trị viên nhóm",
           systemMessage: systemMessage,
+          updatedRules: updatedConversation.rules,
         });
       }
 
       // Thông báo cho các thành viên khác
+      // conversation.groupMembers.forEach((member) => {
+      //   if (member !== IDUser && member !== IDMemberToDemote) {
+      //     const userSocket = getUser(member);
+      //     if (userSocket) {
+      //       io.to(userSocket.socketId).emit("member_demoted_notification", {
+      //         conversationId: IDConversation,
+      //         demotedMember: IDMemberToDemote,
+      //         demotedBy: IDUser,
+      //         systemMessage,
+      //       });
+      //     }
+      //   }
+      // });
       conversation.groupMembers.forEach((member) => {
-        if (member !== IDUser && member !== IDMemberToDemote) {
-          const userSocket = getUser(member);
-          if (userSocket) {
-            io.to(userSocket.socketId).emit("member_demoted_notification", {
-              conversationId: IDConversation,
-              demotedMember: IDMemberToDemote,
-              demotedBy: IDUser,
-              systemMessage,
-            });
-          }
+        const userSocket = getUser(member);
+        if (userSocket) {
+          io.to(userSocket.socketId).emit("member_demoted_notification", {
+            conversationId: IDConversation,
+            demotedMember: IDMemberToDemote,
+            demotedBy: IDUser,
+            systemMessage,
+            updatedRules: updatedConversation.rules,
+            demotedMemberInfo: demotedMemberInfo
+          });
         }
       });
     } catch (error) {

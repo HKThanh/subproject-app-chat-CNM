@@ -6,10 +6,12 @@ const nextConfig: NextConfig = {
     domains: [
       'ui-avatars.com',
       'nodebucketcnm203.s3.ap-southeast-1.amazonaws.com',
+      'nodejs-hk2.s3.ap-southeast-1.amazonaws.com',
       'example.com',
       'static.vecteezy.com',
       'danhgiaxe.edu.vn',
-      'https://picsum.photos'
+      'https://picsum.photos',
+      'nodejs-hk2.s3.ap-southeast-1.amazonaws.com'
     ],
     dangerouslyAllowSVG: true,
     contentDispositionType: 'attachment',

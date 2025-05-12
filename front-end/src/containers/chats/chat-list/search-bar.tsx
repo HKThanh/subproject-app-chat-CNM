@@ -218,7 +218,8 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
         setShowResults(false);
         setSearchText("");
       } else {
-        console.error("Failed to create conversation:", response.message);
+        // console.error("Failed to create conversation:", response.message);
+        toast.info("bạn chưa kết bạn với người này!");
       }
     });
   };

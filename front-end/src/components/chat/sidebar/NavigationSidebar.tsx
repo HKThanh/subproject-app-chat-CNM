@@ -155,10 +155,10 @@ export default function NavigationSidebar() {
                 <User className="mr-2 h-4 w-4" />
                 Trang cá nhân
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              {/* <DropdownMenuItem>
                 <Settings className="mr-2 h-4 w-4" />
                 Cài đặt
-              </DropdownMenuItem>
+              </DropdownMenuItem> */}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-red-600"

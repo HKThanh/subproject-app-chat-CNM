@@ -229,16 +229,16 @@ authController.login = async (req, res, io) => {
             const token = jwt.sign({ 
                 id: user.id,
                 platform: platform 
-            }, JWT_SECRET, { expiresIn: '30m' });
+            }, JWT_SECRET, { expiresIn: '2h' });
             
             const refreshToken = jwt.sign({ 
                 id: user.id,
                 platform: platform 
-            }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
+            }, JWT_REFRESH_SECRET, { expiresIn: '4d' });
 
             // Lưu token theo platform
-            await redisClient.setEx(deviceKey, 1800, token);
-            await redisClient.setEx(`${deviceKey}-refresh`, 86400, refreshToken);
+            await redisClient.setEx(deviceKey, 7200, token);
+            await redisClient.setEx(`${deviceKey}-refresh`, 345600, refreshToken);
 
             // Cập nhật trạng thái đăng nhập
             if (!user.isLoggedin) {
@@ -319,20 +319,20 @@ authController.refreshToken = async (req, res) => {
         const newToken = jwt.sign({
             id: user.id,
             platform: platform
-        }, JWT_SECRET, { expiresIn: '30m' });
+        }, JWT_SECRET, { expiresIn: '2h' });
 
-        const newRefreshToken = jwt.sign({
-            id: user.id,
-            platform: platform
-        }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
+        // const newRefreshToken = jwt.sign({
+        //     id: user.id,
+        //     platform: platform
+        // }, JWT_REFRESH_SECRET, { expiresIn: '1d' });
 
         // Update tokens in Redis
-        await redisClient.setEx(deviceKey, 1800, newToken);
-        await redisClient.setEx(`${deviceKey}-refresh`, 86400, newRefreshToken);
+        await redisClient.setEx(deviceKey, 7200, newToken);
+        // await redisClient.setEx(`${deviceKey}-refresh`, 86400, newRefreshToken);
 
         return res.status(200).json({
             accessToken: newToken,
-            refreshToken: newRefreshToken
+            // refreshToken: newRefreshToken
         });
 
     } catch (err) {
