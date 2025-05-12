@@ -15,7 +15,6 @@ const ConversationController = require("./conversationController");
 const MessageController = require("./messageController");
 const conversationModel = require("../models/ConversationModel");
 
-
 const userController = {};
 
 userController.getAllUsers = async (req, res) => {
@@ -49,7 +48,7 @@ userController.getUser = async (req, res) => {
       ismale: user.ismale,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-    }
+    };
 
     res.status(200).json(dataReturn);
   } catch (error) {
@@ -105,12 +104,10 @@ userController.resetPassword = async (req, res) => {
     user.password = hash;
     await user.save();
 
-    res
-      .status(200)
-      .json({
-        message: "Cập nhật mật khẩu thành công",
-        newpass: user.password,
-      });
+    res.status(200).json({
+      message: "Cập nhật mật khẩu thành công",
+      newpass: user.password,
+    });
   });
 };
 
@@ -199,7 +196,7 @@ userController.updateProfile = async (req, res) => {
 
     if (fullname) user.fullname = fullname;
     if (ismale !== undefined) {
-      user.ismale = ismale === true || ismale === 'true';
+      user.ismale = ismale === true || ismale === "true";
     }
     if (birthday) user.birthday = birthday;
     if (bio) user.bio = bio;
@@ -235,7 +232,7 @@ userController.sendFriendRequest = async (req, res, io) => {
   if (senderId === receiverId) {
     return res.status(400).json({
       code: -2,
-      message: "Gửi cho bản thân làm gì"
+      message: "Gửi cho bản thân làm gì",
     });
   }
 
@@ -250,27 +247,29 @@ userController.sendFriendRequest = async (req, res, io) => {
 
   const alreadyFriend = await UserModel.findOne({
     id: senderId,
-    friendList: { $in: [receiverId] }
+    friendList: { $in: [receiverId] },
   });
 
   if (alreadyFriend) {
     return res.json({ code: 3, message: "Hai bạn đã kết bạn" });
   }
 
-  const existing = await FriendRequestModel.findOne(
-    {
-      $or: [
-        { senderId, receiverId },
-        { senderId: receiverId, receiverId: senderId }
-      ]
-    }
-  )
-  
+  const existing = await FriendRequestModel.findOne({
+    $or: [
+      { senderId, receiverId },
+      { senderId: receiverId, receiverId: senderId },
+    ],
+  });
+
   if (existing) {
     if (existing.status === "ACCEPTED") {
       return res.json({ code: 2, message: "Hai bạn đã kết bạn" });
     } else if (existing.status === "PENDING") {
-      return res.json({ code: 0, message: "Yêu cầu đã được gửi", data: existing });
+      return res.json({
+        code: 0,
+        message: "Yêu cầu đã được gửi",
+        data: existing,
+      });
     }
   }
 
@@ -285,11 +284,11 @@ userController.sendFriendRequest = async (req, res, io) => {
   const newRequest = await FriendRequestModel.create({
     senderId,
     receiverId,
-    status: "PENDING"
+    status: "PENDING",
   });
 
   // Emit socket event cho người nhận
-  io.to(receiverId).emit('newFriendRequest', {
+  io.to(receiverId).emit("newFriendRequest", {
     message: "Bạn có yêu cầu kết bạn mới",
     requestId: newRequest.id,
     sender: {
@@ -306,7 +305,7 @@ userController.sendFriendRequest = async (req, res, io) => {
   return res.json({
     code: 1,
     message: "Request sent",
-    data: { senderId, receiverId }
+    data: { senderId, receiverId },
   });
 };
 
@@ -368,10 +367,13 @@ userController.handleFriendRequest = async (req, res, io) => {
 
     if (type === "ACCEPTED") {
       // Add to friend list
-      await userController.addToFriendList(request.senderId, request.receiverId);
+      await userController.addToFriendList(
+        request.senderId,
+        request.receiverId
+      );
 
       // Emit socket event to both sender and receiver
-      io.to(request.senderId).emit('friendRequestAccepted', {
+      io.to(request.senderId).emit("friendRequestAccepted", {
         success: true,
         message: "Yêu cầu kết bạn đã được chấp nhận",
         data: {
@@ -381,7 +383,7 @@ userController.handleFriendRequest = async (req, res, io) => {
         error: null,
       });
 
-      io.to(request.receiverId).emit('friendRequestAccepted', {
+      io.to(request.receiverId).emit("friendRequestAccepted", {
         success: true,
         message: "Bạn đã chấp nhận yêu cầu kết bạn",
         data: {
@@ -402,7 +404,7 @@ userController.handleFriendRequest = async (req, res, io) => {
 
     if (type === "DECLINED") {
       // Emit socket event to sender
-      io.to(request.senderId).emit('friendRequestDeclined', {
+      io.to(request.senderId).emit("friendRequestDeclined", {
         success: true,
         message: "Yêu cầu kết bạn đã bị từ chối",
         data: {
@@ -420,7 +422,7 @@ userController.handleFriendRequest = async (req, res, io) => {
       });
     }
   } catch (error) {
-    console.error('Handle friend request error:', error);
+    console.error("Handle friend request error:", error);
     return res.status(500).json({
       success: false,
       message: "Đã xảy ra lỗi khi xử lý yêu cầu kết bạn",
@@ -511,7 +513,7 @@ userController.getAllSendedFriendRequest = async (req, res) => {
             id: receiver.id,
             fullname: receiver.fullname,
             urlavatar: receiver.urlavatar,
-            phone:receiver.phone,
+            phone: receiver.phone,
             email: receiver.email,
           },
         };
@@ -524,7 +526,6 @@ userController.getAllSendedFriendRequest = async (req, res) => {
       data: requestsWithReceiverInfo,
       error: null,
     });
-
   } catch (error) {
     console.error("Error fetching sent friend requests:", error);
     return res.status(500).json({
@@ -612,94 +613,90 @@ userController.cancelFriendRequest = async (req, res, io) => {
 
   // Kiểm tra input
   if (!requestId) {
-      return res.status(400).json({
-          success: false,
-          message: "Thiếu ID yêu cầu kết bạn",
-          data: null,
-          error: "Missing requestId",
-          code: -2,
-      });
+    return res.status(400).json({
+      success: false,
+      message: "Thiếu ID yêu cầu kết bạn",
+      data: null,
+      error: "Missing requestId",
+      code: -2,
+    });
   }
 
   try {
-      // Tìm yêu cầu kết bạn
-      const request = await FriendRequestModel.findOne({
-          id: requestId,
-          senderId,
-          status: "PENDING",
-      });
+    // Tìm yêu cầu kết bạn
+    const request = await FriendRequestModel.findOne({
+      id: requestId,
+      senderId,
+      status: "PENDING",
+    });
 
-      if (!request) {
-          return res.status(404).json({
-              success: false,
-              message: "Không tìm thấy yêu cầu kết bạn",
-              data: null,
-              error: "Friend request not found or not authorized",
-              code: 0,
-          });
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy yêu cầu kết bạn",
+        data: null,
+        error: "Friend request not found or not authorized",
+        code: 0,
+      });
+    }
+
+    // Lấy receiverId từ request để cập nhật Redis và Socket.IO
+    const receiverId = request.receiverId;
+
+    // Xóa yêu cầu kết bạn
+    await FriendRequestModel.deleteOne({ id: requestId });
+
+    // Cập nhật Redis cache
+    const redisKey = `friend_requests:${receiverId}`;
+    const cachedRequests = await redisClient.get(redisKey);
+
+    if (cachedRequests) {
+      let requests = [];
+      try {
+        requests = JSON.parse(cachedRequests);
+      } catch (parseError) {
+        console.error("Error parsing Redis data:", parseError);
       }
 
-      // Lấy receiverId từ request để cập nhật Redis và Socket.IO
-      const receiverId = request.receiverId;
+      const updatedRequests = requests.filter(
+        (req) => req.id.toString() !== request.id.toString()
+      );
 
-      // Xóa yêu cầu kết bạn
-      await FriendRequestModel.deleteOne({ id: requestId });
+      await redisClient.setEx(redisKey, 3600, JSON.stringify(updatedRequests));
 
-      // Cập nhật Redis cache
-      const redisKey = `friend_requests:${receiverId}`;
-      const cachedRequests = await redisClient.get(redisKey);
-
-      if (cachedRequests) {
-          let requests = [];
-          try {
-              requests = JSON.parse(cachedRequests);
-          } catch (parseError) {
-              console.error("Error parsing Redis data:", parseError);
-          }
-
-          const updatedRequests = requests.filter(
-              req => req.id.toString() !== request.id.toString()
-          );
-
-          await redisClient.setEx(
-              redisKey,
-              3600,
-              JSON.stringify(updatedRequests)
-          );
-
-          // Emit socket event cho người nhận với danh sách cập nhật
-          io.to(receiverId).emit('friendRequestCancelled', {
-              success: true,
-              message: "Yêu cầu kết bạn đã bị hủy",
-              data: updatedRequests,
-              error: null,
-          });
-      } else {
-          // Nếu không có cache, chỉ emit thông tin hủy
-          io.to(receiverId).emit('friendRequestCancelled', {
-              success: true,
-              message: "Yêu cầu kết bạn đã bị hủy",
-              data: { requestId: request.id, senderId },
-              error: null,
-          });
-      }
-
-      return res.status(200).json({
-          success: true,
-          message: "Đã hủy yêu cầu kết bạn",
-          data: { requestId: request.id, senderId, receiverId },
-          error: null,
-          code: 1,
+      // Emit socket event cho người nhận với danh sách cập nhật
+      io.to(receiverId).emit("friendRequestCancelled", {
+        success: true,
+        message: "Yêu cầu kết bạn đã bị hủy",
+        data: updatedRequests,
+        error: null,
       });
+    } else {
+      // Nếu không có cache, chỉ emit thông tin hủy
+      io.to(receiverId).emit("friendRequestCancelled", {
+        success: true,
+        message: "Yêu cầu kết bạn đã bị hủy",
+        data: { requestId: request.id, senderId },
+        error: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Đã hủy yêu cầu kết bạn",
+      data: { requestId: request.id, senderId, receiverId },
+      error: null,
+      code: 1,
+    });
   } catch (error) {
-      console.error("Error cancelling friend request:", error);
-      return res.status(500).json({
-          success: false,
-          message: "Lỗi server khi hủy yêu cầu kết bạn",
-          data: null,
-          error: error.message,
-          code: -1,
-      });
+    console.error("Error cancelling friend request:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Lỗi server khi hủy yêu cầu kết bạn",
+      data: null,
+      error: error.message,
+      code: -1,
+    });
   }
 };
 
@@ -742,40 +739,42 @@ userController.findUserByText = async (req, res) => {
     if (!text || text.trim().length === 0) {
       return res.status(400).json({
         code: 0,
-        message: "Vui lòng nhập từ khóa tìm kiếm"
+        message: "Vui lòng nhập từ khóa tìm kiếm",
       });
     }
 
     // Chuẩn hóa từ khóa tìm kiếm, giữ nguyên dấu tiếng Việt
     const normalizedText = text.trim();
-    
+
     // Tạo regex pattern cho tìm kiếm tương đối, hỗ trợ Unicode/tiếng Việt
     const searchPattern = new RegExp(normalizedText, "i");
 
     console.log(`Đang tìm kiếm với từ khóa: "${normalizedText}"`);
     console.log(currentUserId);
-    
 
     // Tìm kiếm song song theo cả fullname, phone và email
-    const users = await UserModel.find({
-      $or: [
-        { fullname: searchPattern },
-        { phone: searchPattern },
-        { email: searchPattern }
-      ],
-      id: { $ne: currentUserId } // Loại bỏ người dùng hiện tại
-    }, { _id: 0, id: 1, fullname: 1, urlavatar: 1, phone: 1, email: 1 });
+    const users = await UserModel.find(
+      {
+        $or: [
+          { fullname: searchPattern },
+          { phone: searchPattern },
+          { email: searchPattern },
+        ],
+        id: { $ne: currentUserId }, // Loại bỏ người dùng hiện tại
+      },
+      { _id: 0, id: 1, fullname: 1, urlavatar: 1, phone: 1, email: 1 }
+    );
 
     if (!users || users.length === 0) {
       return res.status(404).json({
         code: 0,
-        message: "Không tìm thấy người dùng"
+        message: "Không tìm thấy người dùng",
       });
     }
 
     // Loại bỏ trùng lặp nếu có
-    const uniqueUsers = users.filter((user, index, self) =>
-      index === self.findIndex((u) => u.id === user.id)
+    const uniqueUsers = users.filter(
+      (user, index, self) => index === self.findIndex((u) => u.id === user.id)
     );
 
     console.log(`Tìm thấy ${uniqueUsers.length} người dùng phù hợp`);
@@ -783,15 +782,14 @@ userController.findUserByText = async (req, res) => {
     return res.status(200).json({
       code: 1,
       message: "Tìm kiếm thành công",
-      data: uniqueUsers
+      data: uniqueUsers,
     });
-
   } catch (error) {
     console.error("Search error:", error);
     return res.status(500).json({
       code: -1,
       message: "Lỗi server khi tìm kiếm",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -816,7 +814,7 @@ userController.getUserById = async (req, res) => {
       phone: user.phone,
       coverPhoto: user.coverPhoto,
       ismale: user.ismale,
-    }
+    };
 
     res.status(200).json(dataReturn);
   } catch (error) {
@@ -870,7 +868,7 @@ userController.blockUser = async (req, res, io) => {
         { senderId: blockerId, receiverId: blockedId },
         { senderId: blockedId, receiverId: blockerId },
       ],
-    })
+    });
 
     if (conversation) {
       await conversationModel.updateOne(
@@ -880,7 +878,7 @@ userController.blockUser = async (req, res, io) => {
     }
 
     // Thông báo cho người bị chặn qua Socket.IO
-    io.to(blockedId).emit('blockedByUser', {
+    io.to(blockedId).emit("blockedByUser", {
       blockerId: blockerId,
       fullname: blocker.fullname,
       urlavatar: blocker.urlavatar,
@@ -931,7 +929,9 @@ userController.unblockUser = async (req, res, io) => {
     }
 
     // Xóa khỏi danh sách chặn
-    blocker.blockedUsers = blocker.blockedUsers.filter(id => id !== blockedId);
+    blocker.blockedUsers = blocker.blockedUsers.filter(
+      (id) => id !== blockedId
+    );
     await blocker.save();
 
     const conversation = conversationModel.findOne({
@@ -939,7 +939,7 @@ userController.unblockUser = async (req, res, io) => {
         { senderId: blockerId, receiverId: blockedId },
         { senderId: blockedId, receiverId: blockerId },
       ],
-    })
+    });
 
     if (conversation) {
       await conversationModel.updateOne(
@@ -949,7 +949,7 @@ userController.unblockUser = async (req, res, io) => {
     }
 
     // Thông báo cho người được bỏ chặn
-    io.to(blockedId).emit('unblockedByUser', {
+    io.to(blockedId).emit("unblockedByUser", {
       blockerId: blockerId,
       fullname: blocker.fullname,
       urlavatar: blocker.urlavatar,
@@ -985,7 +985,7 @@ userController.getBlockedUsers = async (req, res) => {
         success: false,
         message: "Người dùng không tồn tại",
         data: null,
-        error: "User not found"
+        error: "User not found",
       });
     }
 
@@ -1007,13 +1007,15 @@ userController.getBlockedUsers = async (req, res) => {
     );
 
     // Lọc bỏ các null values (trường hợp user không tồn tại)
-    const filteredBlockedUsers = blockedUsersDetails.filter(user => user !== null);
+    const filteredBlockedUsers = blockedUsersDetails.filter(
+      (user) => user !== null
+    );
 
     return res.status(200).json({
       success: true,
       message: "Lấy danh sách người bị chặn thành công",
       data: filteredBlockedUsers || [],
-      error: null
+      error: null,
     });
   } catch (error) {
     console.error("Error in getBlockedUsers:", error);
@@ -1021,7 +1023,7 @@ userController.getBlockedUsers = async (req, res) => {
       success: false,
       message: "Lỗi khi lấy danh sách người bị chặn",
       data: null,
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -1065,20 +1067,20 @@ userController.unFriend = async (req, res, io) => {
     }
 
     // Xóa ID của người bạn khỏi danh sách bạn bè của người dùng hiện tại
-    user.friendList = user.friendList.filter(id => id !== friendId);
+    user.friendList = user.friendList.filter((id) => id !== friendId);
     await user.save();
 
     // Xóa ID của người dùng hiện tại khỏi danh sách bạn bè của người bạn
-    friend.friendList = friend.friendList.filter(id => id !== userId);
+    friend.friendList = friend.friendList.filter((id) => id !== userId);
     await friend.save();
 
     // Emit socket event cho cả hai bên
-    io.to(userId).emit('unFriend', {
+    io.to(userId).emit("unFriend", {
       message: `Bạn đã hủy kết bạn với ${friend.fullname}`,
       friendId: friendId,
     });
 
-    io.to(friendId).emit('unFriend', {
+    io.to(friendId).emit("unFriend", {
       message: `${user.fullname} đã hủy kết bạn với bạn`,
       friendId: userId,
     });
@@ -1096,6 +1098,6 @@ userController.unFriend = async (req, res, io) => {
       error: error.message,
     });
   }
-}
+};
 
 module.exports = userController;

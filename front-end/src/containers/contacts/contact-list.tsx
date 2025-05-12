@@ -75,13 +75,14 @@ export default function ContactList({
       return;
     }
 
-    console.log("Setting up unFriend listener");
+    console.log("Setting up socket listeners for friend updates");
 
+    // Xử lý khi người khác xóa mình khỏi danh sách bạn bè
     const handleUnfriend = (data: { friendId: string; message: string }) => {
       console.log("Unfriend event received:", data);
       toast.info(data.message);
 
-      // Cập nhật danh sách bạn bè
+      // Cập nhật danh sách bạn bè ngay lập tức
       setContacts((prevGroups) => {
         const newGroups = prevGroups
           .map((group) => ({
@@ -96,17 +97,32 @@ export default function ContactList({
       });
 
       // Cập nhật tổng số bạn bè
-      setTotalFriends((prev) => prev - 1);
+      setTotalFriends((prev) => Math.max(0, prev - 1));
     };
 
+    // Lắng nghe tất cả các biến thể có thể có của sự kiện unfriend
     socket.on("unFriend", handleUnfriend);
+    socket.on("unfriend", handleUnfriend);
+    socket.on("removeFriend", handleUnfriend);
+    socket.on("friendRemoved", handleUnfriend);
 
-    // Kiểm tra xem socket có đang lắng nghe sự kiện unFriend không
-    console.log("Socket listeners:", socket.listeners("unFriend"));
+    // Kiểm tra kết nối socket
+    console.log("Socket connected:", socket.connected);
+
+    // Đảm bảo đã join vào room cá nhân để nhận thông báo
+    const userId = JSON.parse(sessionStorage.getItem("user-session") || "{}")
+      ?.state?.user?.id;
+    if (userId) {
+      console.log("Joining user room:", userId);
+      socket.emit("joinUserRoom", userId);
+    }
 
     return () => {
-      console.log("Cleaning up unFriend listener");
+      console.log("Cleaning up friend update listeners");
       socket.off("unFriend", handleUnfriend);
+      socket.off("unfriend", handleUnfriend);
+      socket.off("removeFriend", handleUnfriend);
+      socket.off("friendRemoved", handleUnfriend);
     };
   }, [socket]);
 
@@ -199,14 +215,30 @@ export default function ContactList({
   // Đơn giản hóa cách xử lý dropdown và xóa bạn
   const handleRemoveFriend = async (friendId: string) => {
     console.log("Removing friend:", friendId);
-
-    // Đóng dropdown trước
-    // setActiveDropdown(null);
+    setIsProcessing(true);
 
     try {
       const token = await getAuthToken();
-      console.log("Unfriend token:", token);
+      const userId = JSON.parse(sessionStorage.getItem("user-session") || "{}")
+        ?.state?.user?.id;
 
+      // Cập nhật UI ngay lập tức (optimistic update)
+      setContacts((prevGroups) => {
+        const newGroups = prevGroups
+          .map((group) => ({
+            ...group,
+            contacts: group.contacts.filter(
+              (contact) => contact.id !== friendId
+            ),
+          }))
+          .filter((group) => group.contacts.length > 0);
+
+        return newGroups;
+      });
+
+      setTotalFriends((prev) => Math.max(0, prev - 1));
+
+      // Gửi yêu cầu xóa bạn đến server
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/user/friend/unfriend`,
         {
@@ -218,7 +250,6 @@ export default function ContactList({
           body: JSON.stringify({ friendId }),
         }
       );
-      console.log("Unfriend response:", response);
 
       const result = await response.json();
       console.log("Unfriend result:", result);
@@ -226,27 +257,26 @@ export default function ContactList({
       if (result.code === 1) {
         toast.success("Đã xóa bạn thành công");
 
-        // Cập nhật UI
-        setContacts((prevGroups) => {
-          const newGroups = prevGroups
-            .map((group) => ({
-              ...group,
-              contacts: group.contacts.filter(
-                (contact) => contact.id !== friendId
-              ),
-            }))
-            .filter((group) => group.contacts.length > 0);
-
-          return newGroups;
-        });
-
-        setTotalFriends((prev) => prev - 1);
+        // Đảm bảo socket emit sự kiện unfriend nếu server không tự động làm
+        if (socket && socket.connected) {
+          socket.emit("unfriend", {
+            senderId: userId,
+            receiverId: friendId,
+            message: "Bạn đã bị xóa khỏi danh sách bạn bè",
+          });
+        }
       } else {
+        // Nếu API thất bại, hoàn tác UI (rollback optimistic update)
         toast.error(result.message || "Không thể xóa bạn");
+        fetchFriendList(); // Tải lại danh sách bạn bè
       }
     } catch (error) {
       console.error("Error removing friend:", error);
       toast.error("Đã xảy ra lỗi khi xóa bạn");
+      fetchFriendList(); // Tải lại danh sách bạn bè nếu có lỗi
+    } finally {
+      setIsProcessing(false);
+      setActiveDropdown(null);
     }
   };
 
