@@ -384,6 +384,127 @@ export default function ContactList({
     }
   }, [confirmDialogOpen]);
 
+  // Lắng nghe sự kiện khi có người chấp nhận lời mời kết bạn
+  useEffect(() => {
+    if (!socket) return;
+
+    // Xử lý khi có người chấp nhận lời mời kết bạn
+    const handleFriendRequestAccepted = (data: any) => {
+      console.log("Friend request accepted event received:", data);
+
+      // Kiểm tra dữ liệu nhận được
+      if (!data || !data.sender) {
+        console.error("Invalid friend request accepted data:", data);
+        // Tải lại danh sách bạn bè để đảm bảo dữ liệu chính xác
+        fetchFriendList();
+        return;
+      }
+
+      // Lấy thông tin người dùng từ dữ liệu nhận được
+      const newFriend = data.sender;
+
+      // Tạo đối tượng contact từ dữ liệu nhận được
+      const newContact: Contact = {
+        id: newFriend.id,
+        fullname: newFriend.fullname || "Người dùng", // Sử dụng tên thật
+        urlavatar: newFriend.urlavatar || "/default-avatar.png",
+        email: newFriend.email,
+        phone: newFriend.phone,
+      };
+
+      console.log("Adding new friend to contact list:", newContact);
+
+      // Cập nhật danh sách bạn bè
+      setContacts((prevGroups) => {
+        // Xác định chữ cái đầu tiên của tên
+        const firstLetter = newContact.fullname.charAt(0).toUpperCase();
+
+        // Tìm nhóm tương ứng
+        const groupIndex = prevGroups.findIndex(
+          (group) => group.letter === firstLetter
+        );
+
+        // Tạo bản sao của mảng nhóm
+        const newGroups = [...prevGroups];
+
+        if (groupIndex >= 0) {
+          // Kiểm tra xem liên hệ đã tồn tại chưa
+          const contactExists = newGroups[groupIndex].contacts.some(
+            (contact) => contact.id === newContact.id
+          );
+
+          if (!contactExists) {
+            // Nếu nhóm đã tồn tại và liên hệ chưa tồn tại, thêm liên hệ mới vào nhóm đó
+            const updatedContacts = [
+              ...newGroups[groupIndex].contacts,
+              newContact,
+            ];
+
+            // Sắp xếp lại danh sách liên hệ theo tên
+            updatedContacts.sort((a, b) =>
+              a.fullname.localeCompare(b.fullname)
+            );
+
+            // Cập nhật nhóm
+            newGroups[groupIndex] = {
+              ...newGroups[groupIndex],
+              contacts: updatedContacts,
+            };
+          }
+        } else {
+          // Nếu nhóm chưa tồn tại, tạo nhóm mới
+          const newGroup = {
+            letter: firstLetter,
+            contacts: [newContact],
+          };
+
+          // Thêm nhóm mới vào mảng và sắp xếp lại
+          newGroups.push(newGroup);
+          newGroups.sort((a, b) => a.letter.localeCompare(b.letter));
+        }
+
+        return newGroups;
+      });
+
+      // Cập nhật tổng số bạn bè
+      setTotalFriends((prev) => prev + 1);
+
+      // Hiển thị thông báo
+      toast.success(
+        `${newContact.fullname} đã chấp nhận lời mời kết bạn của bạn`
+      );
+    };
+
+    // Đăng ký lắng nghe sự kiện
+    socket.on("friendRequestAccepted", handleFriendRequestAccepted);
+
+    // Đảm bảo hủy đăng ký khi component unmount
+    return () => {
+      socket.off("friendRequestAccepted", handleFriendRequestAccepted);
+    };
+  }, [socket]);
+
+  // Thêm listener cho sự kiện khi bạn chấp nhận lời mời kết bạn của người khác
+  useEffect(() => {
+    if (!socket) return;
+
+    // Xử lý khi bạn chấp nhận lời mời kết bạn của người khác
+    const handleYouAcceptedFriendRequest = (data: any) => {
+      console.log("You accepted friend request event received:", data);
+
+      // Nếu bạn vừa chấp nhận lời mời kết bạn, cập nhật danh sách bạn bè
+      fetchFriendList();
+    };
+
+    // Đăng ký lắng nghe sự kiện
+    socket.on("youAcceptedFriendRequest", handleYouAcceptedFriendRequest);
+
+    // Đảm bảo hủy đăng ký khi component unmount
+    return () => {
+      socket.off("youAcceptedFriendRequest", handleYouAcceptedFriendRequest);
+    };
+  }, [socket]);
+
   return (
     <div className="flex flex-col h-full p-4">
       {/* Header with total friends count */}
