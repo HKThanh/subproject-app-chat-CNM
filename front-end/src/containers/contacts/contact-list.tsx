@@ -58,6 +58,8 @@ export default function ContactList({
   const { socket } = useSocket(); // Sử dụng socket hook
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [friendToRemove, setFriendToRemove] = useState<Contact | null>(null);
+  const [actionInProgress, setActionInProgress] = useState(false);
+  const [actionType, setActionType] = useState<"remove" | "block" | null>(null);
 
   // Kiểm tra socket khi component mount
   useEffect(() => {
@@ -274,7 +276,6 @@ export default function ContactList({
           socket.emit("unfriend", {
             senderId: userId,
             receiverId: friendId,
-            // message: "Bạn đã bị xóa khỏi danh sách bạn bè",
           });
         }
       } else {
@@ -287,13 +288,23 @@ export default function ContactList({
       toast.error("Đã xảy ra lỗi khi xóa bạn");
       fetchFriendList(); // Tải lại danh sách bạn bè nếu có lỗi
     } finally {
+      // Đảm bảo reset state
       setIsProcessing(false);
       setActiveDropdown(null);
+      setConfirmDialogOpen(false);
+      setFriendToRemove(null);
+
+      // Đảm bảo không có overlay nào còn tồn tại
+      setTimeout(() => {
+        document.body.style.pointerEvents = "auto";
+      }, 100);
     }
   };
 
   // Xử lý chặn người dùng
   const handleBlockUser = async (userId: string) => {
+    setActionInProgress(true); // Đánh dấu đang có hành động xử lý
+
     try {
       const token = await getAuthToken();
       const response = await fetch(
@@ -335,10 +346,11 @@ export default function ContactList({
     } catch (error) {
       console.error("Error blocking user:", error);
       toast.error("Đã xảy ra lỗi khi chặn người dùng");
+    } finally {
+      // Đóng dropdown
+      setActiveDropdown(null);
+      setActionInProgress(false); // Đánh dấu đã hoàn thành hành động
     }
-
-    // Đóng dropdown
-    setActiveDropdown(null);
   };
 
   // Lọc danh sách theo searchQuery
@@ -371,18 +383,14 @@ export default function ContactList({
   // Thêm useEffect để xử lý việc đóng dialog
   useEffect(() => {
     // Khi confirmDialogOpen thay đổi từ true sang false (đóng dialog)
-    // Đảm bảo reset các state liên quan
     if (!confirmDialogOpen) {
-      // Đảm bảo isProcessing được reset
-      setIsProcessing(false);
-
-      // Đảm bảo activeDropdown được reset nếu cần
-      // setActiveDropdown(null);
-
-      // Đảm bảo selectedContact được reset
-      setSelectedContact(null);
+      // Chỉ reset các state khi không có hành động đang xử lý
+      if (!actionInProgress) {
+        setIsProcessing(false);
+        setSelectedContact(null);
+      }
     }
-  }, [confirmDialogOpen]);
+  }, [confirmDialogOpen, actionInProgress]);
 
   // Lắng nghe sự kiện khi có người chấp nhận lời mời kết bạn
   useEffect(() => {
@@ -653,6 +661,11 @@ export default function ContactList({
             // Khi dialog đóng, reset các state
             setFriendToRemove(null);
             setIsProcessing(false);
+
+            // Đảm bảo không có overlay nào còn tồn tại
+            setTimeout(() => {
+              document.body.style.pointerEvents = "auto";
+            }, 100);
           }
         }}
       >
@@ -669,6 +682,13 @@ export default function ContactList({
               onClick={() => {
                 // Đảm bảo reset state khi nhấn Hủy
                 setIsProcessing(false);
+                setFriendToRemove(null);
+                setConfirmDialogOpen(false);
+
+                // Đảm bảo không có overlay nào còn tồn tại
+                setTimeout(() => {
+                  document.body.style.pointerEvents = "auto";
+                }, 100);
               }}
             >
               Hủy
