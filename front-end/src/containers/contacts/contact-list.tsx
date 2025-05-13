@@ -276,6 +276,7 @@ export default function ContactList({
           socket.emit("unfriend", {
             senderId: userId,
             receiverId: friendId,
+            message: "Bạn đã bị xóa khỏi danh sách bạn bè",
           });
         }
       } else {
@@ -400,87 +401,110 @@ export default function ContactList({
     const handleFriendRequestAccepted = (data: any) => {
       console.log("Friend request accepted event received:", data);
 
-      // Kiểm tra dữ liệu nhận được
-      if (!data || !data.sender) {
-        console.error("Invalid friend request accepted data:", data);
-        // Tải lại danh sách bạn bè để đảm bảo dữ liệu chính xác
-        fetchFriendList();
-        return;
-      }
-
-      // Lấy thông tin người dùng từ dữ liệu nhận được
-      const newFriend = data.sender;
-
-      // Tạo đối tượng contact từ dữ liệu nhận được
-      const newContact: Contact = {
-        id: newFriend.id,
-        fullname: newFriend.fullname || "Người dùng", // Sử dụng tên thật
-        urlavatar: newFriend.urlavatar || "/default-avatar.png",
-        email: newFriend.email,
-        phone: newFriend.phone,
-      };
-
-      console.log("Adding new friend to contact list:", newContact);
-
-      // Cập nhật danh sách bạn bè
-      setContacts((prevGroups) => {
-        // Xác định chữ cái đầu tiên của tên
-        const firstLetter = newContact.fullname.charAt(0).toUpperCase();
-
-        // Tìm nhóm tương ứng
-        const groupIndex = prevGroups.findIndex(
-          (group) => group.letter === firstLetter
-        );
-
-        // Tạo bản sao của mảng nhóm
-        const newGroups = [...prevGroups];
-
-        if (groupIndex >= 0) {
-          // Kiểm tra xem liên hệ đã tồn tại chưa
-          const contactExists = newGroups[groupIndex].contacts.some(
-            (contact) => contact.id === newContact.id
+      try {
+        // Kiểm tra dữ liệu nhận được một cách an toàn
+        if (!data || typeof data !== "object") {
+          console.log(
+            "Empty or invalid data received, fetching friend list anyway"
           );
-
-          if (!contactExists) {
-            // Nếu nhóm đã tồn tại và liên hệ chưa tồn tại, thêm liên hệ mới vào nhóm đó
-            const updatedContacts = [
-              ...newGroups[groupIndex].contacts,
-              newContact,
-            ];
-
-            // Sắp xếp lại danh sách liên hệ theo tên
-            updatedContacts.sort((a, b) =>
-              a.fullname.localeCompare(b.fullname)
-            );
-
-            // Cập nhật nhóm
-            newGroups[groupIndex] = {
-              ...newGroups[groupIndex],
-              contacts: updatedContacts,
-            };
-          }
-        } else {
-          // Nếu nhóm chưa tồn tại, tạo nhóm mới
-          const newGroup = {
-            letter: firstLetter,
-            contacts: [newContact],
-          };
-
-          // Thêm nhóm mới vào mảng và sắp xếp lại
-          newGroups.push(newGroup);
-          newGroups.sort((a, b) => a.letter.localeCompare(b.letter));
+          fetchFriendList();
+          return;
         }
 
-        return newGroups;
-      });
+        // Kiểm tra xem data có phải là object rỗng không
+        if (Object.keys(data).length === 0) {
+          console.log("Empty object received, fetching friend list anyway");
+          fetchFriendList();
+          return;
+        }
 
-      // Cập nhật tổng số bạn bè
-      setTotalFriends((prev) => prev + 1);
+        // Kiểm tra xem data.sender có tồn tại không
+        if (!data.sender) {
+          console.log(
+            "Data without sender received, fetching friend list anyway"
+          );
+          fetchFriendList();
+          return;
+        }
 
-      // Hiển thị thông báo
-      toast.success(
-        `${newContact.fullname} đã chấp nhận lời mời kết bạn của bạn`
-      );
+        // Lấy thông tin người dùng từ dữ liệu nhận được
+        const newFriend = data.sender;
+
+        // Tạo đối tượng contact từ dữ liệu nhận được
+        const newContact: Contact = {
+          id: newFriend.id,
+          fullname: newFriend.fullname || "Người dùng", // Sử dụng tên thật
+          urlavatar: newFriend.urlavatar || "/default-avatar.png",
+          email: newFriend.email,
+          phone: newFriend.phone,
+        };
+
+        console.log("Adding new friend to contact list:", newContact);
+
+        // Cập nhật danh sách bạn bè
+        setContacts((prevGroups) => {
+          // Xác định chữ cái đầu tiên của tên
+          const firstLetter = newContact.fullname.charAt(0).toUpperCase();
+
+          // Tìm nhóm tương ứng
+          const groupIndex = prevGroups.findIndex(
+            (group) => group.letter === firstLetter
+          );
+
+          // Tạo bản sao của mảng nhóm
+          const newGroups = [...prevGroups];
+
+          if (groupIndex >= 0) {
+            // Kiểm tra xem liên hệ đã tồn tại chưa
+            const contactExists = newGroups[groupIndex].contacts.some(
+              (contact) => contact.id === newContact.id
+            );
+
+            if (!contactExists) {
+              // Nếu nhóm đã tồn tại và liên hệ chưa tồn tại, thêm liên hệ mới vào nhóm đó
+              const updatedContacts = [
+                ...newGroups[groupIndex].contacts,
+                newContact,
+              ];
+
+              // Sắp xếp lại danh sách liên hệ theo tên
+              updatedContacts.sort((a, b) =>
+                a.fullname.localeCompare(b.fullname)
+              );
+
+              // Cập nhật nhóm
+              newGroups[groupIndex] = {
+                ...newGroups[groupIndex],
+                contacts: updatedContacts,
+              };
+            }
+          } else {
+            // Nếu nhóm chưa tồn tại, tạo nhóm mới
+            const newGroup = {
+              letter: firstLetter,
+              contacts: [newContact],
+            };
+
+            // Thêm nhóm mới vào mảng và sắp xếp lại
+            newGroups.push(newGroup);
+            newGroups.sort((a, b) => a.letter.localeCompare(b.letter));
+          }
+
+          return newGroups;
+        });
+
+        // Cập nhật tổng số bạn bè
+        setTotalFriends((prev) => prev + 1);
+
+        // Hiển thị thông báo
+        toast.success(
+          `${newContact.fullname} đã chấp nhận lời mời kết bạn của bạn`
+        );
+      } catch (error) {
+        console.log("Error processing friend request accepted data:", error);
+        // Luôn tải lại danh sách bạn bè nếu có lỗi
+        fetchFriendList();
+      }
     };
 
     // Đăng ký lắng nghe sự kiện
