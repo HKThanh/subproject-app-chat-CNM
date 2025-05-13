@@ -274,7 +274,7 @@ export default function ContactList({
           socket.emit("unfriend", {
             senderId: userId,
             receiverId: friendId,
-            message: "Bạn đã bị xóa khỏi danh sách bạn bè",
+            // message: "Bạn đã bị xóa khỏi danh sách bạn bè",
           });
         }
       } else {
@@ -633,8 +633,8 @@ export default function ContactList({
                             setFriendToRemove(contact);
                           }}
                         >
-                          <UserX className="w-4 h-4 mr-2" />
-                          <span>Xóa bạn</span>
+                          <UserX className="w-4 h-4 mr-2 text-red-600" />
+                          <span className="text-red-600">Xóa bạn</span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
