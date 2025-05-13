@@ -12,6 +12,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 
 interface Contact {
   id: string;
@@ -46,6 +56,8 @@ export default function ContactList({
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const { socket } = useSocket(); // Sử dụng socket hook
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [friendToRemove, setFriendToRemove] = useState<Contact | null>(null);
 
   // Kiểm tra socket khi component mount
   useEffect(() => {
@@ -339,6 +351,39 @@ export default function ContactList({
     }))
     .filter((group) => group.contacts.length > 0);
 
+  // Thêm style vào component
+  useEffect(() => {
+    // Thêm style để đảm bảo các nút dropdown luôn có thể nhấn được
+    const style = document.createElement("style");
+    style.innerHTML = `
+      .dropdown-trigger {
+        pointer-events: auto !important;
+        z-index: 50 !important;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  // Thêm useEffect để xử lý việc đóng dialog
+  useEffect(() => {
+    // Khi confirmDialogOpen thay đổi từ true sang false (đóng dialog)
+    // Đảm bảo reset các state liên quan
+    if (!confirmDialogOpen) {
+      // Đảm bảo isProcessing được reset
+      setIsProcessing(false);
+
+      // Đảm bảo activeDropdown được reset nếu cần
+      // setActiveDropdown(null);
+
+      // Đảm bảo selectedContact được reset
+      setSelectedContact(null);
+    }
+  }, [confirmDialogOpen]);
+
   return (
     <div className="flex flex-col h-full p-4">
       {/* Header with total friends count */}
@@ -447,7 +492,10 @@ export default function ContactList({
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <button className="p-2 hover:bg-gray-200 rounded-full">
+                        <button
+                          className="p-2 hover:bg-gray-200 rounded-full dropdown-trigger"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <MoreHorizontal className="w-5 h-5 text-gray-500" />
                         </button>
                       </DropdownMenuTrigger>
@@ -459,7 +507,10 @@ export default function ContactList({
                           <span>Chặn người này</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => handleRemoveFriend(contact.id)}
+                          onClick={() => {
+                            setConfirmDialogOpen(true);
+                            setFriendToRemove(contact);
+                          }}
                         >
                           <UserX className="w-4 h-4 mr-2" />
                           <span>Xóa bạn</span>
@@ -473,6 +524,47 @@ export default function ContactList({
           ))
         )}
       </div>
+      <AlertDialog
+        open={confirmDialogOpen}
+        onOpenChange={(open) => {
+          setConfirmDialogOpen(open);
+          if (!open) {
+            // Khi dialog đóng, reset các state
+            setFriendToRemove(null);
+            setIsProcessing(false);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xác nhận xóa bạn</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc chắn muốn xóa {friendToRemove?.fullname} khỏi danh
+              sách bạn bè không? Hành động này không thể hoàn tác.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                // Đảm bảo reset state khi nhấn Hủy
+                setIsProcessing(false);
+              }}
+            >
+              Hủy
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (friendToRemove) {
+                  handleRemoveFriend(friendToRemove.id);
+                }
+              }}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              Xóa bạn
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
