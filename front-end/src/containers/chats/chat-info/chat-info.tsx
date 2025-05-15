@@ -54,6 +54,13 @@ export default function ChatInfo({
   changeGroupOwner,
   demoteMember,
 }: ChatInfoProps) {
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupAvatar, setNewGroupAvatar] = useState<File | null>(null);
+  const [newGroupAvatarPreview, setNewGroupAvatarPreview] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+
+  const [isEditGroupModalOpen, setIsEditGroupModalOpen] = useState(false);
+  const [isDeleteGroupConfirmOpen, setIsDeleteGroupConfirmOpen] = useState(false);
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
@@ -63,6 +70,7 @@ export default function ChatInfo({
   const [friends, setFriends] = useState<
     Array<{ id: string; fullname: string; urlavatar?: string }>
   >([]);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
   const [isLoading, setIsLoading] = useState(false);
   const [confirmationState, setConfirmationState] = useState({
     isOpen: false,
@@ -162,7 +170,7 @@ export default function ChatInfo({
       socket.off("message_from_server", handleNewGroupConversation);
     };
   }, [socket, isLoading, activeConversation]);
-  // Add this useEffect to handle promotion response
+  // useEffect to handle promotion response
   // useEffect(() => {
   //   if (!socket) return;
 
@@ -217,8 +225,8 @@ export default function ChatInfo({
   // Filter friends based on search query
   const filteredFriends = searchQuery
     ? friends.filter((friend) =>
-        friend.fullname.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      friend.fullname.toLowerCase().includes(searchQuery.toLowerCase())
+    )
     : friends;
   const toggleUserSelection = (userId: string) => {
     if (selectedUsers.includes(userId)) {
@@ -272,7 +280,7 @@ export default function ChatInfo({
       setIsMembersModalOpen(false);
       toast.success("Đang xóa thành viên khỏi nhóm...");
     } else if (confirmationState.action === "promote") {
-      // Add this section to handle promotion
+      // section to handle promotion
       if (!socket || !currentUser) return;
 
       socket.emit("promote_member_to_admin", {
@@ -390,6 +398,9 @@ export default function ChatInfo({
 
   // New function to handle deleting group
   const handleDeleteGroup = () => {
+    setIsDeleteGroupConfirmOpen(true);
+  };
+  const handleConfirmDeleteGroup = () => {
     if (!socket || !activeConversation) return;
 
     socket.emit("delete_group", {
@@ -397,61 +408,157 @@ export default function ChatInfo({
       IDUser: currentUser?.id,
     });
 
+    // Close the confirmation dialog
+    setIsDeleteGroupConfirmOpen(false);
+
     toast.success("Đang xóa nhóm...");
   };
+  // function to handle the leave group confirmation dialog
+  const handleUpdateGroupInfo = async () => {
+    if (!activeConversation) return;
 
+    setIsUploading(true);
+
+    try {
+      let groupAvatarUrl = activeConversation.groupAvatar;
+
+      // Upload new avatar if selected
+      if (newGroupAvatar) {
+        const formData = new FormData();
+        formData.append("avatar-group", newGroupAvatar);
+
+        const token = await getAuthToken();
+
+        const response = await fetch(`${apiUrl}/upload/avatar-group`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          toast.error(errorData.message || "Failed to upload avatar");
+          return;
+        }
+        const data = await response.json();
+        if (data.success) {
+          groupAvatarUrl = data.fileUrl;
+        } else {
+          throw new Error(data.message || "Failed to upload avatar");
+        }
+      }
+
+      // Send update to server
+      socket?.emit("update_group_info", {
+        IDConversation: activeConversation.idConversation,
+        IDUser: currentUser?.id,
+        groupName: newGroupName || activeConversation.groupName,
+        groupAvatarUrl: groupAvatarUrl,
+      });
+
+      // Close modal and reset state
+      setIsEditGroupModalOpen(false);
+      setNewGroupName("");
+      setNewGroupAvatar(null);
+      setNewGroupAvatarPreview("");
+
+      toast.success("Đang cập nhật thông tin nhóm...");
+    } catch (error) {
+      console.error("Error updating group info:", error);
+      toast.error("Lỗi khi cập nhật thông tin nhóm");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // function to handle avatar selection
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Kích thước file quá lớn. Vui lòng chọn file nhỏ hơn 5MB");
+        return;
+      }
+
+      // Check file type
+      if (!file.type.startsWith("image/")) {
+        toast.error("Vui lòng chọn file hình ảnh");
+        return;
+      }
+
+      setNewGroupAvatar(file);
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewGroupAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  //useEffect to initialize the group name when opening the edit modal
+  useEffect(() => {
+    if (isEditGroupModalOpen && activeConversation) {
+      setNewGroupName(activeConversation.groupName || "");
+      setNewGroupAvatarPreview("");
+      setNewGroupAvatar(null);
+    }
+  }, [isEditGroupModalOpen, activeConversation]);
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 text-gray-900">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200 text-center">
-        <h2 className="text-lg font-medium">
-          Thông tin {isGroup ? "nhóm" : "hội thoại"}
-        </h2>
-      </div>
-
-      {/* Profile */}
-      <div className="p-4 flex flex-col items-center border-b border-gray-200">
-        <div className="relative mb-2">
-          <div className="w-20 h-20 rounded-full overflow-hidden">
-            {isGroup ? (
-              <Image
-                src={
-                  activeConversation?.groupAvatar ||
-                  "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp"
-                }
-                alt={activeConversation?.groupName || "Group"}
-                width={80}
-                height={80}
-                className="object-cover"
-              />
-            ) : (
-              <Image
-                src={
-                  activeConversation?.otherUser?.urlavatar ||
-                  `https://ui-avatars.com/api/?name=${
-                    activeConversation?.otherUser?.fullname || "User"
-                  }`
-                }
-                alt={activeConversation?.otherUser?.fullname || "User"}
-                width={80}
-                height={80}
-                className="object-cover"
-              />
-            )}
-          </div>
-          <button className="absolute bottom-0 right-0 bg-gray-200 p-1 rounded-full">
-            <Pencil className="w-4 h-4 text-gray-600" />
-          </button>
+    (activeConversation &&
+      <div className="h-full overflow-y-auto bg-gray-50 text-gray-900">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200 text-center">
+          <h2 className="text-lg font-medium">
+            Thông tin {isGroup ? "nhóm" : "hội thoại"}
+          </h2>
         </div>
-        <h3 className="text-lg font-medium mb-4">
-          {isGroup
-            ? activeConversation?.groupName || "Nhóm"
-            : activeConversation?.otherUser?.fullname || "Người dùng"}
-        </h3>
 
-        {/* Action buttons */}
-        <div className="flex justify-between w-full">
-          <div className="flex flex-col items-center">
+        {/* Profile */}
+        <div className="p-4 flex flex-col items-center border-b border-gray-200">
+          <div className="relative mb-2">
+            <div className="w-20 h-20 rounded-full overflow-hidden">
+              {isGroup ? (
+                <Image
+                  src={
+                    activeConversation?.groupAvatar ||
+                    "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp"
+                  }
+                  alt={activeConversation?.groupName || "Group"}
+                  width={80}
+                  height={80}
+                  className="object-cover"
+                />
+              ) : (
+                <Image
+                  src={
+                    activeConversation?.otherUser?.urlavatar ||
+                    `https://ui-avatars.com/api/?name=${activeConversation?.otherUser?.fullname || "User"
+                    }`
+                  }
+                  alt={activeConversation?.otherUser?.fullname || "User"}
+                  width={80}
+                  height={80}
+                  className="object-cover"
+                />
+              )}
+            </div>
+            <button className="absolute bottom-0 right-0 bg-gray-200 p-1 rounded-full">
+              <Pencil className="w-4 h-4 text-gray-600" />
+            </button>
+          </div>
+          <h3 className="text-lg font-medium mb-4">
+            {isGroup
+              ? activeConversation?.groupName || "Nhóm"
+              : activeConversation?.otherUser?.fullname || "Người dùng"}
+          </h3>
+
+          {/* Action buttons */}
+          <div className="flex justify-between w-full">
+            {/* <div className="flex flex-col items-center">
             <button className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center mb-1">
               <Bell className="w-5 h-5 text-blue-900" />
             </button>
@@ -462,56 +569,70 @@ export default function ChatInfo({
               <Pin className="w-5 h-5 text-blue-900" />
             </button>
             <span className="text-xs text-center">Ghim hội thoại</span>
-          </div>
-          {!isGroup && (
+          </div> */}
+            {/* {!isGroup && (
             <div className="flex flex-col items-center">
               <button className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center mb-1">
                 <Users className="w-5 h-5 text-blue-900" />
               </button>
               <span className="text-xs text-center">Tạo nhóm</span>
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Collapsible Sections */}
-      {isGroup && (
-        <>
-          {/* Members Section */}
-          <div className="border-b border-gray-200">
-            <button
-              className="w-full p-4 flex items-center justify-between"
-              onClick={() => toggleSection("members")}
-            >
-              <div className="flex items-center">
-                <Users className="w-5 h-5 mr-3 text-gray-600" />
-                <span>Thành viên nhóm</span>
-              </div>
-              <div className="flex items-center">
-                <span className="text-sm text-gray-500 mr-2">
-                  {activeConversation?.groupMembers?.length} thành viên
-                </span>
-                <ChevronDown
-                  className={`w-4 h-4 transition-transform ${
-                    sectionsState.members ? "rotate-180" : ""
-                  }`}
-                />
-              </div>
-            </button>
-            {sectionsState.members && (
-              <div className="px-4 pb-4">
-                <button
-                  className="w-full py-2 text-blue-600 text-sm font-medium flex items-center justify-center border border-blue-600 rounded-md mb-2"
-                  onClick={() => setIsMembersModalOpen(true)}
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  Xem tất cả thành viên
-                </button>
+          )} */}
+            {/* Add this button in the Group Actions section, before the Leave Group button */}
+            {isGroup && (
+              <div className="p-4 space-y-2">
+                {isOwnerOrCoOwner && (
+                  <button
+                    onClick={() => setIsEditGroupModalOpen(true)}
+                    className="w-full py-2 text-blue-600 text-sm font-medium flex items-center justify-center border border-blue-600 rounded-md mb-2"
+                  >
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Chỉnh sửa thông tin nhóm
+                  </button>
+                )}
               </div>
             )}
           </div>
+        </div>
 
-          {/* Media Section */}
+        {/* Collapsible Sections */}
+        <>
+          {/* Members Section - Only for groups */}
+          {isGroup && (
+            <div className="border-b border-gray-200">
+              <button
+                className="w-full p-4 flex items-center justify-between"
+                onClick={() => toggleSection("members")}
+              >
+                <div className="flex items-center">
+                  <Users className="w-5 h-5 mr-3 text-gray-600" />
+                  <span>Thành viên nhóm</span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-sm text-gray-500 mr-2">
+                    {activeConversation?.groupMembers?.length} thành viên
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform ${sectionsState.members ? "rotate-180" : ""
+                      }`}
+                  />
+                </div>
+              </button>
+              {sectionsState.members && (
+                <div className="px-4 pb-4">
+                  <button
+                    className="w-full py-2 text-blue-600 text-sm font-medium flex items-center justify-center border border-blue-600 rounded-md mb-2"
+                    onClick={() => setIsMembersModalOpen(true)}
+                  >
+                    <Users className="w-4 h-4 mr-2" />
+                    Xem tất cả thành viên
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Media Section - Now for all conversations */}
           <div className="border-b border-gray-200">
             <button
               className="w-full p-4 flex items-center justify-between"
@@ -534,9 +655,8 @@ export default function ChatInfo({
                   mục
                 </span>
                 <ChevronDown
-                  className={`w-4 h-4 transition-transform ${
-                    sectionsState.media ? "rotate-180" : ""
-                  }`}
+                  className={`w-4 h-4 transition-transform ${sectionsState.media ? "rotate-180" : ""
+                    }`}
                 />
               </div>
             </button>
@@ -574,18 +694,18 @@ export default function ChatInfo({
                 {(activeConversation?.listImage?.length || 0) +
                   (activeConversation?.listVideo?.length || 0) >
                   0 && (
-                  <button
-                    className="w-full py-2 text-gray-600 text-sm font-medium flex items-center justify-center bg-gray-100 rounded-md"
-                    onClick={() => setIsMediaModalOpen(true)}
-                  >
-                    Xem tất cả
-                  </button>
-                )}
+                    <button
+                      className="w-full py-2 text-gray-600 text-sm font-medium flex items-center justify-center bg-gray-100 rounded-md"
+                      onClick={() => setIsMediaModalOpen(true)}
+                    >
+                      Xem tất cả
+                    </button>
+                  )}
               </div>
             )}
           </div>
 
-          {/* Files Section */}
+          {/* Files Section - Now for all conversations */}
           <div className="border-b border-gray-200">
             <button
               className="w-full p-4 flex items-center justify-between"
@@ -600,9 +720,8 @@ export default function ChatInfo({
                   {activeConversation?.listFile?.length || 0} mục
                 </span>
                 <ChevronDown
-                  className={`w-4 h-4 transition-transform ${
-                    sectionsState.files ? "rotate-180" : ""
-                  }`}
+                  className={`w-4 h-4 transition-transform ${sectionsState.files ? "rotate-180" : ""
+                    }`}
                 />
               </div>
             </button>
@@ -646,10 +765,10 @@ export default function ChatInfo({
                   {/* Show placeholder if no files */}
                   {(!activeConversation?.listFile ||
                     activeConversation.listFile.length === 0) && (
-                    <div className="py-4 text-center text-gray-500">
-                      Chưa có file nào
-                    </div>
-                  )}
+                      <div className="py-4 text-center text-gray-500">
+                        Chưa có file nào
+                      </div>
+                    )}
                 </div>
                 {(activeConversation?.listFile?.length || 0) > 0 && (
                   <button
@@ -663,128 +782,204 @@ export default function ChatInfo({
             )}
           </div>
         </>
-      )}
 
-      {/* Group Actions */}
-      {isGroup && (
-        <div className="p-4 space-y-2">
-          <button
-            onClick={handleLeaveGroup}
-            className="w-full py-2 text-red-600 text-sm font-medium flex items-center justify-center border border-red-600 rounded-md"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Rời khỏi nhóm
-          </button>
 
-          {isOwner && (
+        {/* Group Actions */}
+        {isGroup && (
+          <div className="p-4 space-y-2">
             <button
-              onClick={handleDeleteGroup}
-              className="w-full py-2 text-white text-sm font-medium flex items-center justify-center bg-red-600 rounded-md"
+              onClick={handleLeaveGroup}
+              className="w-full py-2 text-red-600 text-sm font-medium flex items-center justify-center border border-red-600 rounded-md"
             >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Xóa nhóm
+              <LogOut className="w-4 h-4 mr-2" />
+              Rời khỏi nhóm
             </button>
-          )}
-        </div>
-      )}
 
-      {/* Members Modal - Keep existing modal code */}
-      {/* Members Modal */}
-      <Dialog open={isMembersModalOpen} onOpenChange={setIsMembersModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogTitle className="flex items-center justify-between">
-            <span>Thành viên nhóm</span>
-            {isOwnerOrCoOwner && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setIsMembersModalOpen(false);
-                  setIsAddMemberModalOpen(true);
-                }}
-                className="ml-auto"
+            {isOwner && (
+              <button
+                onClick={handleDeleteGroup}
+                className="w-full py-2 text-white text-sm font-medium flex items-center justify-center bg-red-600 rounded-md"
               >
-                <UserPlus className="w-4 h-4 mr-2" />
-                Thêm
-              </Button>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Xóa nhóm
+              </button>
             )}
-          </DialogTitle>
+          </div>
+        )}
 
-          <div className="mt-4">
-            {/* Owner */}
-            <div className="mb-4">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">
-                Trưởng nhóm
-              </h3>
-              {activeConversation?.rules?.IDOwner && (
-                <div className="flex items-center p-2 rounded-md">
-                  <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
-                    <Image
-                      src={
-                        activeConversation.owner?.urlavatar ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                          activeConversation.owner?.fullname || "Owner"
-                        )}`
-                      }
-                      alt={activeConversation.owner?.fullname || "Owner"}
-                      width={40}
-                      height={40}
-                      className="object-cover"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium flex items-center">
-                      {activeConversation.owner?.fullname || "Owner"}
-                      <Crown className="w-4 h-4 text-yellow-500 ml-1" />
-                    </p>
-                  </div>
-                </div>
+        {/* Members Modal - Keep existing modal code */}
+        {/* Members Modal */}
+        <Dialog open={isMembersModalOpen} onOpenChange={setIsMembersModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogTitle className="flex items-center justify-between">
+              <span>Thành viên nhóm</span>
+              {isOwnerOrCoOwner && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsMembersModalOpen(false);
+                    setIsAddMemberModalOpen(true);
+                  }}
+                  className="ml-auto"
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Thêm
+                </Button>
               )}
-            </div>
+            </DialogTitle>
 
-            {/* Co-Owners */}
-            {/* Co-Owners */}
-            {activeConversation?.rules?.listIDCoOwner &&
-              activeConversation.rules.listIDCoOwner.length > 0 && (
-                <div className="mb-4">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">
-                    Phó nhóm
-                  </h3>
-                  {activeConversation.rules.listIDCoOwner.map((coOwnerId) => {
-                    // Find the co-owner information from regularMembers
-                    const coOwnerInfo = activeConversation.coOwners?.find(
-                      (member) => member.id === coOwnerId
-                    );
+            <div className="mt-4">
+              {/* Owner */}
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-gray-500 mb-2">
+                  Trưởng nhóm
+                </h3>
+                {activeConversation?.rules?.IDOwner && (
+                  <div className="flex items-center p-2 rounded-md">
+                    <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
+                      <Image
+                        src={
+                          activeConversation.owner?.urlavatar ||
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                            activeConversation.owner?.fullname || "Owner"
+                          )}`
+                        }
+                        alt={activeConversation.owner?.fullname || "Owner"}
+                        width={40}
+                        height={40}
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium flex items-center">
+                        {activeConversation.owner?.fullname || "Owner"}
+                        <Crown className="w-4 h-4 text-yellow-500 ml-1" />
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
 
-                    // Skip if co-owner info not found
-                    if (!coOwnerInfo) return null;
+              {/* Co-Owners */}
+              {/* Co-Owners */}
+              {activeConversation?.rules?.listIDCoOwner &&
+                activeConversation.rules.listIDCoOwner.length > 0 && (
+                  <div className="mb-4">
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">
+                      Phó nhóm
+                    </h3>
+                    {activeConversation.rules.listIDCoOwner.map((coOwnerId) => {
+                      // Find the co-owner information from regularMembers
+                      const coOwnerInfo = activeConversation.coOwners?.find(
+                        (member) => member.id === coOwnerId
+                      );
+
+                      // Skip if co-owner info not found
+                      if (!coOwnerInfo) return null;
+
+                      return (
+                        <div
+                          key={coOwnerId}
+                          className="flex items-center p-2 rounded-md"
+                        >
+                          <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
+                            <Image
+                              src={
+                                coOwnerInfo.urlavatar ||
+                                `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                  coOwnerInfo.fullname
+                                )}`
+                              }
+                              alt={coOwnerInfo.fullname}
+                              width={40}
+                              height={40}
+                              className="object-cover"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium flex items-center">
+                              {coOwnerInfo.fullname}
+                              <UserCog className="w-4 h-4 text-blue-500 ml-1" />
+                            </p>
+                          </div>
+                          {isOwner && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="p-1 rounded-full hover:bg-gray-100">
+                                  <MoreHorizontal className="w-5 h-5 text-gray-500" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    handleTransferOwnership(coOwnerId)
+                                  }
+                                >
+                                  <Crown className="w-4 h-4 mr-2" />
+                                  <span>Chuyển quyền trưởng nhóm</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleDemoteMember(coOwnerId)}
+                                >
+                                  <UserMinus className="mr-2 h-4 w-4" />
+                                  Thu hồi quyền quản trị
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleRemoveMember(coOwnerId)}
+                                >
+                                  <UserMinus className="w-4 h-4 mr-2" />
+                                  <span>Xóa khỏi nhóm</span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+              {/* Regular Members */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-2">
+                  Thành viên
+                </h3>
+                <div className="max-h-60 overflow-y-auto">
+                  {groupMembers.map((member) => {
+                    // Skip owner and co-owners as they're already displayed
+                    if (
+                      member.id === activeConversation?.rules?.IDOwner ||
+                      activeConversation?.rules?.listIDCoOwner?.includes(
+                        member.id
+                      )
+                    ) {
+                      return null;
+                    }
 
                     return (
                       <div
-                        key={coOwnerId}
-                        className="flex items-center p-2 rounded-md"
+                        key={member.id}
+                        className="flex items-center p-2 rounded-md hover:bg-gray-100"
                       >
                         <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
                           <Image
                             src={
-                              coOwnerInfo.urlavatar ||
+                              member.urlavatar ||
                               `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                coOwnerInfo.fullname
+                                member.fullname
                               )}`
                             }
-                            alt={coOwnerInfo.fullname}
+                            alt={member.fullname}
                             width={40}
                             height={40}
                             className="object-cover"
                           />
                         </div>
                         <div className="flex-1">
-                          <p className="font-medium flex items-center">
-                            {coOwnerInfo.fullname}
-                            <UserCog className="w-4 h-4 text-blue-500 ml-1" />
-                          </p>
+                          <p className="font-medium">{member.fullname}</p>
                         </div>
-                        {isOwner && (
+                        {isOwnerOrCoOwner && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <button className="p-1 rounded-full hover:bg-gray-100">
@@ -792,22 +987,28 @@ export default function ChatInfo({
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              {isOwner && (
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    handleTransferOwnership(member.id)
+                                  }
+                                >
+                                  <Crown className="w-4 h-4 mr-2" />
+                                  <span>Chuyển quyền trưởng nhóm</span>
+                                </DropdownMenuItem>
+                              )}
+                              {isOwner && (
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    handlePromoteToCoOwner(member.id)
+                                  }
+                                >
+                                  <UserCog className="w-4 h-4 mr-2" />
+                                  <span>Thăng cấp thành phó nhóm</span>
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
-                                onClick={() =>
-                                  handleTransferOwnership(coOwnerId)
-                                }
-                              >
-                                <Crown className="w-4 h-4 mr-2" />
-                                <span>Chuyển quyền trưởng nhóm</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleDemoteMember(coOwnerId)}
-                              >
-                                <UserMinus className="mr-2 h-4 w-4" />
-                                Thu hồi quyền quản trị
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleRemoveMember(coOwnerId)}
+                                onClick={() => handleRemoveMember(member.id)}
                               >
                                 <UserMinus className="w-4 h-4 mr-2" />
                                 <span>Xóa khỏi nhóm</span>
@@ -819,435 +1020,474 @@ export default function ChatInfo({
                     );
                   })}
                 </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsMembersModalOpen(false)}
+              >
+                Đóng
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Member Modal */}
+        <Dialog
+          open={isAddMemberModalOpen}
+          onOpenChange={setIsAddMemberModalOpen}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogTitle>Thêm thành viên vào nhóm</DialogTitle>
+
+            <div className="mt-4">
+              <div className="relative mb-4">
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Tìm kiếm bạn bè..."
+                  className="pl-8 pr-4"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              {selectedUsers.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {selectedUsers.map((userId) => {
+                    const friend = friends.find((f) => f.id === userId);
+                    return (
+                      <div
+                        key={userId}
+                        className="flex items-center bg-blue-100 text-blue-800 rounded-full px-3 py-1"
+                      >
+                        <span className="text-xs mr-1">{friend?.fullname}</span>
+                        <button
+                          onClick={() => toggleUserSelection(userId)}
+                          className="text-blue-800"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
 
-            {/* Regular Members */}
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-2">
-                Thành viên
-              </h3>
               <div className="max-h-60 overflow-y-auto">
-                {groupMembers.map((member) => {
-                  // Skip owner and co-owners as they're already displayed
-                  if (
-                    member.id === activeConversation?.rules?.IDOwner ||
-                    activeConversation?.rules?.listIDCoOwner?.includes(
-                      member.id
-                    )
-                  ) {
-                    return null;
-                  }
-
-                  return (
+                {filteredFriends.length > 0 ? (
+                  filteredFriends.map((friend) => (
                     <div
-                      key={member.id}
-                      className="flex items-center p-2 rounded-md hover:bg-gray-100"
+                      key={friend.id}
+                      className={`flex items-center p-2 rounded-md cursor-pointer ${selectedUsers.includes(friend.id)
+                        ? "bg-blue-50"
+                        : "hover:bg-gray-100"
+                        }`}
+                      onClick={() => toggleUserSelection(friend.id)}
                     >
                       <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
                         <Image
                           src={
-                            member.urlavatar ||
+                            friend.urlavatar ||
                             `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                              member.fullname
+                              friend.fullname
                             )}`
                           }
-                          alt={member.fullname}
+                          alt={friend.fullname}
                           width={40}
                           height={40}
                           className="object-cover"
                         />
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium">{member.fullname}</p>
+                        <p className="font-medium">{friend.fullname}</p>
                       </div>
-                      {isOwnerOrCoOwner && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button className="p-1 rounded-full hover:bg-gray-100">
-                              <MoreHorizontal className="w-5 h-5 text-gray-500" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {isOwner && (
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleTransferOwnership(member.id)
-                                }
-                              >
-                                <Crown className="w-4 h-4 mr-2" />
-                                <span>Chuyển quyền trưởng nhóm</span>
-                              </DropdownMenuItem>
-                            )}
-                            {isOwner && (
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handlePromoteToCoOwner(member.id)
-                                }
-                              >
-                                <UserCog className="w-4 h-4 mr-2" />
-                                <span>Thăng cấp thành phó nhóm</span>
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem
-                              onClick={() => handleRemoveMember(member.id)}
-                            >
-                              <UserMinus className="w-4 h-4 mr-2" />
-                              <span>Xóa khỏi nhóm</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 mt-4">
-            <Button
-              variant="outline"
-              onClick={() => setIsMembersModalOpen(false)}
-            >
-              Đóng
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Member Modal */}
-      <Dialog
-        open={isAddMemberModalOpen}
-        onOpenChange={setIsAddMemberModalOpen}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogTitle>Thêm thành viên vào nhóm</DialogTitle>
-
-          <div className="mt-4">
-            <div className="relative mb-4">
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Tìm kiếm bạn bè..."
-                className="pl-8 pr-4"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-
-            {selectedUsers.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-4">
-                {selectedUsers.map((userId) => {
-                  const friend = friends.find((f) => f.id === userId);
-                  return (
-                    <div
-                      key={userId}
-                      className="flex items-center bg-blue-100 text-blue-800 rounded-full px-3 py-1"
-                    >
-                      <span className="text-xs mr-1">{friend?.fullname}</span>
-                      <button
-                        onClick={() => toggleUserSelection(userId)}
-                        className="text-blue-800"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            <div className="max-h-60 overflow-y-auto">
-              {filteredFriends.length > 0 ? (
-                filteredFriends.map((friend) => (
-                  <div
-                    key={friend.id}
-                    className={`flex items-center p-2 rounded-md cursor-pointer ${
-                      selectedUsers.includes(friend.id)
-                        ? "bg-blue-50"
-                        : "hover:bg-gray-100"
-                    }`}
-                    onClick={() => toggleUserSelection(friend.id)}
-                  >
-                    <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
-                      <Image
-                        src={
-                          friend.urlavatar ||
-                          `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                            friend.fullname
-                          )}`
-                        }
-                        alt={friend.fullname}
-                        width={40}
-                        height={40}
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium">{friend.fullname}</p>
-                    </div>
-                    <div
-                      className={`w-5 h-5 rounded-full border ${
-                        selectedUsers.includes(friend.id)
+                      <div
+                        className={`w-5 h-5 rounded-full border ${selectedUsers.includes(friend.id)
                           ? "bg-blue-500 border-blue-500"
                           : "border-gray-300"
-                      }`}
-                    >
-                      {selectedUsers.includes(friend.id) && (
-                        <span className="flex items-center justify-center text-white text-xs">
-                          ✓
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-gray-500 py-4">
-                  {searchQuery
-                    ? "Không tìm thấy bạn bè phù hợp"
-                    : "Không có bạn bè nào để thêm vào nhóm"}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 mt-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsAddMemberModalOpen(false);
-                setSearchQuery("");
-                setSelectedUsers([]);
-              }}
-              disabled={isLoading}
-            >
-              Hủy
-            </Button>
-            <Button
-              onClick={handleAddMembers}
-              disabled={selectedUsers.length === 0 || isLoading}
-            >
-              {isLoading ? "Đang thêm..." : "Thêm thành viên"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      {/* Media Modal */}
-      <Dialog open={isMediaModalOpen} onOpenChange={setIsMediaModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogTitle>Ảnh/Video đã chia sẻ</DialogTitle>
-
-          <div className="mt-4">
-            <div className="grid grid-cols-3 gap-2 max-h-[60vh] overflow-y-auto p-1">
-              {/* Images */}
-              {activeConversation?.listImage?.map((url, index) => (
-                <div
-                  key={`img-${index}`}
-                  className="aspect-square bg-gray-200 rounded overflow-hidden"
-                >
-                  <Image
-                    src={url}
-                    alt="Image"
-                    width={300}
-                    height={300}
-                    className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                  />
-                </div>
-              ))}
-
-              {/* Videos */}
-              {activeConversation?.listVideo?.map((url, index) => (
-                <div
-                  key={`vid-${index}`}
-                  className="aspect-square bg-gray-200 rounded overflow-hidden relative"
-                >
-                  <Image
-                    src={
-                      url.replace(/\.[^/.]+$/, ".jpg") ||
-                      "/icons/video-placeholder.png"
-                    }
-                    alt="Video thumbnail"
-                    width={300}
-                    height={300}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-10 h-10 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="text-white"
+                          }`}
                       >
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {/* Show placeholder if no media */}
-              {activeConversation?.listImage?.length === 0 &&
-                activeConversation?.listVideo?.length === 0 && (
-                  <div className="col-span-3 py-4 text-center text-gray-500">
-                    Chưa có ảnh hoặc video nào
-                  </div>
-                )}
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 mt-4">
-            <Button
-              variant="outline"
-              onClick={() => setIsMediaModalOpen(false)}
-            >
-              Đóng
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Files Modal */}
-      <Dialog open={isFilesModalOpen} onOpenChange={setIsFilesModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogTitle>File đã chia sẻ</DialogTitle>
-
-          <div className="mt-4">
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto p-1">
-              {activeConversation?.listFile?.map((fileUrl, index) => {
-                // Extract filename from URL
-                const fileName =
-                  fileUrl.split("/").pop() || `File ${index + 1}`;
-                // Determine file type from extension
-                const fileExt =
-                  fileName.split(".").pop()?.toLowerCase() || "file";
-
-                return (
-                  <div
-                    key={index}
-                    className="flex items-center p-2 hover:bg-gray-100 rounded-md"
-                  >
-                    <div className="w-10 h-10 bg-blue-100 rounded flex items-center justify-center mr-3">
-                      <span className="text-xs font-bold text-blue-600">
-                        {fileExt.toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{fileName}</p>
-                      <div className="flex items-center text-xs text-gray-500">
-                        <a
-                          href={fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600"
-                        >
-                          Tải xuống
-                        </a>
+                        {selectedUsers.includes(friend.id) && (
+                          <span className="flex items-center justify-center text-white text-xs">
+                            ✓
+                          </span>
+                        )}
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-
-              {/* Show placeholder if no files */}
-              {(!activeConversation?.listFile ||
-                activeConversation.listFile.length === 0) && (
-                <div className="py-4 text-center text-gray-500">
-                  Chưa có file nào
-                </div>
-              )}
+                  ))
+                ) : (
+                  <p className="text-center text-gray-500 py-4">
+                    {searchQuery
+                      ? "Không tìm thấy bạn bè phù hợp"
+                      : "Không có bạn bè nào để thêm vào nhóm"}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-
-          <div className="flex justify-end gap-2 mt-4">
-            <Button
-              variant="outline"
-              onClick={() => setIsFilesModalOpen(false)}
-            >
-              Đóng
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Confirmation Modal */}
-      <Dialog
-        open={confirmationState.isOpen}
-        onOpenChange={(open) => {
-          if (!open)
-            setConfirmationState({ isOpen: false, memberId: "", action: "" });
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogTitle>
-            {confirmationState.action === "remove" && "Xóa thành viên"}
-            {confirmationState.action === "promote" && "Thăng cấp thành viên"}
-            {confirmationState.action === "transfer" &&
-              "Chuyển quyền trưởng nhóm"}
-          </DialogTitle>
-
-          <div className="mt-4">
-            <p>
-              {confirmationState.action === "remove" &&
-                "Bạn có chắc chắn muốn xóa thành viên này khỏi nhóm?"}
-              {confirmationState.action === "promote" &&
-                "Bạn có chắc chắn muốn thăng cấp thành viên này lên phó nhóm?"}
-              {confirmationState.action === "transfer" &&
-                "Bạn có chắc chắn muốn chuyển quyền trưởng nhóm cho thành viên này?"}
-            </p>
 
             <div className="flex justify-end gap-2 mt-4">
               <Button
                 variant="outline"
-                onClick={() =>
-                  setConfirmationState({
-                    isOpen: false,
-                    memberId: "",
-                    action: "",
-                  })
-                }
+                onClick={() => {
+                  setIsAddMemberModalOpen(false);
+                  setSearchQuery("");
+                  setSelectedUsers([]);
+                }}
+                disabled={isLoading}
               >
                 Hủy
               </Button>
-              <Button onClick={handleConfirmAction}>Xác nhận</Button>
+              <Button
+                onClick={handleAddMembers}
+                disabled={selectedUsers.length === 0 || isLoading}
+              >
+                {isLoading ? "Đang thêm..." : "Thêm thành viên"}
+              </Button>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+        {/* Media Modal */}
+        <Dialog open={isMediaModalOpen} onOpenChange={setIsMediaModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogTitle>Ảnh/Video đã chia sẻ</DialogTitle>
 
-      {/* Leave Group Confirmation Dialog */}
-      <Dialog
-        open={isLeaveGroupConfirmOpen}
-        onOpenChange={setIsLeaveGroupConfirmOpen}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogTitle>Xác nhận rời nhóm</DialogTitle>
+            <div className="mt-4">
+              <div className="grid grid-cols-3 gap-2 max-h-[60vh] overflow-y-auto p-1">
+                {/* Images */}
+                {activeConversation?.listImage?.map((url, index) => (
+                  <div
+                    key={`img-${index}`}
+                    className="aspect-square bg-gray-200 rounded overflow-hidden"
+                  >
+                    <Image
+                      src={url}
+                      alt="Image"
+                      width={300}
+                      height={300}
+                      className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                    />
+                  </div>
+                ))}
 
-          <div className="mt-4">
-            <p className="text-gray-700">
-              Bạn có chắc chắn muốn rời khỏi nhóm này? Bạn sẽ không thể xem tin
-              nhắn trong nhóm sau khi rời.
-            </p>
-          </div>
+                {/* Videos */}
+                {activeConversation?.listVideo?.map((url, index) => (
+                  <div
+                    key={`vid-${index}`}
+                    className="aspect-square bg-gray-200 rounded overflow-hidden relative"
+                  >
+                    <Image
+                      src={
+                        url.replace(/\.[^/.]+$/, ".jpg") ||
+                        "/icons/video-placeholder.png"
+                      }
+                      alt="Video thumbnail"
+                      width={300}
+                      height={300}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-10 h-10 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="text-white"
+                        >
+                          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                ))}
 
-          <div className="flex justify-end gap-2 mt-4">
-            <Button
-              variant="outline"
-              onClick={() => setIsLeaveGroupConfirmOpen(false)}
-            >
-              Hủy
-            </Button>
-            <Button variant="destructive" onClick={handleConfirmLeaveGroup}>
-              Rời nhóm
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+                {/* Show placeholder if no media */}
+                {activeConversation?.listImage?.length === 0 &&
+                  activeConversation?.listVideo?.length === 0 && (
+                    <div className="col-span-3 py-4 text-center text-gray-500">
+                      Chưa có ảnh hoặc video nào
+                    </div>
+                  )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsMediaModalOpen(false)}
+              >
+                Đóng
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Files Modal */}
+        <Dialog open={isFilesModalOpen} onOpenChange={setIsFilesModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogTitle>File đã chia sẻ</DialogTitle>
+
+            <div className="mt-4">
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto p-1">
+                {activeConversation?.listFile?.map((fileUrl, index) => {
+                  // Extract filename from URL
+                  const fileName =
+                    fileUrl.split("/").pop() || `File ${index + 1}`;
+                  // Determine file type from extension
+                  const fileExt =
+                    fileName.split(".").pop()?.toLowerCase() || "file";
+
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center p-2 hover:bg-gray-100 rounded-md"
+                    >
+                      <div className="w-10 h-10 bg-blue-100 rounded flex items-center justify-center mr-3">
+                        <span className="text-xs font-bold text-blue-600">
+                          {fileExt.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{fileName}</p>
+                        <div className="flex items-center text-xs text-gray-500">
+                          <a
+                            href={fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600"
+                          >
+                            Tải xuống
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Show placeholder if no files */}
+                {(!activeConversation?.listFile ||
+                  activeConversation.listFile.length === 0) && (
+                    <div className="py-4 text-center text-gray-500">
+                      Chưa có file nào
+                    </div>
+                  )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsFilesModalOpen(false)}
+              >
+                Đóng
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Confirmation Modal */}
+        <Dialog
+          open={confirmationState.isOpen}
+          onOpenChange={(open) => {
+            if (!open)
+              setConfirmationState({ isOpen: false, memberId: "", action: "" });
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogTitle>
+              {confirmationState.action === "remove" && "Xóa thành viên"}
+              {confirmationState.action === "promote" && "Thăng cấp thành viên"}
+              {confirmationState.action === "transfer" &&
+                "Chuyển quyền trưởng nhóm"}
+              {confirmationState.action === "demote" &&
+                "Thu hồi quyền quản trị viên"}
+            </DialogTitle>
+
+            <div className="mt-4">
+              <p>
+                {confirmationState.action === "remove" &&
+                  "Bạn có chắc chắn muốn xóa thành viên này khỏi nhóm?"}
+                {confirmationState.action === "promote" &&
+                  "Bạn có chắc chắn muốn thăng cấp thành viên này lên phó nhóm?"}
+                {confirmationState.action === "transfer" &&
+                  "Bạn có chắc chắn muốn chuyển quyền trưởng nhóm cho thành viên này?"}
+                {confirmationState.action === "demote" &&
+                  "Bạn có chắc chắn muốn thu hồi quyền quản trị viên của thành viên này?"}
+              </p>
+
+              <div className="flex justify-end gap-2 mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setConfirmationState({
+                      isOpen: false,
+                      memberId: "",
+                      action: "",
+                    })
+                  }
+                >
+                  Hủy
+                </Button>
+                <Button
+                  variant={
+                    confirmationState.action === "demote" ||
+                      confirmationState.action === "remove"
+                      ? "destructive"
+                      : "default"
+                  }
+                  onClick={handleConfirmAction}
+                >
+                  Xác nhận
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Leave Group Confirmation Dialog */}
+        <Dialog
+          open={isLeaveGroupConfirmOpen}
+          onOpenChange={setIsLeaveGroupConfirmOpen}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogTitle>Xác nhận rời nhóm</DialogTitle>
+
+            <div className="mt-4">
+              <p className="text-gray-700">
+                Bạn có chắc chắn muốn rời khỏi nhóm này? Bạn sẽ không thể xem tin
+                nhắn trong nhóm sau khi rời.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsLeaveGroupConfirmOpen(false)}
+              >
+                Hủy
+              </Button>
+              <Button variant="destructive" onClick={handleConfirmLeaveGroup}>
+                Rời nhóm
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add this Edit Group Modal */}
+        <Dialog open={isEditGroupModalOpen} onOpenChange={setIsEditGroupModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogTitle>Chỉnh sửa thông tin nhóm</DialogTitle>
+
+            <div className="mt-4 space-y-4">
+              <div className="flex flex-col items-center">
+                <div className="relative w-24 h-24 rounded-full overflow-hidden mb-2 border-2 border-gray-200">
+                  <Image
+                    src={
+                      newGroupAvatarPreview ||
+                      activeConversation?.groupAvatar ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        activeConversation?.groupName || "Group"
+                      )}`
+                    }
+                    alt="Group Avatar"
+                    width={96}
+                    height={96}
+                    className="object-cover"
+                  />
+                  <label
+                    htmlFor="group-avatar-upload"
+                    className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
+                  >
+                    <Pencil className="w-6 h-6 text-white" />
+                  </label>
+                  <input
+                    id="group-avatar-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarChange}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">
+                  Tên nhóm
+                </label>
+                <Input
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  placeholder="Nhập tên nhóm mới"
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditGroupModalOpen(false);
+                  setNewGroupName("");
+                  setNewGroupAvatar(null);
+                  setNewGroupAvatarPreview("");
+                }}
+                disabled={isUploading}
+              >
+                Hủy
+              </Button>
+              <Button
+                onClick={handleUpdateGroupInfo}
+                disabled={
+                  isUploading ||
+                  (!newGroupName && !newGroupAvatar) ||
+                  (newGroupName === activeConversation?.groupName && !newGroupAvatar)
+                }
+              >
+                {isUploading ? "Đang cập nhật..." : "Cập nhật"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Group Confirmation Dialog */}
+        <Dialog
+          open={isDeleteGroupConfirmOpen}
+          onOpenChange={setIsDeleteGroupConfirmOpen}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogTitle>Xác nhận xóa nhóm</DialogTitle>
+
+            <div className="mt-4">
+              <p className="text-gray-700">
+                Bạn có chắc chắn muốn xóa nhóm này? Hành động này không thể hoàn tác và tất cả tin nhắn,
+                tệp đính kèm và dữ liệu nhóm sẽ bị xóa vĩnh viễn.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsDeleteGroupConfirmOpen(false)}
+              >
+                Hủy
+              </Button>
+              <Button variant="destructive" onClick={handleConfirmDeleteGroup}>
+                Xóa nhóm
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    )
+
+
   );
 }

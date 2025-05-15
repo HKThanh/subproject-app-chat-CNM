@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
   ThumbsUp,
@@ -11,29 +11,34 @@ import {
   MessageSquareX,
   RotateCcw,
   MessageSquareShare,
-} from "lucide-react"
-import { useState } from "react"
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
-import Image from "next/image"
+} from "lucide-react";
+import { useState } from "react";
+import {
+  Tooltip,
+  TooltipProvider,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
+import Image from "next/image";
 
 // Add senderName and isGroup props to the interface
 interface ChatMessageProps {
-  message: string
-  timestamp: string
-  isOwn?: boolean
-  type?: "text" | "image" | "video" | "document" | "file"
-  fileUrl?: string
-  messageId?: string
-  isRemove: boolean
-  isRecall?: boolean
-  isGroup?: boolean
-  senderName?: string  
+  message: string;
+  timestamp: string;
+  isOwn?: boolean;
+  type?: "text" | "image" | "video" | "document" | "file";
+  fileUrl?: string;
+  messageId?: string;
+  isRemove: boolean;
+  isRecall?: boolean;
+  isGroup?: boolean;
+  senderName?: string;
   senderAvatar?: string; // Add this prop
   showSenderInfo?: boolean;
-  onReply?: (messageId: string, content: string, type: string) => void
-  onForward?: (messageId: string) => void
-  onDelete?: (messageId: string) => void
-  onRecallMessage?: (messageId: string) => void
+  onReply?: (messageId: string, content: string, type: string) => void;
+  onForward?: (messageId: string) => void;
+  onDelete?: (messageId: string) => void;
+  onRecallMessage?: (messageId: string) => void;
 }
 
 export default function ChatMessage({
@@ -54,13 +59,15 @@ export default function ChatMessage({
   onDelete,
   onRecallMessage,
 }: ChatMessageProps) {
-  const [isHovered, setIsHovered] = useState(false)
+  const [isHovered, setIsHovered] = useState(false);
 
   const renderContent = () => {
     if (isRemove && isOwn) {
-      return <div className="italic text-gray-500">Tin nhắn đã bị xóa</div>
+      return <div className="italic text-gray-500">Tin nhắn đã bị xóa</div>;
     } else if (isRecall) {
-      return <div className="italic text-gray-500">Tin nhắn đã được thu hồi</div>
+      return (
+        <div className="italic text-gray-500">Tin nhắn đã được thu hồi</div>
+      );
     } else {
       switch (type) {
         case "image":
@@ -78,37 +85,41 @@ export default function ChatMessage({
                 <span className="text-sm text-gray-800">{message}</span>
               </div>
             </div>
-          )
+          );
 
         case "video":
           return (
             <div>
-              <video src={fileUrl} controls className="rounded-md max-h-60 max-w-full" />
+              <video
+                src={fileUrl}
+                controls
+                className="rounded-md max-h-60 max-w-full"
+              />
               <div className="mt-2 flex items-center">
                 <Video className="w-4 h-4 mr-1" />
                 <span className="text-sm">{message}</span>
               </div>
             </div>
-          )
+          );
 
         case "document":
         case "file":
-          let fileName = "Tài liệu"
+          let fileName = "Tài liệu";
           if (fileUrl) {
             try {
-              const urlParts = fileUrl.split("/")
-              const rawFileName = urlParts[urlParts.length - 1]
-              const fileNameParts = rawFileName.split("?")
-              fileName = decodeURIComponent(fileNameParts[0])
+              const urlParts = fileUrl.split("/");
+              const rawFileName = urlParts[urlParts.length - 1];
+              const fileNameParts = rawFileName.split("?");
+              fileName = decodeURIComponent(fileNameParts[0]);
               if (!fileName || fileName.length > 100) {
-                fileName = "Tài liệu đính kèm"
+                fileName = "Tài liệu đính kèm";
               }
             } catch (e) {
-              console.error("Error parsing filename:", e)
-              fileName = "Tài liệu đính kèm"
+              console.error("Error parsing filename:", e);
+              fileName = "Tài liệu đính kèm";
             }
           } else if (message && !message.includes("http")) {
-            fileName = message
+            fileName = message;
           }
 
           return (
@@ -116,8 +127,12 @@ export default function ChatMessage({
               <div className={`flex items-center rounded-md p-2 bg-gray-200`}>
                 <FileText className={`w-8 h-8 mr-2 text-gray-700`} />
                 <div className="flex-1 overflow-hidden">
-                  <p className={`text-sm font-medium truncate text-gray-800`}>{fileName}</p>
-                  <p className="text-xs text-gray-600">Đã gửi một tệp đính kèm</p>
+                  <p className={`text-sm font-medium truncate text-gray-800`}>
+                    {fileName}
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    Đã gửi một tệp đính kèm
+                  </p>
                 </div>
                 <a
                   href={fileUrl}
@@ -130,16 +145,18 @@ export default function ChatMessage({
                 </a>
               </div>
             </div>
-          )
+          );
 
         default:
-          return <div className="whitespace-pre-wrap break-words">{message}</div>
+          return (
+            <div className="whitespace-pre-wrap break-words">{message}</div>
+          );
       }
     }
-  }
+  };
 
   const renderActionButtons = () => {
-    if (!isHovered || isRecall || (isRemove && isOwn)) return null
+    if (!isHovered || isRecall || (isRemove && isOwn)) return null;
 
     return (
       <div
@@ -157,7 +174,10 @@ export default function ChatMessage({
                   onClick={() => onReply && onReply(messageId, message, type)}
                   className="p-1.5 rounded-full hover:bg-gray-100 transition-all duration-200 flex items-center justify-center"
                 >
-                  <MessageSquareQuote className="w-4 h-4 text-gray-600" color="gray"/>
+                  <MessageSquareQuote
+                    className="w-4 h-4 text-gray-600"
+                    color="gray"
+                  />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs font-medium">
@@ -172,8 +192,9 @@ export default function ChatMessage({
                 <button
                   onClick={() => onForward && onForward(messageId)}
                   className="p-1.5 rounded-full hover:bg-gray-100 transition-all duration-200 flex items-center justify-center"
+                  aria-label="Chuyển tiếp tin nhắn"
                 >
-                  <MessageSquareShare className="w-4 h-4 text-gray-600" color="gray"/>
+                  <MessageSquareShare className="w-4 h-4 text-gray-600" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs font-medium">
@@ -188,10 +209,15 @@ export default function ChatMessage({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
-                      onClick={() => onRecallMessage && onRecallMessage(messageId)}
+                      onClick={() =>
+                        onRecallMessage && onRecallMessage(messageId)
+                      }
                       className="p-1.5 rounded-full hover:bg-blue-50 transition-all duration-200 flex items-center justify-center"
                     >
-                      <RotateCcw className="w-4 h-4 text-blue-500" color="gray"/>
+                      <RotateCcw
+                        className="w-4 h-4 text-blue-500"
+                        color="gray"
+                      />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="text-xs font-medium">
@@ -207,7 +233,10 @@ export default function ChatMessage({
                       onClick={() => onDelete && onDelete(messageId)}
                       className="p-1.5 rounded-full hover:bg-red-50 transition-all duration-200 flex items-center justify-center"
                     >
-                      <MessageSquareX className="w-4 h-4 text-red-500" color="gray"/>
+                      <MessageSquareX
+                        className="w-4 h-4 text-red-500"
+                        color="gray"
+                      />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="text-xs font-medium">
@@ -219,8 +248,8 @@ export default function ChatMessage({
           )}
         </div>
       </div>
-    )
-  }
+    );
+  };
 
   return (
     <div
@@ -249,22 +278,32 @@ export default function ChatMessage({
                 </span>
               </div>
             )}
-            <span className="text-xs font-medium text-gray-700">{senderName}</span>
+            <span className="text-xs font-medium text-gray-700">
+              {senderName}
+            </span>
           </div>
         )}
-        
+
         {/* Container cho nội dung tin nhắn */}
         <div
           className={`rounded-lg p-3 ${
             type !== "text"
               ? "bg-transparent"
               : isOwn
-                ? "bg-[#8A56FF] text-white max-w-xs md:max-w-md lg:max-w-lg"
-                : "bg-gray-100 text-gray-800 inline-block"
+              ? "bg-[#8A56FF] text-white max-w-xs md:max-w-md lg:max-w-lg"
+              : "bg-gray-100 text-gray-800 inline-block"
           }`}
           style={{
-            backgroundColor: type !== "text" ? "transparent" : isOwn ? "#8A56FF" : "",
-            color: type !== "text" ? (isOwn ? "white" : "black") : isOwn ? "white" : "",
+            backgroundColor:
+              type !== "text" ? "transparent" : isOwn ? "#8A56FF" : "",
+            color:
+              type !== "text"
+                ? isOwn
+                  ? "white"
+                  : "black"
+                : isOwn
+                ? "white"
+                : "",
             maxWidth: !isOwn ? "80%" : "",
           }}
         >
@@ -289,5 +328,5 @@ export default function ChatMessage({
         </div>
       )}
     </div>
-  )
+  );
 }

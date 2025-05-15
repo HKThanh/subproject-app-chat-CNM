@@ -386,7 +386,30 @@ const handleSendMessage = async (io, socket) => {
         dateTime: new Date().toISOString(),
         isRead: false,
       });
+      // Phân loại và lưu vào list tương ứng của conversation
+      const updateFields = {
+        lastChange: new Date().toISOString(),
+        idNewestMessage: messageDetail.idMessage,
+      };
 
+      // Tự động lưu vào danh sách tương ứng dựa vào type
+      if (type === "image") {
+        // Lưu vào listImage
+        updateFields.$push = { listImage: messageContent };
+      } else if (type === "video") {
+        // Lưu vào listVideo
+        updateFields.$push = { listVideo: messageContent };
+      } else if (type === "file" || type === "document") {
+        // Lưu vào listFile
+        updateFields.$push = { listFile: messageContent };
+      }
+
+      // Cập nhật conversation
+      await Conversation.findOneAndUpdate(
+        { idConversation: conversation.idConversation },
+        updateFields,
+        { new: true }
+      );
       // Update last change của conversation
       await updateLastChangeConversation(
         conversation.idConversation,
@@ -425,13 +448,27 @@ const handleSendMessage = async (io, socket) => {
           "receive_message",
           messageWithUsers
         );
-        console.log("Emitting message to receiver:", IDReceiver);
+        io.to(receiverOnline.socketId).emit("conversation_updated", {
+          conversationId: conversation.idConversation,
+          updates: {
+            listImage: updatedConversation.listImage || [],
+            listFile: updatedConversation.listFile || [],
+            listVideo: updatedConversation.listVideo || [],
+            lastChange: updatedConversation.lastChange
+          }
+        });
       }
 
       // Emit success cho sender
       socket.emit("send_message_success", {
         conversationId: conversation.idConversation,
         message: messageWithUsers,
+        conversationUpdates: {
+          listImage: updatedConversation.listImage || [],
+          listFile: updatedConversation.listFile || [],
+          listVideo: updatedConversation.listVideo || [],
+          lastChange: updatedConversation.lastChange
+        }
       });
     } catch (error) {
       console.error("Error sending message:", error);
@@ -632,10 +669,23 @@ const handleForwardMessage = async (io, socket) => {
           senderInfo,
         };
 
-        // Gửi tin nhắn tới receiver nếu online
-        const receiverOnline = getUser(IDReceiver);
-        if (receiverOnline) {
-          io.to(receiverOnline.socketId).emit("receive_message", messageWithUser);
+        if (conversation.isGroup) {
+          // Nếu là nhóm, gửi tới tất cả thành viên trong nhóm
+          conversation.groupMembers.forEach((memberId) => {
+            if (memberId !== IDSender) { // Không gửi lại cho người gửi
+              const memberSocket = getUser(memberId);
+              console.log("Member socket ID: ", memberSocket);
+              if (memberSocket) {
+                io.to(memberSocket.socketId).emit("receive_message", messageWithUser);
+              }
+            }
+          });
+        } else {
+          // Gửi tin nhắn tới receiver nếu online
+          const receiverOnline = getUser(IDReceiver);
+          if (receiverOnline) {
+            io.to(receiverOnline.socketId).emit("receive_message", messageWithUser);
+          }
         }
 
         io.to(IDConversation).emit("receive_message", messageWithUser);
@@ -1331,7 +1381,24 @@ const handleAddMemberToGroup = async (io, socket) => {
 
     // Cập nhật lastChange và idNewestMessage
     await updateLastChangeConversation(IDConversation, systemMessage.idMessage);
+    // Get owner information
+    const ownerInfo = await User.findOne({ id: conversation.rules.IDOwner }).select(
+      "id fullname urlavatar phone email -_id"
+    );
 
+    // Get coOwners information
+    const coOwnersInfo = await Promise.all(
+      (conversation.rules.listIDCoOwner || []).map(async (coOwnerId) => {
+        const userInfo = await User.findOne({ id: coOwnerId }).select(
+          "id fullname urlavatar"
+        );
+        return {
+          id: coOwnerId,
+          fullname: userInfo ? userInfo.fullname : "Unknown User",
+          urlavatar: userInfo ? userInfo.urlavatar : null,
+        };
+      })
+    );
     const dataNewMembers = await Promise.all(
       newMembers.map(async (member) => {
         const userInfo = await User.findOne({ id: member }).select(
@@ -1354,19 +1421,42 @@ const handleAddMemberToGroup = async (io, socket) => {
           conversationId: IDConversation,
           message: systemMessage
         });
+
       }
     });
     // Gửi thông báo cho các thành viên mới
     newMembers.forEach(async (member) => {
-
+      const allMembersInfo = await Promise.all(
+        conversation.groupMembers.map(async (member) => {
+          const userInfo = await User.findOne({ id: member }).select(
+            "id fullname urlavatar phone status"
+          );
+          return {
+            id: member,
+            fullname: userInfo ? userInfo.fullname : "Unknown User",
+            urlavatar: userInfo ? userInfo.urlavatar : null,
+            phone: userInfo ? userInfo.phone : null,
+            status: userInfo ? userInfo.status : "offline",
+          };
+        })
+      );
       const userSocket = getUser(member);
       if (userSocket?.socketId) {
         io.to(userSocket.socketId).emit("new_group_conversation", {
           success: true,
-          conversation: updatedConversation,
-
+          conversation: {
+            ...updatedConversation.toObject(),
+          },
+          owner: ownerInfo ? {
+            id: ownerInfo.id,
+            fullname: ownerInfo.fullname,
+            urlavatar: ownerInfo.urlavatar,
+            phone: ownerInfo.phone,
+            email: ownerInfo.email
+          } : null,
+          coOwners: coOwnersInfo,
+          members: allMembersInfo,
           message: "Bạn đã được thêm vào nhóm",
-          members: dataNewMembers,
           systemMessage
         });
       }
@@ -1683,7 +1773,7 @@ const handleChangeOwnerGroup = async (io, socket) => {
     const user = await User.findOne({ id: IDUser }).select("fullname");
     const newOwner = await User.findOne({ id: IDNewOwner }).select("id fullname urlavatar phone email");
     const oldOwner = await User.findOne({ id: IDUser }).select("fullname");
-    
+
     // Create formatted owner object with complete information
     const newOwnerInfo = {
       id: newOwner.id,
@@ -1792,7 +1882,27 @@ const handleSendGroupMessage = (io, socket) => {
         dateTime: new Date().toISOString(),
         isRead: false,
       });
+      const updateFields = {
+        lastChange: new Date().toISOString(),
+        idNewestMessage: messageDetail.idMessage,
+      };
 
+      // Tự động lưu vào danh sách tương ứng dựa vào type
+      if (type === "image") {
+        // Lưu vào listImage
+        updateFields.$push = { listImage: messageContent };
+      } else if (type === "video") {
+        // Lưu vào listVideo
+        updateFields.$push = { listVideo: messageContent };
+      } else if (type === "file" || type === "document") {
+        // Lưu vào listFile
+        updateFields.$push = { listFile: messageContent };
+      }
+      const updatedConversation = await Conversation.findOneAndUpdate(
+        { idConversation: IDConversation },
+        updateFields,
+        { new: true }
+      );
       // Update last change của conversation
       await Conversation.updateOne(
         { idConversation: IDConversation },
@@ -1824,6 +1934,17 @@ const handleSendGroupMessage = (io, socket) => {
             "receive_message",
             messageWithUsers
           );
+
+          // Send updated conversation to group members
+          io.to(receiverOnline.socketId).emit("conversation_updated", {
+            conversationId: IDConversation,
+            updates: {
+              listImage: updatedConversation.listImage || [],
+              listFile: updatedConversation.listFile || [],
+              listVideo: updatedConversation.listVideo || [],
+              lastChange: updatedConversation.lastChange
+            }
+          });
         }
       });
 
@@ -1838,6 +1959,12 @@ const handleSendGroupMessage = (io, socket) => {
       socket.emit("send_message_success", {
         conversationId: IDConversation,
         message: messageWithUsers,
+        conversationUpdates: {
+          listImage: updatedConversation.listImage || [],
+          listFile: updatedConversation.listFile || [],
+          listVideo: updatedConversation.listVideo || [],
+          lastChange: updatedConversation.lastChange
+        }
       });
     } catch (error) {
       console.error("Error sending group message:", error);
@@ -2090,6 +2217,8 @@ const handleUpdateGroupInfo = (io, socket) => {
           ...updates,
           lastChange: undefined, // Không cần trả về lastChange
         },
+        systemMessage,
+        conversationId: IDConversation,
       });
 
       // Thông báo cho tất cả thành viên trong nhóm
@@ -2103,6 +2232,7 @@ const handleUpdateGroupInfo = (io, socket) => {
                 ...updates,
                 lastChange: undefined,
               },
+              systemMessage,
               message: systemMessage,
             });
           }
@@ -2235,18 +2365,29 @@ const handlePromoteMemberToAdmin = (io, socket) => {
       }
 
       // Thông báo cho các thành viên khác
+      // conversation.groupMembers.forEach((member) => {
+      //   if (member !== IDUser && member !== IDMemberToPromote) {
+      //     const userSocket = getUser(member);
+      //     if (userSocket) {
+      //       io.to(userSocket.socketId).emit("member_promoted_notification", {
+      //         conversationId: IDConversation,
+      //         promotedMember: IDMemberToPromote,
+      //         promotedBy: IDUser,
+      //         systemMessage,
+      //       });
+      //     }
+      //   }
+      // });
       conversation.groupMembers.forEach((member) => {
-        if (member !== IDUser && member !== IDMemberToPromote) {
-          const userSocket = getUser(member);
-          if (userSocket) {
-            io.to(userSocket.socketId).emit("member_promoted_notification", {
-              conversationId: IDConversation,
-              promotedMember: IDMemberToPromote,
-              promotedBy: IDUser,
-              systemMessage,
-              updatedRules: updatedConversation.rules
-            });
-          }
+        const userSocket = getUser(member);
+        if (userSocket?.socketId) {
+          io.to(userSocket.socketId).emit("member_promoted_notification", {
+            conversationId: IDConversation,
+            promotedMember: IDMemberToPromote,
+            promotedBy: IDUser,
+            systemMessage,
+            updatedRules: updatedConversation.rules
+          });
         }
       });
     } catch (error) {
@@ -2336,6 +2477,7 @@ const handleDemoteMember = (io, socket) => {
 
       // Thông báo cho người giáng cấp
       socket.emit("demote_member_response", {
+        conversationId: IDConversation,
         success: true,
         message: "Thu hồi quyền quản trị viên thành công",
         memberId: IDMemberToDemote,
@@ -2354,17 +2496,28 @@ const handleDemoteMember = (io, socket) => {
       }
 
       // Thông báo cho các thành viên khác
+      // conversation.groupMembers.forEach((member) => {
+      //   if (member !== IDUser && member !== IDMemberToDemote) {
+      //     const userSocket = getUser(member);
+      //     if (userSocket) {
+      //       io.to(userSocket.socketId).emit("member_demoted_notification", {
+      //         conversationId: IDConversation,
+      //         demotedMember: IDMemberToDemote,
+      //         demotedBy: IDUser,
+      //         systemMessage,
+      //       });
+      //     }
+      //   }
+      // });
       conversation.groupMembers.forEach((member) => {
-        if (member !== IDUser && member !== IDMemberToDemote) {
-          const userSocket = getUser(member);
-          if (userSocket) {
-            io.to(userSocket.socketId).emit("member_demoted_notification", {
-              conversationId: IDConversation,
-              demotedMember: IDMemberToDemote,
-              demotedBy: IDUser,
-              systemMessage,
-            });
-          }
+        const userSocket = getUser(member);
+        if (userSocket) {
+          io.to(userSocket.socketId).emit("member_demoted_notification", {
+            conversationId: IDConversation,
+            demotedMember: IDMemberToDemote,
+            demotedBy: IDUser,
+            systemMessage,
+          });
         }
       });
     } catch (error) {

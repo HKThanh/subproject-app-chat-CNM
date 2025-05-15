@@ -70,7 +70,7 @@ const ResetPassScreen = ({ navigation }: ResetPassScreenProps) => {
 
     setIsLoading(true);
     try {
-      const response = await fetch('http://192.168.0.106:3000/auth/reset-password-request', {
+      const response = await fetch('http://192.168.0.104:3000/auth/reset-password-request', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
