@@ -451,6 +451,7 @@ authController.verifyToken = async (io, socket, data) => {
 
         io.to(socketId).emit('loginQRSuccess', {
             message: 'Đăng nhập thành công',
+            user: user,
             accessToken: token,
             refreshToken: refreshToken,
         });
