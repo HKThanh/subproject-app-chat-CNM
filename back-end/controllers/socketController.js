@@ -1112,8 +1112,8 @@ const handleCreatGroupConversation = (io, socket) => {
   socket.on("create_group_conversation", async (payload) => {
     // groupMembers phải có cả IDOwner
     console.log("create_group_conversation payload:>>> ", payload);
-    const { IDOwner, groupName, groupMembers } = payload;
-    const groupAvatar = payload.groupAvatar;
+    const { IDOwner, groupName, groupMembers, groupAvatarUrl } = payload;
+    const groupAvatar = groupAvatarUrl || null;
 
     if (groupMembers.length < 2) {
       socket.emit("create_group_conversation_response", {

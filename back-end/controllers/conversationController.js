@@ -122,15 +122,17 @@ const createNewInfoConversationGroup = async (
     let urlavatar = null;
     if (groupAvatar) {
       // 1. Upload ảnh lên S3
-      const params = {
-        Bucket: process.env.AWS_BUCKET_NAME,
-        Key: uuidv4(),
-        Body: groupAvatar,
-        ContentType: groupAvatar.mimetype
-      };
+      // const params = {
+      //   Bucket: process.env.AWS_BUCKET_NAME,
+      //   Key: uuidv4(),
+      //   Body: groupAvatar,
+      //   ContentType: groupAvatar.mimetype
+      // };
 
-      const s3Data = await s3.upload(params).promise();
-      urlavatar = s3Data.Location;
+      // const s3Data = await s3.upload(params).promise();
+      // urlavatar = s3Data.Location;
+
+      urlavatar = groupAvatar;
     } else {
       urlavatar = "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp";
     }
