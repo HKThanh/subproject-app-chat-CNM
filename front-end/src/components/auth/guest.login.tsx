@@ -36,6 +36,7 @@ const formSchema = z.object({
 export default function LoginForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const userStore = useUserStore();
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -92,7 +93,6 @@ export default function LoginForm() {
       localStorage.setItem("accessToken", data.accessToken);
       localStorage.setItem("refreshToken", data.refreshToken);
       // Update user store with login data
-      const userStore = useUserStore();
       userStore.setUser(data.user, data.accessToken);
       userStore.setTokens(data.accessToken, data.refreshToken);
       // Chuyển hướng đến trang chính
@@ -111,7 +111,7 @@ export default function LoginForm() {
         clearInterval(countdownInterval);
       }
     };
-  }, [router]);
+  }, [router, userStore, countdownInterval]);
 
   // Yêu cầu tạo mã QR khi chuyển sang tab QR
   useEffect(() => {
@@ -139,6 +139,7 @@ export default function LoginForm() {
     return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
   };
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (isLoading) return;
     setIsLoading(true);
     setError(null);
 
@@ -281,10 +282,18 @@ export default function LoginForm() {
                     className="w-full h-12 rounded-full bg-orange-500/90 hover:bg-orange-600 text-white font-semibold backdrop-blur-sm transition-all"
                     disabled={isLoading}
                   >
-                    {isLoading ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : null}
-                    Đăng nhập
+                    <span className="flex items-center justify-center">
+                      {isLoading ? (
+                        <>
+                          <span className="mr-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          </span>
+                          <span>Đang xử lý...</span>
+                        </>
+                      ) : (
+                        "Đăng nhập"
+                      )}
+                    </span>
                   </Button>
                 </form>
               </Form>
