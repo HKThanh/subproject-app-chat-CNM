@@ -37,6 +37,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import ImageViewer from "@/components/chat/image-viewer";
 
 interface ChatInfoProps {
   activeConversation: Conversation | null;
@@ -93,7 +94,26 @@ export default function ChatInfo({
     currentUser?.id || ""
   );
   const isOwnerOrCoOwner = isOwner || isCoOwner;
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
+  // Create a combined array of images and videos for the viewer
+  const mediaItems = [
+    ...(activeConversation?.listImage || []).map((item: any) => ({
+      url: item,
+      alt: "Image"
+    })),
+    ...(activeConversation?.listVideo || []).map(item => ({
+      url: item,
+      alt: "Video"
+    }))
+  ];
+
+  // Function to open image viewer with specific index
+  const openImageViewer = (index: number) => {
+    setSelectedImageIndex(index);
+    setIsImageViewerOpen(true);
+  };
   // Fetch friends when modal opens
   useEffect(() => {
     if (isAddMemberModalOpen && currentUser) {
@@ -630,9 +650,35 @@ export default function ChatInfo({
               </div>
             </button>
             {sectionsState.media && (
-              <div className="px-3 sm:px-4 pb-3 sm:pb-4">
+              <div className="px-4 pb-4">
                 <div className="grid grid-cols-4 gap-1 mb-2">
-                  {/* ... existing code ... */}
+                  {/* Display actual images and videos from conversation */}
+                  {[
+                    ...(activeConversation?.listImage || []).slice(0, 4),
+                    ...(activeConversation?.listVideo || []).slice(0, 4),
+                  ]
+                    .slice(0, 8)
+                    .map((url, index) => (
+                      <div
+                        key={index}
+                        className="aspect-square bg-gray-200 rounded overflow-hidden"
+                      >
+                        <Image
+                          src={url}
+                          alt="Media item"
+                          width={100}
+                          height={100}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  {/* Show placeholder if no media */}
+                  {activeConversation?.listImage?.length === 0 &&
+                    activeConversation?.listVideo?.length === 0 && (
+                      <div className="col-span-4 py-4 text-center text-gray-500">
+                        Chưa có ảnh hoặc video nào
+                      </div>
+                    )}
                 </div>
                 {(activeConversation?.listImage?.length || 0) +
                   (activeConversation?.listVideo?.length || 0) >
@@ -667,7 +713,61 @@ export default function ChatInfo({
                 />
               </div>
             </button>
-            {/* ... existing code ... */}
+            {sectionsState.files && (
+              <div className="px-4 pb-4">
+                <div className="space-y-2 mb-2">
+                  {/* Display actual files from conversation */}
+                  {activeConversation?.listFile
+                    ?.slice(0, 3)
+                    .map((fileUrl, index) => {
+                      // Extract filename from URL
+                      const fileName =
+                        fileUrl.split("/").pop() || `File ${index + 1}`;
+                      // Determine file type from extension
+                      const fileExt =
+                        fileName.split(".").pop()?.toLowerCase() || "file";
+
+                      return (
+                        <div key={index} className="flex items-center">
+                          <div className="w-10 h-10 bg-blue-100 rounded flex items-center justify-center mr-3">
+                            <span className="text-xs font-bold text-blue-600">
+                              {fileExt.toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{fileName}</p>
+                            <div className="flex items-center text-xs text-gray-500">
+                              <a
+                                href={fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600"
+                              >
+                                Tải xuống
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  {/* Show placeholder if no files */}
+                  {(!activeConversation?.listFile ||
+                    activeConversation.listFile.length === 0) && (
+                      <div className="py-4 text-center text-gray-500">
+                        Chưa có file nào
+                      </div>
+                    )}
+                </div>
+                {(activeConversation?.listFile?.length || 0) > 0 && (
+                  <button
+                    className="w-full py-2 text-gray-600 text-sm font-medium flex items-center justify-center bg-gray-100 rounded-md"
+                    onClick={() => setIsFilesModalOpen(true)}
+                  >
+                    Xem tất cả
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </>
 
@@ -725,27 +825,27 @@ export default function ChatInfo({
                 </h3>
                 {activeConversation?.rules?.IDOwner && (
                   <div className="flex items-center p-2 rounded-md">
-                  <div className="w-10 h-10 rounded-full overflow-hidden mr-3 flex items-center justify-center bg-gray-100">
-                    <Image
-                      src={
-                        activeConversation.owner?.urlavatar ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                          activeConversation.owner?.fullname || "Owner"
-                        )}`
-                      }
-                      alt={activeConversation.owner?.fullname || "Owner"}
-                      width={40}
-                      height={40}
-                      className="object-cover w-full h-full rounded-full"
-                    />
+                    <div className="w-10 h-10 rounded-full overflow-hidden mr-3 flex items-center justify-center bg-gray-100">
+                      <Image
+                        src={
+                          activeConversation.owner?.urlavatar ||
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                            activeConversation.owner?.fullname || "Owner"
+                          )}`
+                        }
+                        alt={activeConversation.owner?.fullname || "Owner"}
+                        width={40}
+                        height={40}
+                        className="object-cover w-full h-full rounded-full"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium flex items-center">
+                        {activeConversation.owner?.fullname || "Owner"}
+                        <Crown className="w-4 h-4 text-yellow-500 ml-1" />
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-medium flex items-center">
-                      {activeConversation.owner?.fullname || "Owner"}
-                      <Crown className="w-4 h-4 text-yellow-500 ml-1" />
-                    </p>
-                  </div>
-                </div>
                 )}
               </div>
 
@@ -1044,18 +1144,19 @@ export default function ChatInfo({
             <div className="mt-4">
               <div className="grid grid-cols-3 gap-2 max-h-[60vh] overflow-y-auto p-1">
                 {/* Images */}
-                {activeConversation?.listImage?.map((url, index) => (
+                {mediaItems.map((item, index) => (
                   <div
-                    key={`img-${index}`}
+                    key={index}
                     className="aspect-square bg-gray-200 rounded overflow-hidden"
+                    onClick={() => openImageViewer(index)}
                   >
                     <Image
-                      src={url}
-                      alt="Image"
-                      width={300}
-                      height={300}
-                      className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                    />
+                      src={item.url}
+                      alt={item.alt || "Media"}
+                      width={120}
+                      height={120}
+                      className="w-full h-full object-cover"
+                      />
                   </div>
                 ))}
 
@@ -1274,7 +1375,7 @@ export default function ChatInfo({
             <DialogTitle>Chỉnh sửa thông tin nhóm</DialogTitle>
 
             <div className="mt-4 space-y-4">
-            <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center">
                 <div className="relative w-24 h-24 mb-2">
                   <Avatar className="w-24 h-24 border-2 border-gray-200">
                     <Image
@@ -1375,7 +1476,15 @@ export default function ChatInfo({
             </div>
           </DialogContent>
         </Dialog>
+        {/* Image Viewer */}
+        <ImageViewer
+          isOpen={isImageViewerOpen}
+          onClose={() => setIsImageViewerOpen(false)}
+          images={mediaItems}
+          initialIndex={selectedImageIndex}
+        />
       </div>
+
     )
 
 
