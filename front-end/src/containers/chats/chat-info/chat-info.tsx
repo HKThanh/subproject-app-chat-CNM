@@ -101,14 +101,18 @@ export default function ChatInfo({
   const mediaItems = [
     ...(activeConversation?.listImage || []).map((item: any) => ({
       url: item,
-      alt: "Image"
+      alt: "Image",
+      type: "image" as const
     })),
     ...(activeConversation?.listVideo || []).map(item => ({
       url: item,
-      alt: "Video"
+      alt: "Video",
+      type: "video" as const
     }))
   ];
-
+useEffect(() => {
+    console.log("mediaItems>> ", mediaItems);
+  }, [mediaItems]);
   // Function to open image viewer with specific index
   const openImageViewer = (index: number) => {
     setSelectedImageIndex(index);
@@ -640,9 +644,7 @@ export default function ChatInfo({
               </div>
               <div className="flex items-center">
                 <span className="text-xs sm:text-sm text-gray-500 mr-1 sm:mr-2">
-                  {(activeConversation?.listImage?.length || 0) +
-                    (activeConversation?.listVideo?.length || 0)}{" "}
-                  mục
+                  {mediaItems.length} mục
                 </span>
                 <ChevronDown
                   className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform ${sectionsState.media ? "rotate-180" : ""}`}
@@ -653,43 +655,66 @@ export default function ChatInfo({
               <div className="px-4 pb-4">
                 <div className="grid grid-cols-4 gap-1 mb-2">
                   {/* Display actual images and videos from conversation */}
-                  {[
-                    ...(activeConversation?.listImage || []).slice(0, 4),
-                    ...(activeConversation?.listVideo || []).slice(0, 4),
-                  ]
-                    .slice(0, 8)
-                    .map((url, index) => (
-                      <div
-                        key={index}
-                        className="aspect-square bg-gray-200 rounded overflow-hidden"
-                      >
+                  {mediaItems.slice(0, 8).map((item, index) => (
+                    <div
+                      key={index}
+                      className="aspect-square bg-gray-200 rounded overflow-hidden cursor-pointer"
+                      onClick={() => openImageViewer(index)}
+                    >
+                      {item.type === "video" ? (
+                        <div className="relative w-full h-full">
+                          <Image
+                            src={item.url.replace(/\.[^/.]+$/, ".jpg") || "/icons/video-placeholder.png"}
+                            alt="Video thumbnail"
+                            width={100}
+                            height={100}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-8 h-8 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="text-white"
+                              >
+                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
                         <Image
-                          src={url}
+                          src={item.url}
                           alt="Media item"
                           width={100}
                           height={100}
                           className="w-full h-full object-cover"
                         />
-                      </div>
-                    ))}
+                      )}
+                    </div>
+                  ))}
                   {/* Show placeholder if no media */}
-                  {activeConversation?.listImage?.length === 0 &&
-                    activeConversation?.listVideo?.length === 0 && (
-                      <div className="col-span-4 py-4 text-center text-gray-500">
-                        Chưa có ảnh hoặc video nào
-                      </div>
-                    )}
-                </div>
-                {(activeConversation?.listImage?.length || 0) +
-                  (activeConversation?.listVideo?.length || 0) >
-                  0 && (
-                    <button
-                      className="w-full py-1.5 sm:py-2 text-gray-600 text-xs sm:text-sm font-medium flex items-center justify-center bg-gray-100 rounded-md"
-                      onClick={() => setIsMediaModalOpen(true)}
-                    >
-                      Xem tất cả
-                    </button>
+                  {mediaItems.length === 0 && (
+                    <div className="col-span-4 py-4 text-center text-gray-500">
+                      Chưa có ảnh hoặc video nào
+                    </div>
                   )}
+                </div>
+                {mediaItems.length > 0 && (
+                  <button
+                    className="w-full py-1.5 sm:py-2 text-gray-600 text-xs sm:text-sm font-medium flex items-center justify-center bg-gray-100 rounded-md"
+                    onClick={() => setIsMediaModalOpen(true)}
+                  >
+                    Xem tất cả
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1143,67 +1168,58 @@ export default function ChatInfo({
 
             <div className="mt-4">
               <div className="grid grid-cols-3 gap-2 max-h-[60vh] overflow-y-auto p-1">
-                {/* Images */}
                 {mediaItems.map((item, index) => (
                   <div
                     key={index}
-                    className="aspect-square bg-gray-200 rounded overflow-hidden"
+                    className="aspect-square bg-gray-200 rounded overflow-hidden cursor-pointer"
                     onClick={() => openImageViewer(index)}
                   >
-                    <Image
-                      src={item.url}
-                      alt={item.alt || "Media"}
-                      width={120}
-                      height={120}
-                      className="w-full h-full object-cover"
-                      />
-                  </div>
-                ))}
-
-                {/* Videos */}
-                {activeConversation?.listVideo?.map((url, index) => (
-                  <div
-                    key={`vid-${index}`}
-                    className="aspect-square bg-gray-200 rounded overflow-hidden relative"
-                  >
-                    <Image
-                      src={
-                        url.replace(/\.[^/.]+$/, ".jpg") ||
-                        "/icons/video-placeholder.png"
-                      }
-                      alt="Video thumbnail"
-                      width={300}
-                      height={300}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-10 h-10 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="24"
-                          height="24"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="text-white"
-                        >
-                          <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                        </svg>
+                    {item.type === "video" ? (
+                      <div className="relative w-full h-full">
+                        <Image
+                          src={item.url.replace(/\.[^/.]+$/, ".jpg") || "/icons/video-placeholder.png"}
+                          alt="Video thumbnail"
+                          width={120}
+                          height={120}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-10 h-10 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="24"
+                              height="24"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="text-white"
+                            >
+                              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                            </svg>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <Image
+                        src={item.url}
+                        alt={item.alt || "Media"}
+                        width={120}
+                        height={120}
+                        className="w-full h-full object-cover"
+                      />
+                    )}
                   </div>
                 ))}
 
                 {/* Show placeholder if no media */}
-                {activeConversation?.listImage?.length === 0 &&
-                  activeConversation?.listVideo?.length === 0 && (
-                    <div className="col-span-3 py-4 text-center text-gray-500">
-                      Chưa có ảnh hoặc video nào
-                    </div>
-                  )}
+                {mediaItems.length === 0 && (
+                  <div className="col-span-3 py-4 text-center text-gray-500">
+                    Chưa có ảnh hoặc video nào
+                  </div>
+                )}
               </div>
             </div>
 

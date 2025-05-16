@@ -12,6 +12,7 @@ interface ImageViewerProps {
   images: Array<{
     url: string;
     alt?: string;
+    type?: "image" | "video";
   }>;
   initialIndex?: number;
 }
@@ -81,7 +82,8 @@ export default function ImageViewer({
 
   if (!isOpen || images.length === 0) return null;
 
-  const currentImage = images[currentIndex];
+  const currentMedia = images[currentIndex];
+  const isVideo = currentMedia.type === "video";
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -113,17 +115,26 @@ export default function ImageViewer({
           </div>
         </div>
 
-        {/* Image container - improved centering */}
+        {/* Media container - improved centering */}
         <div className="flex-1 flex items-center justify-center overflow-hidden">
           <div className="relative w-full h-full flex items-center justify-center">
-            <Image
-              src={currentImage.url}
-              alt={currentImage.alt || "Image"}
-              width={1200}
-              height={800}
-              className="max-h-[calc(90vh-80px)] max-w-[90vw] object-contain"
-              priority
-            />
+            {isVideo ? (
+              <video
+                src={currentMedia.url}
+                controls
+                autoPlay
+                className="max-h-[calc(90vh-80px)] max-w-[90vw] object-contain"
+              />
+            ) : (
+              <Image
+                src={currentMedia.url}
+                alt={currentMedia.alt || "Image"}
+                width={1200}
+                height={800}
+                className="max-h-[calc(90vh-80px)] max-w-[90vw] object-contain"
+                priority
+              />
+            )}
           </div>
           {/* Navigation buttons */}
           {images.length > 1 && (
