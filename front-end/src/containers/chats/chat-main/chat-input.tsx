@@ -6,6 +6,7 @@ import {
   ImageIcon,
   Paperclip,
   Code,
+  Video,
   MoreHorizontal,
   ThumbsUp,
   Send,
@@ -29,7 +30,7 @@ interface ChatInputProps {
 export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [accessToken, setAccessToken] = useState<string | null>(null);
-
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
   useEffect(() => {
     const fetchToken = async () => {
       const token = await getAuthToken();
@@ -172,6 +173,27 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
 
     // Convert FileList to array
     const fileArray = Array.from(files);
+    
+    // Check file size limits
+    const oversizedFiles = fileArray.filter(file => {
+      // 100MB limit for videos, 10MB for images, 50MB for other files
+      const maxSize = type === 'video' ? 100 * 1024 * 1024 : 
+                     type === 'image' ? 10 * 1024 * 1024 : 
+                     50 * 1024 * 1024;
+      return file.size > maxSize;
+    });
+    
+    if (oversizedFiles.length > 0) {
+      const typeLabel = type === 'video' ? 'Video' : 
+                       type === 'image' ? 'Hình ảnh' : 
+                       'Tệp';
+      const sizeLimit = type === 'video' ? '100MB' : 
+                       type === 'image' ? '10MB' : 
+                       '50MB';
+      toast.error(`${typeLabel} không được vượt quá ${sizeLimit}`);
+      return;
+    }
+    
     setSelectedFiles(prev => [...prev, ...fileArray]);
     setFileType(type);
 
@@ -348,7 +370,7 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
           className="p-2 rounded-full hover:bg-gray-200"
           onClick={() => videoInputRef.current?.click()}
         >
-          <Code className="w-5 h-5 text-gray-500" />
+          <Video className="w-5 h-5 text-gray-500" />
         </button>
         <button className="p-2 rounded-full hover:bg-gray-200">
           <Smile className="w-5 h-5 text-gray-500" />

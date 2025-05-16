@@ -246,9 +246,9 @@ export default function TabNavigation({
           <DialogTitle className="text-lg font-semibold border-b pb-2">Tạo nhóm</DialogTitle>
           <div className="space-y-4 py-2">
             <div className="flex items-center">
-              <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mr-3">
+              {/* <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mr-3">
                 <Camera className="h-6 w-6 text-gray-500" />
-              </div>
+              </div> */}
               <Input
                 id="group-name"
                 value={groupName}
