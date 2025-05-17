@@ -418,16 +418,25 @@ export const useChat = (userId: string) => {
     });
     
     // Loại bỏ tin nhắn trùng lặp (giữ lại tin nhắn đầu tiên)
+    // Đồng thời đảm bảo thuộc tính isOwn được thiết lập đúng
     const uniqueMessageIds = new Set<string>();
     const uniqueMessages = combined.filter(message => {
       if (uniqueMessageIds.has(message.idMessage)) {
         return false;
       }
       uniqueMessageIds.add(message.idMessage);
+      
+      // Đảm bảo thuộc tính isOwn được thiết lập đúng
+      if (message.idSender === userId) {
+        message.isOwn = true;
+      } else {
+        message.isOwn = false;
+      }
+      
       return true;
     });  
     return uniqueMessages;
-  }, [state.olderMessages, state.messages]);
+  }, [state.olderMessages, state.messages, userId]);
   // Xử lý phản hồi tải cuộc trò chuyện - tối ưu dependencies
   const handleLoadConversationsResponse = useCallback((data: {
     Items: Conversation[];
