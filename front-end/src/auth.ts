@@ -100,6 +100,7 @@ export const {
     },
     callbacks: {
         async jwt({ token, user, session, trigger }) {
+            // console.log('Token callback:', { token, user, session, trigger });
             if (token.accessToken) {
 
                 const expired = typeof token.accessToken === 'string' && isTokenExpired(token.accessToken);
@@ -181,7 +182,7 @@ export const {
                     }
                 }
             }
-            else if (!token.accessToken || !token.refreshToken) {
+            else if (trigger !== 'signIn' && (!token.accessToken || !token.refreshToken)) {
                 console.error('No access token in token callback');
                 throw new Error(`SESSION_EXPIRED`);
             }
