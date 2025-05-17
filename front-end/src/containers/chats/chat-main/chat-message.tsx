@@ -81,7 +81,7 @@ export default function ChatMessage({
                 <img
                   src={fileUrl || "/placeholder.svg"}
                   alt={message}
-                  className="rounded-md max-h-60 max-w-full object-contain"
+                  className="rounded-md max-h-40 sm:max-h-60 max-w-full object-contain"
                 />
               </div>
               <div className="mt-2 flex items-center">

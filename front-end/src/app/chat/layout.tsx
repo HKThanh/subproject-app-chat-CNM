@@ -10,12 +10,10 @@ export default function chatLayout({
   return (
     <UserDataLoader>
       <SocketProviders>
-        <div className="h-screen flex bg-background">
+        <div className="h-screen flex flex-col sm:flex-row bg-background">
           <NavigationSidebar />
-          <div className="ml-[70px] flex flex-1">
-            {/* <ChatListSidebar /> */}
+          <div className="ml-0 sm:ml-[70px] flex flex-1">
             <main className="flex-1 bg-gray-50">
-              {/* Chat content area */}
               {children}
             </main>
           </div>
