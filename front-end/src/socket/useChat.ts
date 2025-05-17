@@ -16,7 +16,8 @@ export interface Message {
   isRemove?: boolean;
   isRecall?: boolean;
   isFoward?: boolean; // Trường mới cho tin nhắn chuyển tiếp
-  originalMessageId?: string; // ID của tin nhắn gốc khi chuyển tiếp
+  isReply?: boolean; // Trường mới cho tin nhắn reply
+  idMessageReply?: string; // ID của tin nhắn gốc khi chuyển tiếp
   isOwn?: boolean; // Đánh dấu tin nhắn của người dùng hiện tại
   senderInfo?: {
     id?: string;
@@ -424,12 +425,7 @@ export const useChat = (userId: string) => {
       }
       uniqueMessageIds.add(message.idMessage);
       return true;
-    });
-    
-    console.log(`Tổng tin nhắn cho cuộc trò chuyện ${conversationId}:`, uniqueMessages.length);
-    console.log(`- Tin nhắn cũ: ${older.length}`);
-    console.log(`- Tin nhắn mới: ${recent.length}`);
-    
+    });  
     return uniqueMessages;
   }, [state.olderMessages, state.messages]);
   // Xử lý phản hồi tải cuộc trò chuyện - tối ưu dependencies
@@ -2404,6 +2400,88 @@ export const useChat = (userId: string) => {
       }
     }
   }, [dispatch, conversations]);
+  //xử lý reply message
+  const replyMessage = useCallback(
+    (conversationId: string, messageId: string, text: string, type: string = "text", fileUrl?: string) => {
+      if (!socket) return;
+      console.log("Sending reply message...", conversationId, messageId, text, type, fileUrl);
+      const conversation = conversations.find(
+        (conv) => conv.idConversation === conversationId
+      );
+      
+      if (!conversation) return;
+      
+      const receiverId = conversation.isGroup 
+        ? "" 
+        : conversation.idSender === userId
+          ? conversation.idReceiver 
+          : conversation.idSender;
+      
+      socket.emit("reply_message", {
+        IDSender: userId,
+        IDReceiver: receiverId,
+        IDConversation: conversationId,
+        IDMessageReply: messageId,
+        textMessage: text,
+        type: type,
+        fileUrl: fileUrl
+      });
+    },
+    [socket, userId, conversations]
+  );
+  // const handleReceiveMessage = useCallback((message: Message) => {
+  //   // Xử lý tin nhắn nhận được, bao gồm cả tin nhắn reply
+  //   if (!message || !message.idConversation) {
+  //     console.error("Tin nhắn không hợp lệ:", message);
+  //     return;
+  //   }
+    
+  //   const conversationId = message.idConversation;
+  //   const conversationMessages = state.messages[conversationId] || [];
+    
+  //   // Kiểm tra xem tin nhắn đã tồn tại chưa
+  //   const messageExists = conversationMessages.some(
+  //     (msg) => msg.idMessage === message.idMessage
+  //   );
+    
+  //   if (messageExists) return;
+    
+  //   // Thêm trường isOwn để xác định tin nhắn của người dùng hiện tại
+  //   const newMessage = {
+  //     ...message,
+  //     isOwn: message.idSender === userId,
+  //   };
+    
+  //   // Sử dụng dispatch để cập nhật state
+  //   dispatch({
+  //     type: 'ADD_MESSAGE',
+  //     payload: {
+  //       conversationId,
+  //       message: newMessage
+  //     }
+  //   });
+    
+  //   // Cập nhật thông tin cuộc trò chuyện nếu cần
+  //   if (!newMessage.isOwn) {
+  //     dispatch({
+  //       type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+  //       payload: {
+  //         conversationId,
+  //         latestMessage: {
+  //           idMessage: `system-${Date.now()}`,
+  //           idConversation: message.idConversation,
+  //           content: message.content,
+  //           dateTime: message.dateTime,
+  //           isRead: false,
+  //           type: message.type || "text",
+  //           idSender: message.idSender,
+  //           idReceiver: message.idReceiver,
+  //           isReply: message.isReply
+  //         }
+  //       }
+  //     });
+  //   }
+  // }, [dispatch, state.messages, userId]);
   // Gộp các useEffect đăng ký sự kiện socket
   useEffect(() => {
     if (!socket) return;
@@ -2674,6 +2752,7 @@ export const useChat = (userId: string) => {
                   isRead: false,
                   idReceiver: message.idReceiver,
                   idSender: message.idSender,
+                  isReply: message.isReply,
                   type: message.type
                 },
                 lastChange: message.dateTime,
@@ -2896,7 +2975,7 @@ export const useChat = (userId: string) => {
         });
       });
     };
-
+    socket.on("receive_message", handleReceiveMessage);
     socket.on('users_status', handleUsersStatus);
 
     return () => {
@@ -2940,6 +3019,8 @@ export const useChat = (userId: string) => {
       // Unregister the event listeners for change info group
       socket.off("update_group_info_response", handleUpdateGroupInfoResponse);
       socket.off("group_info_updated", handleGroupInfoUpdated);
+
+      socket.off("receive_message", handleReceiveMessage);
       socket.offAny();
     };
   }, [socket, userId, messages, conversations, loadConversations, handleGroupDeletedResponse, handleGroupDeletedNotification,
@@ -3472,5 +3553,6 @@ export const useChat = (userId: string) => {
     removeMembersFromGroup,
     changeGroupOwner,
     demoteMember,
+    replyMessage,
   };
 };

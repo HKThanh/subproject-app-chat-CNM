@@ -28,6 +28,12 @@ interface ChatMessageProps {
   timestamp: string;
   isOwn?: boolean;
   type?: "text" | "image" | "video" | "document" | "file";
+  isReply?: boolean;
+  replyInfo?: {
+    name: string;
+    content: string;
+    type: string;
+  };
   fileUrl?: string;
   messageId?: string;
   isRemove: boolean;
@@ -51,6 +57,8 @@ export default function ChatMessage({
   isRemove,
   isRecall,
   messageId = "",
+  isReply = false,
+  replyInfo,
   isGroup = false,
   senderName = "",
   senderAvatar = "",
@@ -254,7 +262,40 @@ export default function ChatMessage({
       </div>
     );
   };
+  const renderReplyPreview = () => {
+    if (!isReply || !replyInfo) return null;
 
+    return (
+      <div 
+        className={`mb-2 p-2 rounded border-l-4 ${
+          isOwn 
+            ? 'bg-[#7649d9] border-[#6a40c7] text-white/90' 
+            : 'bg-gray-200 border-gray-300 text-gray-700'
+        }`}
+      >
+        <div className="text-xs font-medium">
+          {replyInfo.name}
+        </div>
+        <div className="text-xs truncate">
+          {replyInfo.type !== "text" ? (
+            <span className="flex items-center">
+              {replyInfo.type === "image" ? (
+                <ImageIcon className="h-3 w-3 mr-1" />
+              ) : replyInfo.type === "video" ? (
+                <Video className="h-3 w-3 mr-1" />
+              ) : (
+                <FileText className="h-3 w-3 mr-1" />
+              )}
+              {replyInfo.type === "image" ? "Hình ảnh" : 
+               replyInfo.type === "video" ? "Video" : "Tệp đính kèm"}
+            </span>
+          ) : (
+            replyInfo.content
+          )}
+        </div>
+      </div>
+    );
+  };
   return (
     <>
     <div
@@ -312,6 +353,8 @@ export default function ChatMessage({
             maxWidth: !isOwn ? "80%" : "",
           }}
         >
+          {/* Hiển thị thông tin tin nhắn reply */}
+          {renderReplyPreview()}
           {renderContent()}
 
           {message && message.trim() !== "" && (
@@ -325,13 +368,13 @@ export default function ChatMessage({
         {renderActionButtons()}
       </div>
 
-      {!isOwn && (
+      {/* {!isOwn && (
         <div className="flex items-center mt-1 ml-2">
           <button className="p-1 rounded-full hover:bg-gray-200">
             <ThumbsUp className="w-4 h-4 text-gray-500" />
           </button>
         </div>
-      )}
+      )} */}
     </div>
     {/* Image Viewer */}
     {type === "image" && fileUrl && (

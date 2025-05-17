@@ -36,7 +36,8 @@ export default function Home() {
     addMembersToGroup,
     removeMembersFromGroup,
     changeGroupOwner,
-    demoteMember
+    demoteMember,
+    replyMessage
   } = useChatContext();
 
   // Tải danh sách cuộc trò chuyện khi component được mount
@@ -116,12 +117,18 @@ export default function Home() {
   const handleSendMessage = (
     text: string,
     type: string = "text",
-    fileUrl?: string
+    fileUrl?: string,
+    replyingTo?: {name: string;
+      messageId: string;
+      content: string;
+      type: string;}
   ) => {
     if (activeConversation) {
-      console.log("check send message:", type, fileUrl, text);
-
-      if (type === "text") {
+      console.log("check send message:", type, fileUrl, text, replyingTo);
+      if (replyingTo) {
+        replyMessage(activeConversation, replyingTo.messageId, text, type, fileUrl);
+      } 
+      else if (type === "text") {
         sendMessage(activeConversation, text);
       } else {
         sendMessage(

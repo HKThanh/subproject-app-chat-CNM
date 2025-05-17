@@ -30,7 +30,12 @@ interface ChatDetailProps {
   hasMoreMessages: { [conversationId: string]: boolean };
   combinedMessages: (conversationId: string) => Message[];
   loadMoreMessages: (conversationId: string, lastMessageId: string) => void;
-  onSendMessage: (text: string, type?: string, fileUrl?: string) => void;
+  onSendMessage: (text: string, type?: string, fileUrl?: string, replyingTo?: {
+    name: string;
+    messageId: string;
+    content: string;
+    type: string;
+  }) => void;
   onDeleteMessage?: (messageId: string) => void;
   onRecallMessage?: (messageId: string) => void;
   onForwardMessage?: (messageId: string, targetConversations: string[]) => void;
@@ -154,15 +159,51 @@ export default function ChatDetail({
     }
   }, [showForwardDialog, conversations, activeConversation]);
 
+  // Hàm xử lý khi người dùng muốn reply một tin nhắn
   const handleReply = (messageId: string, content: string, type: string) => {
     setReplyingTo({
-      name: activeConversation?.otherUser?.fullname || "Người dùng",
+      name: activeConversation?.isGroup
+        ? displayMessages.find(msg => msg.idMessage === messageId)?.senderInfo?.fullname || "Người dùng"
+        : activeConversation?.otherUser?.fullname || "Người dùng",
       messageId,
       content,
       type,
     });
   };
 
+  // Hàm hủy reply
+  const cancelReply = () => {
+    setReplyingTo(null);
+  };
+  // Thêm component hiển thị tin nhắn reply
+  const ReplyPreview = ({ replyData, onCancel }: { replyData: { name: string; messageId: string; content: string; type: string; }; onCancel: () => void; }) => {
+    return (
+      <div className="bg-gray-100 p-2 rounded-md mb-2 border-l-4 border-blue-500">
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-medium text-blue-600">
+            Trả lời {replyData.name}
+          </span>
+          <button onClick={onCancel} className="text-gray-500 hover:text-gray-700">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+        <div className="text-sm text-gray-600 truncate">
+          {replyData.type !== "text" ? (
+            <span className="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4V5h12v10z" clipRule="evenodd" />
+              </svg>
+              {replyData.type === "image" ? "Hình ảnh" : replyData.type === "video" ? "Video" : "Tệp đính kèm"}
+            </span>
+          ) : (
+            replyData.content
+          )}
+        </div>
+      </div>
+    );
+  };
   const handleForward = (messageId: string) => {
     setForwardingMessage(messageId);
     setShowForwardDialog(true);
@@ -202,11 +243,6 @@ export default function ChatDetail({
         : [...prev, conversationId]
     );
   };
-
-  const cancelReply = () => {
-    setReplyingTo(null);
-  };
-
   if (loading) {
     return (
       <div className="flex flex-col h-full items-center justify-center">
@@ -408,7 +444,75 @@ export default function ChatDetail({
                     senderAvatar =
                       activeConversation?.otherUser?.urlavatar || "";
                   }
+                  // Xử lý thông tin tin nhắn reply
+                  let replyInfo = null;
+                  if (msg.isReply && msg.idMessageReply) {
+                    // Tìm tin nhắn gốc từ danh sách tin nhắn hiện có
+                    const originalMessage = displayMessages.find(
+                      (m) => m.idMessage === msg.idMessageReply
+                    );
 
+                    if (originalMessage) {
+                      // Tìm thông tin người gửi tin nhắn gốc
+                      let originalSenderName = "";
+
+                      if (originalMessage.senderInfo?.fullname) {
+                        originalSenderName = originalMessage.senderInfo.fullname;
+                      } else if (activeConversation?.isGroup && originalMessage.idSender) {
+                        const originalMember = activeConversation.regularMembers?.find(
+                          (member) => member.id === originalMessage.idSender
+                        );
+
+                        if (originalMember) {
+                          originalSenderName = originalMember.fullname || originalMessage.idSender;
+                        } else if (activeConversation.owner?.id === originalMessage.idSender) {
+                          originalSenderName = activeConversation.owner.fullname || originalMessage.idSender;
+                        } else {
+                          originalSenderName = originalMessage.idSender;
+                        }
+                      } else if (!activeConversation?.isGroup) {
+                        originalSenderName = originalMessage.idSender === msg.idSender
+                          ? activeConversation?.otherUser?.fullname || "Người dùng"
+                          : "Bạn";
+                      }
+
+                      // Chuẩn bị nội dung tin nhắn gốc để hiển thị
+                      let originalContent = originalMessage.content || "";
+                      let originalType = originalMessage.type || "text";
+                      
+                      if (originalType !== "text" && originalContent.includes("http")) {
+                        const urlMatch = originalContent.match(/(https?:\/\/[^\s]+)/g);
+                        const fileUrl = urlMatch ? urlMatch[0] : undefined;
+
+                        if (fileUrl) {
+                          originalContent = originalContent.replace(fileUrl, "").trim();
+
+                          if (!originalContent) {
+                            if (originalType === "image") {
+                              originalContent = "Hình ảnh";
+                            } else if (originalType === "video") {
+                              originalContent = "Video";
+                            } else {
+                              originalContent = "Tệp đính kèm";
+                            }
+                          }
+                        }
+                      }
+
+                      replyInfo = {
+                        name: originalSenderName,
+                        content: originalContent,
+                        type: originalType
+                      };
+                    } else {
+                      // Nếu không tìm thấy tin nhắn gốc, hiển thị thông tin mặc định
+                      replyInfo = {
+                        name: "Người dùng",
+                        content: "Tin nhắn gốc không còn tồn tại",
+                        type: "text"
+                      };
+                    }
+                  }
                   return (
                     <ChatMessage
                       key={msg.idMessage || index}
@@ -438,6 +542,8 @@ export default function ChatDetail({
                       onForward={handleForward}
                       onRecallMessage={onRecallMessage}
                       onDelete={handleDelete}
+                      isReply={msg.isReply || false}
+                      replyInfo={replyInfo || undefined}
                     />
                   );
                 })
@@ -451,12 +557,17 @@ export default function ChatDetail({
           </div>
         )}
       </div>
+      {/* Chat Input */}
+      {/* <div className="p-3 border-t border-gray-200">
+      {replyingTo && (
+        <ReplyPreview replyData={replyingTo} onCancel={cancelReply} />
+      )} */}
       <ChatInput
         onSendMessage={onSendMessage}
         replyingTo={replyingTo}
         onCancelReply={cancelReply}
       />
-
+      {/* </div> */}
       <Dialog open={showForwardDialog} onOpenChange={setShowForwardDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
