@@ -45,6 +45,10 @@ const ConversationSchema = new Schema({
         type: [String],
         default: []
     },
+    listVideo: {
+        type: [String],
+        default: []
+    },
     lastChange: {
         type: String,
         default: () => moment.tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DDTHH:mm:ss.SSS')

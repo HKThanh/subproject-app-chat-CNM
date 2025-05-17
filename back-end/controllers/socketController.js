@@ -381,7 +381,7 @@ const handleSendMessage = async (io, socket) => {
         idSender: IDSender,
         idReceiver: IDReceiver,
         idConversation: conversation.idConversation,
-        type: type, // 'text', 'image', 'video', 'document'
+        type: type, // 'text', 'image', 'video', 'audio', 'document'
         content: messageContent,
         dateTime: new Date().toISOString(),
         isRead: false,
@@ -396,8 +396,8 @@ const handleSendMessage = async (io, socket) => {
       if (type === "image") {
         // Lưu vào listImage
         updateFields.$push = { listImage: messageContent };
-      } else if (type === "video") {
-        // Lưu vào listVideo
+      } else if (type === "video" || type === "audio") {
+        // Lưu vào listVideo (bao gồm cả audio)
         updateFields.$push = { listVideo: messageContent };
       } else if (type === "file" || type === "document") {
         // Lưu vào listFile
@@ -405,7 +405,7 @@ const handleSendMessage = async (io, socket) => {
       }
 
       // Cập nhật conversation
-      await Conversation.findOneAndUpdate(
+      const updatedConversation = await Conversation.findOneAndUpdate(
         { idConversation: conversation.idConversation },
         updateFields,
         { new: true }
@@ -1900,7 +1900,7 @@ const handleSendGroupMessage = (io, socket) => {
         idMessage: uuidv4(),
         idSender: IDSender,
         idConversation: IDConversation,
-        type: type, // 'text', 'image', 'video', 'document'
+        type: type, // 'text', 'image', 'video', 'audio', 'document'
         content: messageContent,
         dateTime: new Date().toISOString(),
         isRead: false,
@@ -1914,8 +1914,8 @@ const handleSendGroupMessage = (io, socket) => {
       if (type === "image") {
         // Lưu vào listImage
         updateFields.$push = { listImage: messageContent };
-      } else if (type === "video") {
-        // Lưu vào listVideo
+      } else if (type === "video" || type === "audio") {
+        // Lưu vào listVideo (bao gồm cả audio)
         updateFields.$push = { listVideo: messageContent };
       } else if (type === "file" || type === "document") {
         // Lưu vào listFile
@@ -2654,6 +2654,155 @@ const handleSearchMessagesInGroup = (io, socket) => {
   });
 };
 
+const handleReplyMessage = async (io, socket) => {
+  socket.on("reply_message", async (payload) => {
+    try {
+      const { 
+        IDSender, 
+        IDReceiver, 
+        IDConversation, 
+        IDMessageReply, 
+        textMessage, 
+        type = "text", 
+        fileUrl 
+      } = payload;
+      
+      console.log("Received reply message:", payload);
+      
+      // Tìm tin nhắn gốc để reply
+      const originalMessage = await MessageDetail.findOne({ idMessage: IDMessageReply });
+      if (!originalMessage) {
+        throw new Error("Không tìm thấy tin nhắn gốc");
+      }
+      
+      // Tìm conversation
+      let conversation = await Conversation.findOne({ idConversation: IDConversation });
+      
+      // Tạo message detail dựa vào type
+      let messageContent = textMessage;
+      if (type !== "text") {
+        messageContent = fileUrl;
+      }
+      
+      // Tạo tin nhắn reply
+      const messageDetail = await MessageDetail.create({
+        idMessage: uuidv4(),
+        idSender: IDSender,
+        idReceiver: IDReceiver,
+        idConversation: IDConversation,
+        type: type,
+        content: messageContent,
+        dateTime: new Date().toISOString(),
+        isRead: false,
+        isReply: true,
+        idMessageReply: IDMessageReply
+      });
+      
+      // Cập nhật conversation
+      const updateFields = {
+        lastChange: new Date().toISOString(),
+        idNewestMessage: messageDetail.idMessage,
+      };
+      
+      // Tự động lưu vào danh sách tương ứng dựa vào type
+      if (type === "image") {
+        updateFields.$push = { listImage: messageContent };
+      } else if (type === "video") {
+        updateFields.$push = { listVideo: messageContent };
+      } else if (type === "audio") {
+        // Nếu chưa có listAudio, tạo mới
+        if (!conversation.listAudio) {
+          await Conversation.updateOne(
+            { idConversation: conversation.idConversation },
+            { $set: { listAudio: [] } }
+          );
+        }
+        // Lưu vào listAudio
+        updateFields.$push = { listAudio: messageContent };
+      } else if (type === "file" || type === "document") {
+        updateFields.$push = { listFile: messageContent };
+      }
+      
+      const updatedConversation = await Conversation.findOneAndUpdate(
+        { idConversation: IDConversation },
+        updateFields,
+        { new: true }
+      );
+      
+      // Update last change của conversation
+      await updateLastChangeConversation(IDConversation, messageDetail.idMessage);
+      
+      // Lấy thông tin người gửi
+      const sender = await User.findOne({ id: IDSender }).select("id fullname urlavatar");
+      
+      // Thêm thông tin người gửi và tin nhắn gốc vào tin nhắn
+      const messageWithUsers = {
+        ...messageDetail.toObject(),
+        senderInfo: sender,
+        originalMessage: originalMessage
+      };
+      
+      // Xử lý gửi tin nhắn dựa vào loại conversation (nhóm hoặc đơn)
+      if (conversation.isGroup) {
+        // Nếu là nhóm, gửi tới tất cả thành viên trong nhóm
+        const groupMembers = conversation.groupMembers || [];
+        
+        groupMembers.forEach((member) => {
+          if (member !== IDSender) {
+            const receiverOnline = getUser(member);
+            if (receiverOnline) {
+              io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers);
+              io.to(receiverOnline.socketId).emit("conversation_updated", {
+                conversationId: IDConversation,
+                updates: {
+                  listImage: updatedConversation.listImage || [],
+                  listFile: updatedConversation.listFile || [],
+                  listVideo: updatedConversation.listVideo || [],
+                  lastChange: updatedConversation.lastChange
+                }
+              });
+            }
+          }
+        });
+      } else {
+        // Nếu là chat đơn, gửi tới người nhận
+        const receiverOnline = getUser(IDReceiver);
+        if (receiverOnline) {
+          io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers);
+          io.to(receiverOnline.socketId).emit("conversation_updated", {
+            conversationId: IDConversation,
+            updates: {
+              listImage: updatedConversation.listImage || [],
+              listFile: updatedConversation.listFile || [],
+              listVideo: updatedConversation.listVideo || [],
+              lastChange: updatedConversation.lastChange
+            }
+          });
+        }
+      }
+      
+      // Emit success cho sender
+      socket.emit("send_message_success", {
+        conversationId: IDConversation,
+        message: messageWithUsers,
+        conversationUpdates: {
+          listImage: updatedConversation.listImage || [],
+          listFile: updatedConversation.listFile || [],
+          listVideo: updatedConversation.listVideo || [],
+          lastChange: updatedConversation.lastChange
+        }
+      });
+      
+    } catch (error) {
+      console.error("Error replying to message:", error);
+      socket.emit("error", {
+        message: "Lỗi khi trả lời tin nhắn",
+        error: error.message,
+      });
+    }
+  });
+};
+
 // Thêm vào socketController.js
 const handlePinGroupMessage = (io, socket) => {
   socket.on("pin_group_message", async (payload) => {
@@ -3050,4 +3199,5 @@ module.exports = {
   handlePinGroupMessage,
   handleLeaveGroup,
   handleLoadGroupConversation,
+  handleReplyMessage, // Thêm handler mới
 };
