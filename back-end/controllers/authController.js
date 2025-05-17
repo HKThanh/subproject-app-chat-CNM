@@ -442,12 +442,14 @@ authController.verifyToken = async (io, socket, data) => {
             return;
         }
 
-        const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30m' });
-        const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH, { expiresIn: '1d' });
+        const deviceKey = `${user.email}-web`;
+
+        const token = jwt.sign({ id: user.id, platform: 'web' }, JWT_SECRET, { expiresIn: '2h' });
+        const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH, { expiresIn: '4d' });
 
         // store token in redis
-        await redisClient.setEx(user.email, 1800, token);
-        await redisClient.setEx(`${user.email}-refresh`, 86400, refreshToken);
+        await redisClient.setEx(deviceKey, 7200, token);
+        await redisClient.setEx(`${deviceKey}-refresh`, 345600, refreshToken);
 
         io.to(socketId).emit('loginQRSuccess', {
             message: 'Đăng nhập thành công',
