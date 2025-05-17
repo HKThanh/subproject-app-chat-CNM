@@ -792,10 +792,24 @@ const handleLoadMessages = (io, socket) => {
         .sort({ dateTime: firstMessageId ? 1 : -1 })
         .limit(limit);
 
-      // Chỉ format dateTime, không cần xử lý content vì đã được set khi recall
+      // Lấy thông tin người gửi cho mỗi tin nhắn
+      const senderIds = [...new Set(messages.map(msg => msg.idSender))];
+      const senders = await User.find({ id: { $in: senderIds } })
+        .select("id fullname urlavatar phone status");
+      
+      const senderMap = senders.reduce((map, sender) => {
+        map[sender.id] = sender;
+        return map;
+      }, {});
+
+      // Format tin nhắn với thông tin người gửi
       let processedMessages = messages.map((msg) => ({
         ...msg.toJSON(),
         dateTime: moment.tz(msg.dateTime, "Asia/Ho_Chi_Minh").format(),
+        senderInfo: senderMap[msg.idSender] || {
+          id: msg.idSender,
+          fullname: "Unknown User"
+        }
       }));
 
       // Sắp xếp lại nếu load tin nhắn mới
@@ -805,9 +819,21 @@ const handleLoadMessages = (io, socket) => {
         );
       }
 
+      // Kiểm tra xem còn tin nhắn cũ hơn không
+      const hasMoreOlder = lastMessageId ? await MessageDetail.exists({
+        idConversation: IDConversation,
+        dateTime: { $lt: messages[messages.length - 1]?.dateTime }
+      }) : false;
+
+      // Kiểm tra xem còn tin nhắn mới hơn không
+      const hasMoreNewer = firstMessageId ? await MessageDetail.exists({
+        idConversation: IDConversation,
+        dateTime: { $gt: messages[0]?.dateTime }
+      }) : false;
+
       socket.emit("load_messages_response", {
         messages: processedMessages,
-        hasMore: messages.length === limit,
+        hasMore: messages.length === limit || (lastMessageId ? hasMoreOlder : hasMoreNewer),
         conversationId: IDConversation,
         direction: lastMessageId ? "older" : "newer",
       });
