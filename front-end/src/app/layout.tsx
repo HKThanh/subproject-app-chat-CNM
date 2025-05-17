@@ -8,6 +8,7 @@ import { Toaster } from "sonner";
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
+import useUserStore from "@/stores/useUserStoree";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -21,22 +22,31 @@ export default function RootLayout({
   const router = useRouter();
 
   useEffect(() => {
-    // Add a global error handler for auth errors
-    const handleAuthError = (event: PromiseRejectionEvent): void => {
-      if (event && event.reason && 
-          typeof event.reason.message === 'string' && 
-          event.reason.message.includes('SESSION_EXPIRED')) {
+    const handleAuthError = async (event: PromiseRejectionEvent): Promise<void> => {
+      if (event?.reason?.message?.includes('SESSION_EXPIRED')) {
         console.log('Session expired, redirecting to login');
         
-        // Sign out the user and redirect to login
-        signOut({ redirect: true, callbackUrl: '/auth/login' });
+        try {
+          // Clear any stored auth data
+          const userStore = useUserStore.getState();
+          userStore.clearUser();
+          
+          // Sign out and redirect
+          await signOut({ 
+            redirect: false,
+          });
+          
+          // Force navigation to login
+          router.push('/auth/login');
+        } catch (error) {
+          console.error('Error during sign out:', error);
+          // Force navigation even if signOut fails
+          window.location.href = '/auth/login';
+        }
       }
     };
 
-    // Add the event listener
     window.addEventListener('unhandledrejection', handleAuthError);
-    
-    // Clean up
     return () => {
       window.removeEventListener('unhandledrejection', handleAuthError);
     };
