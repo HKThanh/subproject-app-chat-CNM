@@ -20,6 +20,7 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 import Image from "next/image";
+import ImageViewer from "@/components/chat/image-viewer";
 
 // Add senderName and isGroup props to the interface
 interface ChatMessageProps {
@@ -60,7 +61,7 @@ export default function ChatMessage({
   onRecallMessage,
 }: ChatMessageProps) {
   const [isHovered, setIsHovered] = useState(false);
-
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
   const renderContent = () => {
     if (isRemove && isOwn) {
       return <div className="italic text-gray-500">Tin nhắn đã bị xóa</div>;
@@ -73,13 +74,16 @@ export default function ChatMessage({
         case "image":
           return (
             <div className="relative">
-              <a href={fileUrl} target="_blank" rel="noopener noreferrer">
+              <div 
+                className="cursor-pointer" 
+                onClick={() => setIsImageViewerOpen(true)}
+              >
                 <img
                   src={fileUrl || "/placeholder.svg"}
                   alt={message}
                   className="rounded-md max-h-60 max-w-full object-contain"
                 />
-              </a>
+              </div>
               <div className="mt-2 flex items-center">
                 <ImageIcon className="w-4 h-4 mr-1 text-gray-800" />
                 <span className="text-sm text-gray-800">{message}</span>
@@ -252,6 +256,7 @@ export default function ChatMessage({
   };
 
   return (
+    <>
     <div
       className={`mb-10 ${isOwn ? "flex justify-end" : ""}`}
       onMouseEnter={() => setIsHovered(true)}
@@ -328,5 +333,15 @@ export default function ChatMessage({
         </div>
       )}
     </div>
+    {/* Image Viewer */}
+    {type === "image" && fileUrl && (
+        <ImageViewer
+          isOpen={isImageViewerOpen}
+          onClose={() => setIsImageViewerOpen(false)}
+          images={[{ url: fileUrl, alt: message }]}
+          initialIndex={0}
+        />
+      )}
+    </>
   );
 }

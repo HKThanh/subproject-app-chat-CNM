@@ -381,7 +381,7 @@ const handleSendMessage = async (io, socket) => {
         idSender: IDSender,
         idReceiver: IDReceiver,
         idConversation: conversation.idConversation,
-        type: type, // 'text', 'image', 'video', 'document'
+        type: type, // 'text', 'image', 'video', 'audio', 'document'
         content: messageContent,
         dateTime: new Date().toISOString(),
         isRead: false,
@@ -396,8 +396,8 @@ const handleSendMessage = async (io, socket) => {
       if (type === "image") {
         // Lưu vào listImage
         updateFields.$push = { listImage: messageContent };
-      } else if (type === "video") {
-        // Lưu vào listVideo
+      } else if (type === "video" || type === "audio") {
+        // Lưu vào listVideo (bao gồm cả audio)
         updateFields.$push = { listVideo: messageContent };
       } else if (type === "file" || type === "document") {
         // Lưu vào listFile
@@ -405,7 +405,7 @@ const handleSendMessage = async (io, socket) => {
       }
 
       // Cập nhật conversation
-      await Conversation.findOneAndUpdate(
+      const updatedConversation = await Conversation.findOneAndUpdate(
         { idConversation: conversation.idConversation },
         updateFields,
         { new: true }
@@ -1900,7 +1900,7 @@ const handleSendGroupMessage = (io, socket) => {
         idMessage: uuidv4(),
         idSender: IDSender,
         idConversation: IDConversation,
-        type: type, // 'text', 'image', 'video', 'document'
+        type: type, // 'text', 'image', 'video', 'audio', 'document'
         content: messageContent,
         dateTime: new Date().toISOString(),
         isRead: false,
@@ -1914,8 +1914,8 @@ const handleSendGroupMessage = (io, socket) => {
       if (type === "image") {
         // Lưu vào listImage
         updateFields.$push = { listImage: messageContent };
-      } else if (type === "video") {
-        // Lưu vào listVideo
+      } else if (type === "video" || type === "audio") {
+        // Lưu vào listVideo (bao gồm cả audio)
         updateFields.$push = { listVideo: messageContent };
       } else if (type === "file" || type === "document") {
         // Lưu vào listFile
@@ -2654,6 +2654,145 @@ const handleSearchMessagesInGroup = (io, socket) => {
   });
 };
 
+const handleReplyMessage = async (io, socket) => {
+  socket.on("reply_message", async (payload) => {
+    try {
+      const { 
+        IDSender, 
+        IDReceiver, 
+        IDConversation, 
+        IDMessageReply, 
+        textMessage, 
+        type = "text", 
+        fileUrl 
+      } = payload;
+      
+      console.log("Received reply message:", payload);
+      
+      // Tìm tin nhắn gốc để reply
+      const originalMessage = await MessageDetail.findOne({ idMessage: IDMessageReply });
+      if (!originalMessage) {
+        throw new Error("Không tìm thấy tin nhắn gốc");
+      }
+      
+      // Tìm conversation
+      let conversation = await Conversation.findOne({ idConversation: IDConversation });
+      
+      // Tạo message detail dựa vào type
+      let messageContent = textMessage;
+      if (type !== "text") {
+        messageContent = fileUrl;
+      }
+      
+      // Tạo tin nhắn reply
+      const messageDetail = await MessageDetail.create({
+        idMessage: uuidv4(),
+        idSender: IDSender,
+        idReceiver: IDReceiver,
+        idConversation: IDConversation,
+        type: type,
+        content: messageContent,
+        dateTime: new Date().toISOString(),
+        isRead: false,
+        isReply: true,
+        idMessageReply: IDMessageReply
+      });
+      
+      // Cập nhật conversation
+      const updateFields = {
+        lastChange: new Date().toISOString(),
+        idNewestMessage: messageDetail.idMessage,
+      };
+      
+      // Tự động lưu vào danh sách tương ứng dựa vào type
+      if (type === "image") {
+        updateFields.$push = { listImage: messageContent };
+      } else if (type === "video" || type === "audio") {
+        // Lưu vào listVideo (bao gồm cả audio)
+        updateFields.$push = { listVideo: messageContent };
+      } else if (type === "file" || type === "document") {
+        updateFields.$push = { listFile: messageContent };
+      }
+      
+      const updatedConversation = await Conversation.findOneAndUpdate(
+        { idConversation: IDConversation },
+        updateFields,
+        { new: true }
+      );
+      
+      await updateLastChangeConversation(IDConversation, messageDetail.idMessage);
+      
+      // Lấy thông tin người gửi
+      const sender = await User.findOne({ id: IDSender }).select("id fullname urlavatar");
+      
+      // Thêm thông tin người gửi và tin nhắn gốc vào tin nhắn
+      const messageWithUsers = {
+        ...messageDetail.toObject(),
+        senderInfo: sender,
+        originalMessage: originalMessage
+      };
+      
+      // Xử lý gửi tin nhắn dựa vào loại conversation (nhóm hoặc đơn)
+      if (conversation.isGroup) {
+        // Nếu là nhóm, gửi tới tất cả thành viên trong nhóm
+        const groupMembers = conversation.groupMembers || [];
+        
+        groupMembers.forEach((member) => {
+          if (member !== IDSender) {
+            const receiverOnline = getUser(member);
+            if (receiverOnline) {
+              io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers);
+              io.to(receiverOnline.socketId).emit("conversation_updated", {
+                conversationId: IDConversation,
+                updates: {
+                  listImage: updatedConversation.listImage || [],
+                  listFile: updatedConversation.listFile || [],
+                  listVideo: updatedConversation.listVideo || [],
+                  lastChange: updatedConversation.lastChange
+                }
+              });
+            }
+          }
+        });
+      } else {
+        // Nếu là chat đơn, gửi tới người nhận
+        const receiverOnline = getUser(IDReceiver);
+        if (receiverOnline) {
+          io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers);
+          io.to(receiverOnline.socketId).emit("conversation_updated", {
+            conversationId: IDConversation,
+            updates: {
+              listImage: updatedConversation.listImage || [],
+              listFile: updatedConversation.listFile || [],
+              listVideo: updatedConversation.listVideo || [],
+              lastChange: updatedConversation.lastChange
+            }
+          });
+        }
+      }
+      
+      // Emit success cho sender
+      socket.emit("send_message_success", {
+        conversationId: IDConversation,
+        message: messageWithUsers,
+        conversationUpdates: {
+          listImage: updatedConversation.listImage || [],
+          listFile: updatedConversation.listFile || [],
+          listVideo: updatedConversation.listVideo || [],
+          lastChange: updatedConversation.lastChange
+        }
+      });
+      
+    } catch (error) {
+      console.error("Error replying to message:", error);
+      socket.emit("error", {
+        message: "Lỗi khi trả lời tin nhắn",
+        error: error.message,
+      });
+    }
+  });
+};
+
 // Thêm vào socketController.js
 const handlePinGroupMessage = (io, socket) => {
   socket.on("pin_group_message", async (payload) => {
@@ -3017,6 +3156,760 @@ const handleLoadGroupConversation = (io, socket) => {
   });
 };
 
+const handleMessageReaction = (io, socket) => {
+  socket.on("add_reaction", async (payload) => {
+    try {
+      const { IDUser, IDMessage, reaction, count = 1 } = payload;
+      
+      // Kiểm tra reaction có hợp lệ không
+      const validReactions = ['👍', '❤️', '😂', '😮', '😢', '😡'];
+      if (!validReactions.includes(reaction)) {
+        throw new Error("Reaction không hợp lệ");
+      }
+      
+      // Tìm tin nhắn
+      const message = await MessageDetail.findOne({ idMessage: IDMessage });
+      if (!message) {
+        throw new Error("Không tìm thấy tin nhắn");
+      }
+      
+      // Tìm conversation để xác định các thành viên
+      const conversation = await Conversation.findOne({ idConversation: message.idConversation });
+      if (!conversation) {
+        throw new Error("Không tìm thấy cuộc trò chuyện");
+      }
+      
+      // Khởi tạo reactions nếu chưa có
+      let reactions = message.reactions || new Map();
+      
+      // Khởi tạo reaction loại này nếu chưa có
+      if (!reactions.has(reaction)) {
+        reactions.set(reaction, { 
+          reaction: reaction, 
+          userReactions: [], 
+          totalCount: 0 
+        });
+      }
+      
+      const reactionData = reactions.get(reaction);
+      
+      // Tìm reaction của người dùng này
+      const userReactionIndex = reactionData.userReactions.findIndex(
+        ur => ur.userId === IDUser
+      );
+      
+      if (userReactionIndex !== -1) {
+        // Người dùng đã có reaction loại này
+        const userReaction = reactionData.userReactions[userReactionIndex];
+        const oldCount = userReaction.count;
+        
+        // Cập nhật tổng số reaction
+        reactionData.totalCount = reactionData.totalCount - oldCount + count;
+        
+        // Cập nhật số lượng reaction của người dùng
+        if (count > 0) {
+          userReaction.count = count;
+        } else {
+          // Nếu count = 0, xóa reaction của người dùng
+          reactionData.userReactions.splice(userReactionIndex, 1);
+        }
+      } else if (count > 0) {
+        // Người dùng chưa có reaction loại này
+        reactionData.userReactions.push({
+          userId: IDUser,
+          count: count
+        });
+        
+        // Cập nhật tổng số reaction
+        reactionData.totalCount += count;
+      }
+      
+      // Cập nhật tin nhắn
+      message.reactions = reactions;
+      await message.save();
+      
+      // Lấy thông tin người dùng
+      const user = await User.findOne({ id: IDUser }).select("id fullname urlavatar");
+      
+      // Lấy thông tin tất cả người dùng đã react
+      const allUserIds = new Set();
+      for (const [_, data] of reactions.entries()) {
+        data.userReactions.forEach(ur => allUserIds.add(ur.userId));
+      }
+      
+      const allUsers = await User.find({ id: { $in: Array.from(allUserIds) } })
+        .select("id fullname urlavatar");
+      
+      // Tạo map để dễ dàng truy cập thông tin người dùng
+      const userMap = {};
+      allUsers.forEach(user => {
+        userMap[user.id] = {
+          id: user.id,
+          fullname: user.fullname,
+          urlavatar: user.urlavatar
+        };
+      });
+      
+      // Tạo dữ liệu reaction để gửi về client
+      const reactionSummary = {};
+      for (const [key, data] of reactions.entries()) {
+        if (data.totalCount > 0) {
+          reactionSummary[key] = {
+            reaction: data.reaction,
+            totalCount: data.totalCount,
+            userReactions: data.userReactions.map(ur => ({
+              user: userMap[ur.userId] || { id: ur.userId, fullname: "Unknown User" },
+              count: ur.count
+            }))
+          };
+        }
+      }
+      
+      const reactionUpdate = {
+        messageId: IDMessage,
+        reactions: reactionSummary,
+        currentUser: user
+      };
+      
+      // Gửi cập nhật đến tất cả người dùng trong cuộc trò chuyện
+      if (conversation.isGroup) {
+        // Nếu là nhóm, gửi đến tất cả thành viên
+        conversation.groupMembers.forEach((memberId) => {
+          const memberSocket = getUser(memberId);
+          if (memberSocket) {
+            io.to(memberSocket.socketId).emit("message_reaction_updated", reactionUpdate);
+          }
+        });
+      } else {
+        // Nếu là chat đơn, gửi đến người gửi và người nhận
+        const receiverId = message.idSender === IDUser ? message.idReceiver : message.idSender;
+        
+        // Gửi đến người nhận nếu online
+        const receiverSocket = getUser(receiverId);
+        if (receiverSocket) {
+          io.to(receiverSocket.socketId).emit("message_reaction_updated", reactionUpdate);
+        }
+        
+        // Gửi đến người gửi reaction
+        socket.emit("message_reaction_updated", reactionUpdate);
+      }
+      
+    } catch (error) {
+      console.error("Error adding reaction:", error);
+      socket.emit("error", {
+        message: "Lỗi khi thêm reaction",
+        error: error.message
+      });
+    }
+  });
+};
+
+const handleMentionUser = (io, socket) => {
+  socket.on("mention_user", async (payload) => {
+    try {
+      const { IDSender, IDConversation, mentionedUsers, messageId } = payload;
+      
+      // Kiểm tra dữ liệu đầu vào
+      if (!IDSender || !IDConversation || !Array.isArray(mentionedUsers) || mentionedUsers.length === 0 || !messageId) {
+        throw new Error("Dữ liệu không hợp lệ");
+      }
+      
+      // Tìm conversation để xác định loại (nhóm hay đơn)
+      const conversation = await Conversation.findOne({ idConversation: IDConversation });
+      if (!conversation) {
+        throw new Error("Không tìm thấy cuộc trò chuyện");
+      }
+      
+      // Tìm tin nhắn để cập nhật thông tin mention
+      const message = await MessageDetail.findOne({ idMessage: messageId });
+      if (!message) {
+        throw new Error("Không tìm thấy tin nhắn");
+      }
+      
+      // Cập nhật thông tin mention trong tin nhắn
+      message.mentionedUsers = mentionedUsers;
+      await message.save();
+      
+      // Lấy thông tin người gửi
+      const sender = await User.findOne({ id: IDSender }).select("id fullname urlavatar");
+      
+      // Lấy thông tin người được nhắc
+      const mentionedUsersInfo = await User.find({ 
+        id: { $in: mentionedUsers } 
+      }).select("id fullname urlavatar");
+      
+      // Tạo map để dễ dàng truy cập thông tin người dùng
+      const userMap = {};
+      mentionedUsersInfo.forEach(user => {
+        userMap[user.id] = {
+          id: user.id,
+          fullname: user.fullname,
+          urlavatar: user.urlavatar
+        };
+      });
+      
+      // Chuẩn bị dữ liệu thông báo
+      const mentionData = {
+        messageId: messageId,
+        conversationId: IDConversation,
+        sender: {
+          id: sender.id,
+          fullname: sender.fullname,
+          urlavatar: sender.urlavatar
+        },
+        mentionedUsers: mentionedUsers.map(userId => userMap[userId] || { id: userId }),
+        isGroup: conversation.isGroup,
+        groupName: conversation.isGroup ? (conversation.groupName || "Nhóm chat") : null,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Gửi thông báo đến những người được nhắc
+      mentionedUsers.forEach(userId => {
+        // Không gửi thông báo cho chính người gửi
+        if (userId !== IDSender) {
+          const userSocket = getUser(userId);
+          if (userSocket) {
+            io.to(userSocket.socketId).emit("user_mentioned", mentionData);
+          }
+        }
+      });
+      
+      // Gửi xác nhận cho người gửi
+      socket.emit("mention_user_response", {
+        success: true,
+        messageId: messageId,
+        mentionedUsers: mentionedUsers
+      });
+      
+    } catch (error) {
+      console.error("Error handling user mention:", error);
+      socket.emit("mention_user_response", {
+        success: false,
+        message: "Lỗi khi nhắc người dùng",
+        error: error.message
+      });
+    }
+  });
+};
+const { v4: uuidv4 } = require('uuid');
+const Poll = require('../models/PollModel');
+
+// Hàm xử lý tạo bình chọn
+const handleCreatePoll = (io, socket) => {
+  socket.on("create_poll", async (payload) => {
+    try {
+      const { 
+        idCreator, 
+        idConversation, 
+        question, 
+        options, 
+        settings = {} 
+      } = payload;
+      
+      // Kiểm tra dữ liệu đầu vào
+      if (!idCreator || !idConversation || !question || !Array.isArray(options) || options.length < 2) {
+        throw new Error("Dữ liệu không hợp lệ");
+      }
+      
+      // Tìm conversation để xác định loại (phải là nhóm)
+      const conversation = await Conversation.findOne({ idConversation });
+      if (!conversation) {
+        throw new Error("Không tìm thấy cuộc trò chuyện");
+      }
+      
+      if (!conversation.isGroup) {
+        throw new Error("Chỉ có thể tạo bình chọn trong nhóm chat");
+      }
+      
+      // Kiểm tra người tạo có trong nhóm không
+      const isCreatorInGroup = conversation.groupMembers.includes(idCreator) || 
+                              conversation.coOwners.includes(idCreator) || 
+                              conversation.owner === idCreator;
+      
+      if (!isCreatorInGroup) {
+        throw new Error("Bạn không phải là thành viên của nhóm này");
+      }
+      
+      // Tạo ID cho poll và các options
+      const idPoll = uuidv4();
+      const pollOptions = options.map(option => ({
+        id: uuidv4(),
+        text: option,
+        voters: [],
+        voteCount: 0
+      }));
+      
+      // Tạo tin nhắn thông báo về poll
+      const messageContent = `${question}\n\n${options.map((opt, index) => `${index + 1}. ${opt}`).join('\n')}`;
+      
+      // Tạo tin nhắn trong database
+      const idMessage = uuidv4();
+      const newMessage = new MessageDetail({
+        idMessage,
+        idConversation,
+        idSender: idCreator,
+        idReceiver: idConversation,
+        content: messageContent,
+        type: "poll",
+        timestamp: new Date(),
+        isRemove: false,
+        isRecall: false,
+        isPoll: true,
+        pollId: idPoll
+      });
+      
+      await newMessage.save();
+      
+      // Tạo poll trong database
+      const newPoll = new Poll({
+        idPoll,
+        idConversation,
+        idCreator,
+        idMessage,
+        question,
+        options: pollOptions,
+        settings: {
+          allowMultipleVotes: settings.allowMultipleVotes || false,
+          allowAddOptions: settings.allowAddOptions || false,
+          hideVoters: settings.hideVoters || false,
+          endDate: settings.endDate || null
+        }
+      });
+      
+      await newPoll.save();
+      
+      // Lấy thông tin người tạo
+      const creator = await User.findOne({ id: idCreator }).select("id fullname urlavatar");
+      
+      // Chuẩn bị dữ liệu để gửi về client
+      const pollData = {
+        idPoll,
+        idMessage,
+        idConversation,
+        creator: {
+          id: creator.id,
+          fullname: creator.fullname,
+          urlavatar: creator.urlavatar
+        },
+        question,
+        options: pollOptions.map(opt => ({
+          id: opt.id,
+          text: opt.text,
+          voteCount: 0,
+          voters: []
+        })),
+        settings: newPoll.settings,
+        createdAt: newPoll.createdAt
+      };
+      
+      // Gửi thông báo đến tất cả thành viên trong nhóm
+      conversation.groupMembers.forEach(memberId => {
+        const memberSocket = getUser(memberId);
+        if (memberSocket) {
+          io.to(memberSocket.socketId).emit("poll_created", pollData);
+        }
+      });
+      
+      // Gửi xác nhận cho người tạo
+      socket.emit("create_poll_response", {
+        success: true,
+        poll: pollData
+      });
+      
+    } catch (error) {
+      console.error("Error creating poll:", error);
+      socket.emit("create_poll_response", {
+        success: false,
+        message: "Lỗi khi tạo bình chọn",
+        error: error.message
+      });
+    }
+  });
+};
+
+// Hàm xử lý bình chọn
+const handleVotePoll = (io, socket) => {
+  socket.on("vote_poll", async (payload) => {
+    try {
+      const { idUser, idPoll, optionIds } = payload;
+      
+      // Kiểm tra dữ liệu đầu vào
+      if (!idUser || !idPoll || !Array.isArray(optionIds) || optionIds.length === 0) {
+        throw new Error("Dữ liệu không hợp lệ");
+      }
+      
+      // Tìm poll
+      const poll = await Poll.findOne({ idPoll });
+      if (!poll) {
+        throw new Error("Không tìm thấy bình chọn");
+      }
+      
+      // Kiểm tra poll có còn active không
+      if (!poll.isActive) {
+        throw new Error("Bình chọn đã kết thúc");
+      }
+      
+      // Kiểm tra nếu poll có endDate và đã hết hạn
+      if (poll.settings.endDate && new Date() > new Date(poll.settings.endDate)) {
+        poll.isActive = false;
+        await poll.save();
+        throw new Error("Bình chọn đã hết hạn");
+      }
+      
+      // Tìm conversation để xác định thành viên
+      const conversation = await Conversation.findOne({ idConversation: poll.idConversation });
+      if (!conversation) {
+        throw new Error("Không tìm thấy cuộc trò chuyện");
+      }
+      
+      // Kiểm tra người bình chọn có trong nhóm không
+      const isVoterInGroup = conversation.groupMembers.includes(idUser) || 
+                            conversation.coOwners.includes(idUser) || 
+                            conversation.owner === idUser;
+      
+      if (!isVoterInGroup) {
+        throw new Error("Bạn không phải là thành viên của nhóm này");
+      }
+      
+      // Kiểm tra nếu không cho phép bình chọn nhiều lựa chọn
+      if (!poll.settings.allowMultipleVotes && optionIds.length > 1) {
+        throw new Error("Bình chọn này chỉ cho phép chọn một lựa chọn");
+      }
+      
+      // Xóa các bình chọn cũ của người dùng này (nếu có)
+      poll.options.forEach(option => {
+        const voterIndex = option.voters.indexOf(idUser);
+        if (voterIndex !== -1) {
+          option.voters.splice(voterIndex, 1);
+          option.voteCount = Math.max(0, option.voteCount - 1);
+        }
+      });
+      
+      // Thêm bình chọn mới
+      let validOptionCount = 0;
+      optionIds.forEach(optionId => {
+        const option = poll.options.find(opt => opt.id === optionId);
+        if (option) {
+          option.voters.push(idUser);
+          option.voteCount += 1;
+          validOptionCount += 1;
+        }
+      });
+      
+      if (validOptionCount === 0) {
+        throw new Error("Không tìm thấy lựa chọn hợp lệ");
+      }
+      
+      // Lưu thay đổi
+      await poll.save();
+      
+      // Lấy thông tin người bình chọn
+      const voter = await User.findOne({ id: idUser }).select("id fullname urlavatar");
+      
+      // Chuẩn bị dữ liệu để gửi về client
+      const voteData = {
+        idPoll,
+        idConversation: poll.idConversation,
+        voter: {
+          id: voter.id,
+          fullname: voter.fullname,
+          urlavatar: voter.urlavatar
+        },
+        options: poll.options.map(opt => ({
+          id: opt.id,
+          voteCount: opt.voteCount,
+          voters: poll.settings.hideVoters ? [] : opt.voters
+        }))
+      };
+      
+      // Gửi thông báo đến tất cả thành viên trong nhóm
+      conversation.groupMembers.forEach(memberId => {
+        const memberSocket = getUser(memberId);
+        if (memberSocket) {
+          io.to(memberSocket.socketId).emit("poll_updated", voteData);
+        }
+      });
+      
+      // Gửi xác nhận cho người bình chọn
+      socket.emit("vote_poll_response", {
+        success: true,
+        vote: voteData
+      });
+      
+    } catch (error) {
+      console.error("Error voting poll:", error);
+      socket.emit("vote_poll_response", {
+        success: false,
+        message: "Lỗi khi bình chọn",
+        error: error.message
+      });
+    }
+  });
+};
+
+// Hàm xử lý thêm lựa chọn mới vào bình chọn
+const handleAddPollOption = (io, socket) => {
+  socket.on("add_poll_option", async (payload) => {
+    try {
+      const { idUser, idPoll, optionText } = payload;
+      
+      // Kiểm tra dữ liệu đầu vào
+      if (!idUser || !idPoll || !optionText || optionText.trim() === "") {
+        throw new Error("Dữ liệu không hợp lệ");
+      }
+      
+      // Tìm poll
+      const poll = await Poll.findOne({ idPoll });
+      if (!poll) {
+        throw new Error("Không tìm thấy bình chọn");
+      }
+      
+      // Kiểm tra poll có còn active không
+      if (!poll.isActive) {
+        throw new Error("Bình chọn đã kết thúc");
+      }
+      
+      // Kiểm tra nếu poll có cho phép thêm lựa chọn không
+      if (!poll.settings.allowAddOptions) {
+        throw new Error("Bình chọn này không cho phép thêm lựa chọn mới");
+      }
+      
+      // Tìm conversation để xác định thành viên
+      const conversation = await Conversation.findOne({ idConversation: poll.idConversation });
+      if (!conversation) {
+        throw new Error("Không tìm thấy cuộc trò chuyện");
+      }
+      
+      // Kiểm tra người thêm lựa chọn có trong nhóm không
+      const isUserInGroup = conversation.groupMembers.includes(idUser) || 
+                           conversation.coOwners.includes(idUser) || 
+                           conversation.owner === idUser;
+      
+      if (!isUserInGroup) {
+        throw new Error("Bạn không phải là thành viên của nhóm này");
+      }
+      
+      // Tạo lựa chọn mới
+      const newOption = {
+        id: uuidv4(),
+        text: optionText.trim(),
+        voters: [],
+        voteCount: 0
+      };
+      
+      // Thêm lựa chọn mới vào poll
+      poll.options.push(newOption);
+      
+      // Lưu thay đổi
+      await poll.save();
+      
+      // Lấy thông tin người thêm lựa chọn
+      const user = await User.findOne({ id: idUser }).select("id fullname urlavatar");
+      
+      // Chuẩn bị dữ liệu để gửi về client
+      const optionData = {
+        idPoll,
+        idConversation: poll.idConversation,
+        addedBy: {
+          id: user.id,
+          fullname: user.fullname,
+          urlavatar: user.urlavatar
+        },
+        newOption: {
+          id: newOption.id,
+          text: newOption.text,
+          voteCount: 0,
+          voters: []
+        }
+      };
+      
+      // Gửi thông báo đến tất cả thành viên trong nhóm
+      conversation.groupMembers.forEach(memberId => {
+        const memberSocket = getUser(memberId);
+        if (memberSocket) {
+          io.to(memberSocket.socketId).emit("poll_option_added", optionData);
+        }
+      });
+      
+      // Gửi xác nhận cho người thêm lựa chọn
+      socket.emit("add_poll_option_response", {
+        success: true,
+        option: optionData
+      });
+      
+    } catch (error) {
+      console.error("Error adding poll option:", error);
+      socket.emit("add_poll_option_response", {
+        success: false,
+        message: "Lỗi khi thêm lựa chọn",
+        error: error.message
+      });
+    }
+  });
+};
+
+// Hàm xử lý kết thúc bình chọn
+const handleEndPoll = (io, socket) => {
+  socket.on("end_poll", async (payload) => {
+    try {
+      const { idUser, idPoll } = payload;
+      
+      // Kiểm tra dữ liệu đầu vào
+      if (!idUser || !idPoll) {
+        throw new Error("Dữ liệu không hợp lệ");
+      }
+      
+      // Tìm poll
+      const poll = await Poll.findOne({ idPoll });
+      if (!poll) {
+        throw new Error("Không tìm thấy bình chọn");
+      }
+      
+      // Kiểm tra poll có còn active không
+      if (!poll.isActive) {
+        throw new Error("Bình chọn đã kết thúc");
+      }
+      
+      // Tìm conversation để xác định quyền
+      const conversation = await Conversation.findOne({ idConversation: poll.idConversation });
+      if (!conversation) {
+        throw new Error("Không tìm thấy cuộc trò chuyện");
+      }
+      
+      // Kiểm tra người kết thúc có quyền không (người tạo poll, chủ nhóm hoặc quản trị viên)
+      const hasPermission = poll.idCreator === idUser || 
+                           conversation.owner === idUser || 
+                           conversation.coOwners.includes(idUser);
+      
+      if (!hasPermission) {
+        throw new Error("Bạn không có quyền kết thúc bình chọn này");
+      }
+      
+      // Kết thúc poll
+      poll.isActive = false;
+      await poll.save();
+      
+      // Lấy thông tin người kết thúc
+      const user = await User.findOne({ id: idUser }).select("id fullname urlavatar");
+      
+      // Chuẩn bị dữ liệu để gửi về client
+      const endData = {
+        idPoll,
+        idConversation: poll.idConversation,
+        endedBy: {
+          id: user.id,
+          fullname: user.fullname,
+          urlavatar: user.urlavatar
+        },
+        options: poll.options.map(opt => ({
+          id: opt.id,
+          text: opt.text,
+          voteCount: opt.voteCount,
+          voters: poll.settings.hideVoters ? [] : opt.voters
+        })),
+        endedAt: new Date()
+      };
+      
+      // Gửi thông báo đến tất cả thành viên trong nhóm
+      conversation.groupMembers.forEach(memberId => {
+        const memberSocket = getUser(memberId);
+        if (memberSocket) {
+          io.to(memberSocket.socketId).emit("poll_ended", endData);
+        }
+      });
+      
+      // Gửi xác nhận cho người kết thúc
+      socket.emit("end_poll_response", {
+        success: true,
+        poll: endData
+      });
+      
+    } catch (error) {
+      console.error("Error ending poll:", error);
+      socket.emit("end_poll_response", {
+        success: false,
+        message: "Lỗi khi kết thúc bình chọn",
+        error: error.message
+      });
+    }
+  });
+};
+
+// Hàm xử lý lấy thông tin bình chọn
+const handleGetPoll = (io, socket) => {
+  socket.on("get_poll", async (payload) => {
+    try {
+      const { idUser, idPoll } = payload;
+      
+      // Kiểm tra dữ liệu đầu vào
+      if (!idUser || !idPoll) {
+        throw new Error("Dữ liệu không hợp lệ");
+      }
+      
+      // Tìm poll
+      const poll = await Poll.findOne({ idPoll });
+      if (!poll) {
+        throw new Error("Không tìm thấy bình chọn");
+      }
+      
+      // Tìm conversation để xác định thành viên
+      const conversation = await Conversation.findOne({ idConversation: poll.idConversation });
+      if (!conversation) {
+        throw new Error("Không tìm thấy cuộc trò chuyện");
+      }
+      
+      // Kiểm tra người yêu cầu có trong nhóm không
+      const isUserInGroup = conversation.groupMembers.includes(idUser) || 
+                           conversation.coOwners.includes(idUser) || 
+                           conversation.owner === idUser;
+      
+      if (!isUserInGroup) {
+        throw new Error("Bạn không phải là thành viên của nhóm này");
+      }
+      
+      // Lấy thông tin người tạo
+      const creator = await User.findOne({ id: poll.idCreator }).select("id fullname urlavatar");
+      
+      // Chuẩn bị dữ liệu để gửi về client
+      const pollData = {
+        idPoll: poll.idPoll,
+        idMessage: poll.idMessage,
+        idConversation: poll.idConversation,
+        creator: {
+          id: creator.id,
+          fullname: creator.fullname,
+          urlavatar: creator.urlavatar
+        },
+        question: poll.question,
+        options: poll.options.map(opt => ({
+          id: opt.id,
+          text: opt.text,
+          voteCount: opt.voteCount,
+          voters: poll.settings.hideVoters ? [] : opt.voters
+        })),
+        settings: poll.settings,
+        createdAt: poll.createdAt,
+        updatedAt: poll.updatedAt,
+        isActive: poll.isActive
+      };
+      
+      // Gửi thông tin poll cho người yêu cầu
+      socket.emit("get_poll_response", {
+        success: true,
+        poll: pollData
+      });
+      
+    } catch (error) {
+      console.error("Error getting poll:", error);
+      socket.emit("get_poll_response", {
+        success: false,
+        message: "Lỗi khi lấy thông tin bình chọn",
+        error: error.message
+      });
+    }
+  });
+};
+
 module.exports = {
   handleUserOnline,
   handleLoadConversation,
@@ -3050,4 +3943,8 @@ module.exports = {
   handlePinGroupMessage,
   handleLeaveGroup,
   handleLoadGroupConversation,
+  handleReplyMessage,
+  handleMessageReaction,
+  handleMentionUser,
+  handleMentionUser,
 };
