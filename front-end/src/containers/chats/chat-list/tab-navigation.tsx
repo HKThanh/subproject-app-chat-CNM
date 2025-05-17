@@ -25,6 +25,7 @@ export default function TabNavigation({
   onSelectConversation: (id: string) => void;
   activeConversationId?: string | null;
 }) {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -176,20 +177,19 @@ export default function TabNavigation({
   // Upload avatar lên server
   const uploadGroupAvatar = async (): Promise<string | null> => {
     if (!groupAvatar1) return null;
-
     try {
       const formData = new FormData();
-      formData.append('avatar-group', groupAvatar1);
+      formData.append("avatar-group", groupAvatar1);
 
       const token = await getAuthToken();
-      const response = await fetch(`${API_URL}/upload/avatar-group`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        body: formData
-      });
 
+      const response = await fetch(`${apiUrl}/upload/avatar-group`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
       const data = await response.json();
 
       if (data.success && data.fileUrl) {
@@ -250,6 +250,7 @@ export default function TabNavigation({
       let groupAvatar = null;
       if (groupAvatar1) {
         groupAvatar = await uploadGroupAvatar();
+        console.log("groupAvatar>>>> ", groupAvatar); // Add thi
       }
       // Use the createGroupConversation function from useChat
       createGroupConversation(
@@ -377,7 +378,7 @@ export default function TabNavigation({
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 id="search-friends"
-                placeholder="Nhập tên, số điện thoại, hoặc danh sách số điện thoại"
+                placeholder="Nhập tên bạn bè..."
                 className="pl-10 py-5 rounded-full"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -385,7 +386,7 @@ export default function TabNavigation({
             </div>
 
             <div className="max-h-[400px] overflow-y-auto">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Trò chuyện gần đây</h3>
+              <h3 className="text-sm font-medium text-gray-500 mb-2">Bạn bè</h3>
 
               {filteredFriends.length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-4">
@@ -441,7 +442,7 @@ export default function TabNavigation({
             </Button>
             <Button
               onClick={handleCreateGroup}
-              disabled={isLoading || !groupName.trim() || selectedUsers.length === 0}
+              disabled={isLoading || !groupName.trim() || selectedUsers.length < 2}
               className="rounded-md bg-blue-400 hover:bg-blue-500 px-6"
             >
               {isLoading ? (
