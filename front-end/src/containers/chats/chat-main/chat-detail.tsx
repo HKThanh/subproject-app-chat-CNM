@@ -81,57 +81,70 @@ export default function ChatDetail({
   const { ref: loadMoreRef, inView } = useInView({
     threshold: 0.1,
   });
-const displayMessages = combinedMessages(activeConversation?.idConversation || '');
+  const displayMessages = combinedMessages(activeConversation?.idConversation || '');
   // State để lưu ID tin nhắn đầu tiên hiện tại
   const [firstVisibleMessageId, setFirstVisibleMessageId] = useState<string | null>(null);
-    // Thêm một ref để lưu vị trí scroll hiện tại
-    const scrollPositionRef = useRef<number>(0);
-    // Thêm ref cho container tin nhắn
-    const messagesContainerRef = useRef<HTMLDivElement>(null);
-    // Sửa lại useEffect để chỉ scroll xuống cuối khi có tin nhắn mới, không phải khi tải tin nhắn cũ
-    useEffect(() => {
-      // Lưu vị trí scroll hiện tại trước khi cập nhật
-      if (messagesContainerRef.current) {
-        scrollPositionRef.current = messagesContainerRef.current.scrollTop;
+  //ref để lưu vị trí scroll hiện tại
+  const scrollPositionRef = useRef<number>(0);
+  //ref cho container tin nhắn
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  //chỉ scroll xuống cuối khi có tin nhắn mới, không phải khi tải tin nhắn cũ
+  useEffect(() => {
+    // Lưu vị trí scroll hiện tại trước khi cập nhật
+    if (messagesContainerRef.current) {
+      scrollPositionRef.current = messagesContainerRef.current.scrollTop;
+    }
+
+    // Lấy ID tin nhắn đầu tiên khi messages thay đổi
+    if (chatMessages && chatMessages.length > 0) {
+      // Lấy tin nhắn cũ nhất (đầu tiên) trong danh sách
+      const oldestMessage = [...chatMessages].sort(
+        (a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
+      )[0];
+
+      if (oldestMessage) {
+        setFirstVisibleMessageId(oldestMessage.idMessage);
       }
-      
-      // Lấy ID tin nhắn đầu tiên khi messages thay đổi
-      if (chatMessages && chatMessages.length > 0) {
-        // Lấy tin nhắn cũ nhất (đầu tiên) trong danh sách
-        const oldestMessage = [...chatMessages].sort(
-          (a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
-        )[0];
-        
-        if (oldestMessage) {
-          setFirstVisibleMessageId(oldestMessage.idMessage);
+    }
+  }, [chatMessages]);
+
+  // xử lý việc khôi phục vị trí scroll sau khi tải tin nhắn cũ
+  useEffect(() => {
+    if (loadingMoreMessages === false && messagesContainerRef.current && scrollPositionRef.current > 0) {
+      // Nếu vừa tải xong tin nhắn cũ, giữ nguyên vị trí scroll
+      setTimeout(() => {
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.scrollTop = scrollPositionRef.current + 200; // Add offset to account for new content
         }
-      }
-    }, [chatMessages]);
+      }, 100); // Small delay to ensure DOM has updated
+    }
+  }, [loadingMoreMessages]);
 
-    // Thêm useEffect mới để xử lý việc khôi phục vị trí scroll sau khi tải tin nhắn cũ
-    useEffect(() => {
-      if (loadingMoreMessages === false && messagesContainerRef.current) {
-        // Nếu vừa tải xong tin nhắn cũ, giữ nguyên vị trí scroll
-        messagesContainerRef.current.scrollTop = scrollPositionRef.current;
-      }
-    }, [loadingMoreMessages]);
+  // useEffect cho trường hợp tin nhắn mới
+  useEffect(() => {
+    const isInitialLoad = displayMessages.length > 0 && scrollPositionRef.current === 0;
 
-    // Thêm useEffect riêng để xử lý scroll xuống cuối khi có tin nhắn mới
-    useEffect(() => {
-      // Chỉ scroll xuống cuối khi có tin nhắn mới (không phải khi tải tin nhắn cũ)
-      const isNewMessage = !loadingMoreMessages && displayMessages.length > 0;
-      const isInitialLoad = displayMessages.length > 0 && !scrollPositionRef.current;
-      
-      if ((isNewMessage || isInitialLoad) && messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-      }
-    }, [displayMessages.length]);
-// Khi người dùng lướt đến đầu danh sách và có firstVisibleMessageId
-useEffect(() => {
-  if (inView && firstVisibleMessageId && activeConversation?.idConversation && hasMoreMessages[activeConversation.idConversation]) {
-    loadMoreMessages(activeConversation.idConversation, firstVisibleMessageId);
-  }
-}, [inView, firstVisibleMessageId, activeConversation]);
+    if (isInitialLoad && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [displayMessages.length]);
+
+  // useEffect riêng cho trường hợp loadingMoreMessages thay đổi
+  useEffect(() => {
+    const isNewMessageFromCurrentUser = !loadingMoreMessages &&
+      displayMessages.length > 0 &&
+      displayMessages[displayMessages.length - 1].isOwn;
+
+    if (isNewMessageFromCurrentUser && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [loadingMoreMessages, displayMessages.length]);
+  // Khi người dùng lướt đến đầu danh sách và có firstVisibleMessageId
+  useEffect(() => {
+    if (inView && firstVisibleMessageId && activeConversation?.idConversation && hasMoreMessages[activeConversation.idConversation]) {
+      loadMoreMessages(activeConversation.idConversation, firstVisibleMessageId);
+    }
+  }, [inView, firstVisibleMessageId, activeConversation]);
   useEffect(() => {
     if (showForwardDialog) {
       const filteredConversations = conversations.filter(
@@ -257,8 +270,7 @@ useEffect(() => {
               <Image
                 src={
                   activeConversation?.otherUser?.urlavatar ||
-                  `https://ui-avatars.com/api/?name=${
-                    activeConversation?.otherUser?.fullname || "User"
+                  `https://ui-avatars.com/api/?name=${activeConversation?.otherUser?.fullname || "User"
                   }`
                 }
                 alt={activeConversation?.otherUser?.fullname || "User"}
@@ -278,8 +290,8 @@ useEffect(() => {
               {activeConversation?.isGroup
                 ? `${activeConversation.groupMembers?.length || 0} thành viên`
                 : activeConversation?.otherUser?.isOnline
-                ? "Đang hoạt động"
-                : "Không hoạt động"}
+                  ? "Đang hoạt động"
+                  : "Không hoạt động"}
             </p>
           </div>
         </div>
@@ -304,7 +316,7 @@ useEffect(() => {
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
           </div>
         )}
-        
+
         {/* Thêm ref cho phần tử đầu tiên để phát hiện khi nào cần tải thêm */}
         <div ref={loadMoreRef}></div>
         {displayMessages.length > 0 ? (
@@ -328,16 +340,16 @@ useEffect(() => {
                         timestamp={
                           msg.dateTime
                             ? new Date(msg.dateTime).toLocaleTimeString(
-                                "vi-VN",
-                                {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                }
-                              )
-                            : new Date().toLocaleTimeString("vi-VN", {
+                              "vi-VN",
+                              {
                                 hour: "2-digit",
                                 minute: "2-digit",
-                              })
+                              }
+                            )
+                            : new Date().toLocaleTimeString("vi-VN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
                         }
                       />
                     );
@@ -406,13 +418,13 @@ useEffect(() => {
                       timestamp={
                         msg.dateTime
                           ? new Date(msg.dateTime).toLocaleTimeString("vi-VN", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
                           : new Date().toLocaleTimeString("vi-VN", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
                       }
                       isOwn={Boolean(msg.isOwn)}
                       type={msg.type}
@@ -537,11 +549,11 @@ useEffect(() => {
                         src={
                           conv.isGroup
                             ? conv.groupAvatar ||
-                              "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp"
+                            "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp"
                             : conv.otherUser?.urlavatar ||
-                              `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                conv.otherUser?.fullname || "User"
-                              )}`
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                              conv.otherUser?.fullname || "User"
+                            )}`
                         }
                         alt={
                           conv.isGroup
