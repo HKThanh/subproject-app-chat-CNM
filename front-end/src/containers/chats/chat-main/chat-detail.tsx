@@ -1,4 +1,6 @@
-import ChatHeader from "./chat-header";
+// First install the package:
+// npm install react-intersection-observer
+import { useInView } from 'react-intersection-observer';
 import ChatInput from "./chat-input";
 import ChatMessage from "./chat-message";
 import { Conversation, Message } from "@/socket/useChat";
@@ -24,12 +26,17 @@ interface ChatDetailProps {
   showChatInfo: boolean;
   activeConversation: Conversation | null;
   messages: Message[];
+  loadingMoreMessages: boolean;
+  hasMoreMessages: { [conversationId: string]: boolean };
+  combinedMessages: (conversationId: string) => Message[];
+  loadMoreMessages: (conversationId: string, lastMessageId: string) => void;
   onSendMessage: (text: string, type?: string, fileUrl?: string) => void;
   onDeleteMessage?: (messageId: string) => void;
   onRecallMessage?: (messageId: string) => void;
   onForwardMessage?: (messageId: string, targetConversations: string[]) => void;
   conversations: Conversation[];
   loading: boolean;
+
 }
 
 export default function ChatDetail({
@@ -37,6 +44,10 @@ export default function ChatDetail({
   showChatInfo,
   activeConversation,
   messages: chatMessages,
+  loadingMoreMessages,
+  hasMoreMessages,
+  combinedMessages,
+  loadMoreMessages,
   onSendMessage,
   onDeleteMessage,
   onRecallMessage,
@@ -67,13 +78,60 @@ export default function ChatDetail({
 
   const [deletingMessage, setDeletingMessage] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const { ref: loadMoreRef, inView } = useInView({
+    threshold: 0.1,
+  });
+const displayMessages = combinedMessages(activeConversation?.idConversation || '');
+  // State để lưu ID tin nhắn đầu tiên hiện tại
+  const [firstVisibleMessageId, setFirstVisibleMessageId] = useState<string | null>(null);
+    // Thêm một ref để lưu vị trí scroll hiện tại
+    const scrollPositionRef = useRef<number>(0);
+    // Thêm ref cho container tin nhắn
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
+    // Sửa lại useEffect để chỉ scroll xuống cuối khi có tin nhắn mới, không phải khi tải tin nhắn cũ
+    useEffect(() => {
+      // Lưu vị trí scroll hiện tại trước khi cập nhật
+      if (messagesContainerRef.current) {
+        scrollPositionRef.current = messagesContainerRef.current.scrollTop;
+      }
+      
+      // Lấy ID tin nhắn đầu tiên khi messages thay đổi
+      if (chatMessages && chatMessages.length > 0) {
+        // Lấy tin nhắn cũ nhất (đầu tiên) trong danh sách
+        const oldestMessage = [...chatMessages].sort(
+          (a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
+        )[0];
+        
+        if (oldestMessage) {
+          setFirstVisibleMessageId(oldestMessage.idMessage);
+        }
+      }
+    }, [chatMessages]);
 
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [chatMessages]);
+    // Thêm useEffect mới để xử lý việc khôi phục vị trí scroll sau khi tải tin nhắn cũ
+    useEffect(() => {
+      if (loadingMoreMessages === false && messagesContainerRef.current) {
+        // Nếu vừa tải xong tin nhắn cũ, giữ nguyên vị trí scroll
+        messagesContainerRef.current.scrollTop = scrollPositionRef.current;
+      }
+    }, [loadingMoreMessages]);
 
+    // Thêm useEffect riêng để xử lý scroll xuống cuối khi có tin nhắn mới
+    useEffect(() => {
+      // Chỉ scroll xuống cuối khi có tin nhắn mới (không phải khi tải tin nhắn cũ)
+      const isNewMessage = !loadingMoreMessages && displayMessages.length > 0;
+      const isInitialLoad = displayMessages.length > 0 && !scrollPositionRef.current;
+      
+      if ((isNewMessage || isInitialLoad) && messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    }, [displayMessages.length]);
+// Khi người dùng lướt đến đầu danh sách và có firstVisibleMessageId
+useEffect(() => {
+  if (inView && firstVisibleMessageId && activeConversation?.idConversation && hasMoreMessages[activeConversation.idConversation]) {
+    loadMoreMessages(activeConversation.idConversation, firstVisibleMessageId);
+  }
+}, [inView, firstVisibleMessageId, activeConversation]);
   useEffect(() => {
     if (showForwardDialog) {
       const filteredConversations = conversations.filter(
@@ -239,11 +297,20 @@ export default function ChatDetail({
       </div>
 
       {/* Rest of the component remains the same */}
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-50 pb-8">
-        {chatMessages.length > 0 ? (
+      <div className="flex-1 overflow-y-auto p-4 bg-gray-50 pb-8" ref={messagesContainerRef}>
+        {/* Hiển thị loading indicator khi đang tải thêm tin nhắn */}
+        {loadingMoreMessages && (
+          <div className="flex justify-center py-2">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+          </div>
+        )}
+        
+        {/* Thêm ref cho phần tử đầu tiên để phát hiện khi nào cần tải thêm */}
+        <div ref={loadMoreRef}></div>
+        {displayMessages.length > 0 ? (
           <>
             <div className="space-y-4">
-              {[...chatMessages]
+              {[...displayMessages]
                 .sort((a, b) => {
                   const dateA = a.dateTime ? new Date(a.dateTime).getTime() : 0;
                   const dateB = b.dateTime ? new Date(b.dateTime).getTime() : 0;
