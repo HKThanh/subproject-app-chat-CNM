@@ -88,7 +88,7 @@ const initSocket = (server) => {
         socketController.handleLoadGroupConversation(io, socket);
         // socketController.handleTyping(io, socket);
         socketController.handleReplyMessage(io, socket);
-
+        socketController.handleMessageReaction(io, socket);
         socket.on("disconnect", () => {
             console.log("Client disconnected: " + socket.id);
             const user = socketController.getUserBySocketId(socket.id);

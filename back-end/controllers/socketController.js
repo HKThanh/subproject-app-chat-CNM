@@ -2707,18 +2707,9 @@ const handleReplyMessage = async (io, socket) => {
       // Tự động lưu vào danh sách tương ứng dựa vào type
       if (type === "image") {
         updateFields.$push = { listImage: messageContent };
-      } else if (type === "video") {
+      } else if (type === "video" || type === "audio") {
+        // Lưu vào listVideo (bao gồm cả audio)
         updateFields.$push = { listVideo: messageContent };
-      } else if (type === "audio") {
-        // Nếu chưa có listAudio, tạo mới
-        if (!conversation.listAudio) {
-          await Conversation.updateOne(
-            { idConversation: conversation.idConversation },
-            { $set: { listAudio: [] } }
-          );
-        }
-        // Lưu vào listAudio
-        updateFields.$push = { listAudio: messageContent };
       } else if (type === "file" || type === "document") {
         updateFields.$push = { listFile: messageContent };
       }
@@ -2729,7 +2720,6 @@ const handleReplyMessage = async (io, socket) => {
         { new: true }
       );
       
-      // Update last change của conversation
       await updateLastChangeConversation(IDConversation, messageDetail.idMessage);
       
       // Lấy thông tin người gửi
@@ -3166,6 +3156,154 @@ const handleLoadGroupConversation = (io, socket) => {
   });
 };
 
+const handleMessageReaction = (io, socket) => {
+  socket.on("add_reaction", async (payload) => {
+    try {
+      const { IDUser, IDMessage, reaction, count = 1 } = payload;
+      
+      // Kiểm tra reaction có hợp lệ không
+      const validReactions = ['👍', '❤️', '😂', '😮', '😢', '😡'];
+      if (!validReactions.includes(reaction)) {
+        throw new Error("Reaction không hợp lệ");
+      }
+      
+      // Tìm tin nhắn
+      const message = await MessageDetail.findOne({ idMessage: IDMessage });
+      if (!message) {
+        throw new Error("Không tìm thấy tin nhắn");
+      }
+      
+      // Tìm conversation để xác định các thành viên
+      const conversation = await Conversation.findOne({ idConversation: message.idConversation });
+      if (!conversation) {
+        throw new Error("Không tìm thấy cuộc trò chuyện");
+      }
+      
+      // Khởi tạo reactions nếu chưa có
+      let reactions = message.reactions || new Map();
+      
+      // Khởi tạo reaction loại này nếu chưa có
+      if (!reactions.has(reaction)) {
+        reactions.set(reaction, { 
+          reaction: reaction, 
+          userReactions: [], 
+          totalCount: 0 
+        });
+      }
+      
+      const reactionData = reactions.get(reaction);
+      
+      // Tìm reaction của người dùng này
+      const userReactionIndex = reactionData.userReactions.findIndex(
+        ur => ur.userId === IDUser
+      );
+      
+      if (userReactionIndex !== -1) {
+        // Người dùng đã có reaction loại này
+        const userReaction = reactionData.userReactions[userReactionIndex];
+        const oldCount = userReaction.count;
+        
+        // Cập nhật tổng số reaction
+        reactionData.totalCount = reactionData.totalCount - oldCount + count;
+        
+        // Cập nhật số lượng reaction của người dùng
+        if (count > 0) {
+          userReaction.count = count;
+        } else {
+          // Nếu count = 0, xóa reaction của người dùng
+          reactionData.userReactions.splice(userReactionIndex, 1);
+        }
+      } else if (count > 0) {
+        // Người dùng chưa có reaction loại này
+        reactionData.userReactions.push({
+          userId: IDUser,
+          count: count
+        });
+        
+        // Cập nhật tổng số reaction
+        reactionData.totalCount += count;
+      }
+      
+      // Cập nhật tin nhắn
+      message.reactions = reactions;
+      await message.save();
+      
+      // Lấy thông tin người dùng
+      const user = await User.findOne({ id: IDUser }).select("id fullname urlavatar");
+      
+      // Lấy thông tin tất cả người dùng đã react
+      const allUserIds = new Set();
+      for (const [_, data] of reactions.entries()) {
+        data.userReactions.forEach(ur => allUserIds.add(ur.userId));
+      }
+      
+      const allUsers = await User.find({ id: { $in: Array.from(allUserIds) } })
+        .select("id fullname urlavatar");
+      
+      // Tạo map để dễ dàng truy cập thông tin người dùng
+      const userMap = {};
+      allUsers.forEach(user => {
+        userMap[user.id] = {
+          id: user.id,
+          fullname: user.fullname,
+          urlavatar: user.urlavatar
+        };
+      });
+      
+      // Tạo dữ liệu reaction để gửi về client
+      const reactionSummary = {};
+      for (const [key, data] of reactions.entries()) {
+        if (data.totalCount > 0) {
+          reactionSummary[key] = {
+            reaction: data.reaction,
+            totalCount: data.totalCount,
+            userReactions: data.userReactions.map(ur => ({
+              user: userMap[ur.userId] || { id: ur.userId, fullname: "Unknown User" },
+              count: ur.count
+            }))
+          };
+        }
+      }
+      
+      const reactionUpdate = {
+        messageId: IDMessage,
+        reactions: reactionSummary,
+        currentUser: user
+      };
+      
+      // Gửi cập nhật đến tất cả người dùng trong cuộc trò chuyện
+      if (conversation.isGroup) {
+        // Nếu là nhóm, gửi đến tất cả thành viên
+        conversation.groupMembers.forEach((memberId) => {
+          const memberSocket = getUser(memberId);
+          if (memberSocket) {
+            io.to(memberSocket.socketId).emit("message_reaction_updated", reactionUpdate);
+          }
+        });
+      } else {
+        // Nếu là chat đơn, gửi đến người gửi và người nhận
+        const receiverId = message.idSender === IDUser ? message.idReceiver : message.idSender;
+        
+        // Gửi đến người nhận nếu online
+        const receiverSocket = getUser(receiverId);
+        if (receiverSocket) {
+          io.to(receiverSocket.socketId).emit("message_reaction_updated", reactionUpdate);
+        }
+        
+        // Gửi đến người gửi reaction
+        socket.emit("message_reaction_updated", reactionUpdate);
+      }
+      
+    } catch (error) {
+      console.error("Error adding reaction:", error);
+      socket.emit("error", {
+        message: "Lỗi khi thêm reaction",
+        error: error.message
+      });
+    }
+  });
+};
+
 module.exports = {
   handleUserOnline,
   handleLoadConversation,
@@ -3199,5 +3337,6 @@ module.exports = {
   handlePinGroupMessage,
   handleLeaveGroup,
   handleLoadGroupConversation,
-  handleReplyMessage, // Thêm handler mới
+  handleReplyMessage,
+  handleMessageReaction,
 };
