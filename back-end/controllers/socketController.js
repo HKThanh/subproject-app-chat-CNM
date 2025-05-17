@@ -3391,7 +3391,6 @@ const handleMentionUser = (io, socket) => {
     }
   });
 };
-const { v4: uuidv4 } = require('uuid');
 const Poll = require('../models/PollModel');
 
 // Hàm xử lý tạo bình chọn
