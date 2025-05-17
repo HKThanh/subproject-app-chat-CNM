@@ -67,6 +67,10 @@ const MessageDetailSchema = new Schema({
             ['😢', { reaction: '😢', userReactions: [], totalCount: 0 }],
             ['😡', { reaction: '😡', userReactions: [], totalCount: 0 }]
         ])
+    },
+    mentionedUsers: {
+        type: [String],
+        default: []
     }
 }, {
     timestamps: true
