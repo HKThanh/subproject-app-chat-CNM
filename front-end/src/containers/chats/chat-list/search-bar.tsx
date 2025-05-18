@@ -17,6 +17,7 @@ interface SearchResult {
   fullname: string;
   email: string;
   urlavatar: string;
+  isFriend?: boolean; // Thêm trường để xác định trạng thái kết bạn
 }
 
 export default function SearchBar({ onSelectConversation }: SearchBarProps) {
@@ -52,6 +53,12 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
 
   const handleSearch = async (value: string) => {
     setSearchText(value);
+    if (!value.trim()) {
+      setSearchResults([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -67,7 +74,27 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
 
       const data = await response.json();
       if (data.code === 1) {
-        setSearchResults(data.data);
+        // Lấy danh sách bạn bè để kiểm tra
+        const friendsResponse = await fetch(
+          `${END_POINT_URL}/user/friend/get-friends`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        const friendsData = await friendsResponse.json();
+
+        const friendIds =
+          friendsData.code === 0
+            ? friendsData.data.map((friend: any) => friend.id)
+            : [];
+
+        // Đánh dấu người dùng đã là bạn bè
+        const resultsWithFriendStatus = data.data.map((user: SearchResult) => ({
+          ...user,
+          isFriend: friendIds.includes(user.id),
+        }));
+
+        setSearchResults(resultsWithFriendStatus);
       } else {
         setSearchResults([]);
       }
@@ -124,7 +151,6 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
         }
       }
 
-      // Tiếp tục code gửi yêu cầu kết bạn như cũ
       const response = await fetch(`${END_POINT_URL}/user/send`, {
         method: "POST",
         headers: {
@@ -136,7 +162,6 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
 
       const data = await response.json();
 
-      // Phần còn lại giữ nguyên...
       if (data.code === 1) {
         const newRequest = {
           id: data.data.requestId,
@@ -266,7 +291,9 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
                   <li
                     key={result.id}
                     className="flex items-center p-3 hover:bg-gray-100 cursor-pointer"
-                    onClick={() => handleSelectUser(result.id)}
+                    onClick={() =>
+                      result.isFriend ? handleSelectUser(result.id) : null
+                    }
                   >
                     <img
                       src={result.urlavatar || "https://via.placeholder.com/40"}
@@ -279,15 +306,17 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
                         {result.email}
                       </div>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation(); // Prevent the li click event
-                        handleAddFriend(result.id, result);
-                      }}
-                      className="ml-auto text-blue-500 text-sm hover:text-blue-700"
-                    >
-                      <UserAddIcon width={20} />
-                    </button>
+                    {!result.isFriend && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddFriend(result.id, result);
+                        }}
+                        className="ml-auto text-blue-500 text-sm hover:text-blue-700"
+                      >
+                        <UserAddIcon width={20} />
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
