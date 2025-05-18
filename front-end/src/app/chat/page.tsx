@@ -32,7 +32,7 @@ export default function Home() {
     addMembersToGroup,
     removeMembersFromGroup,
     changeGroupOwner,
-    demoteMember
+    demoteMember,
   } = useChatContext();
 
   // Tải danh sách cuộc trò chuyện khi component được mount
@@ -87,6 +87,32 @@ export default function Home() {
       }
     }
   }, [activeConversation, messages, markMessagesAsRead]);
+
+  // Thêm useEffect để kiểm tra và mở cuộc trò chuyện đã được chọn từ localStorage
+  useEffect(() => {
+    if (isConnected && conversations.length > 0) {
+      // Kiểm tra xem có ID cuộc trò chuyện được lưu trong localStorage không
+      const savedConversationId = localStorage.getItem(
+        "selectedConversationId"
+      );
+
+      if (savedConversationId) {
+        // Tìm cuộc trò chuyện trong danh sách
+        const conversationExists = conversations.some(
+          (conv) => conv.idConversation === savedConversationId
+        );
+
+        if (conversationExists) {
+          // Mở cuộc trò chuyện
+          setActiveConversation(savedConversationId);
+          loadMessages(savedConversationId);
+
+          // Xóa ID đã lưu để tránh mở lại cuộc trò chuyện này khi người dùng quay lại trang
+          localStorage.removeItem("selectedConversationId");
+        }
+      }
+    }
+  }, [isConnected, conversations, loadMessages]);
 
   // Xử lý khi chọn một cuộc trò chuyện
   const handleSelectConversation = (conversationId: string) => {
@@ -218,7 +244,7 @@ export default function Home() {
             // addMembersToGroup={addMembersToGroup}
             removeMembersFromGroup={removeMembersFromGroup}
             changeGroupOwner={changeGroupOwner}
-            demoteMember = {demoteMember}
+            demoteMember={demoteMember}
           />
         </div>
       )}

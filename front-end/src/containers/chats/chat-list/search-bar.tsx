@@ -7,6 +7,7 @@ import UserAddIcon from "@/assets/common/icon-user-add";
 import { useSocketContext } from "@/socket/SocketContext";
 import { UserIcon, UsersIcon } from "lucide-react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 interface SearchBarProps {
   onSelectConversation: (id: string) => void;
@@ -26,6 +27,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   const [showResults, setShowResults] = useState(false);
   const [loading, setLoading] = useState(false);
   const { socket } = useSocketContext();
+  const router = useRouter();
 
   const END_POINT_URL = process.env.NEXT_PUBLIC_API_URL || "localhost:3000";
 
@@ -229,6 +231,9 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
       return;
     }
 
+    // Hiển thị trạng thái đang tải
+    toast.loading("Đang mở cuộc trò chuyện...");
+
     // Emit sự kiện tạo conversation
     socket.emit("create_conversation", {
       IDSender: currentUserId,
@@ -237,14 +242,28 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
 
     // Lắng nghe phản hồi từ server
     socket.once("create_conversation_response", (response) => {
+      toast.dismiss(); // Đóng toast loading
+
       if (response.success) {
-        // Gọi hàm onSelectConversation với idConversation từ backend
-        onSelectConversation(response.conversation.idConversation);
+        console.log(
+          "Nhận được phản hồi tạo cuộc trò chuyện:",
+          response.conversation
+        );
+
+        // Đóng kết quả tìm kiếm và xóa nội dung tìm kiếm
         setShowResults(false);
         setSearchText("");
+
+        // Lưu ID cuộc trò chuyện vào localStorage để có thể truy cập sau khi chuyển trang
+        localStorage.setItem(
+          "selectedConversationId",
+          response.conversation.idConversation
+        );
+
+        // Chuyển hướng đến trang chat
+        router.push("/chat");
       } else {
-        // console.error("Failed to create conversation:", response.message);
-        toast.info("bạn chưa kết bạn với người này!");
+        toast.error(response.message || "Không thể tạo cuộc trò chuyện");
       }
     });
   };
