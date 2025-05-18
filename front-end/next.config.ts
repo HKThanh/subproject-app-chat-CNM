@@ -4,22 +4,23 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   images: {
     domains: [
-      'ui-avatars.com',
-      'nodebucketcnm203.s3.ap-southeast-1.amazonaws.com',
-      'nodejs-hk2.s3.ap-southeast-1.amazonaws.com',
-      'example.com',
-      'static.vecteezy.com',
-      'danhgiaxe.edu.vn',
-      'https://picsum.photos',
-      'nodejs-hk2.s3.ap-southeast-1.amazonaws.com'
+      "ui-avatars.com",
+      "nodebucketcnm203.s3.ap-southeast-1.amazonaws.com",
+      "nodejs-hk2.s3.ap-southeast-1.amazonaws.com",
+      "example.com",
+      "static.vecteezy.com",
+      "danhgiaxe.edu.vn",
+      "https://picsum.photos",
+      "nodejs-hk2.s3.ap-southeast-1.amazonaws.com",
+      "test-9-4.s3.ap-southeast-1.amazonaws.com",
     ],
     dangerouslyAllowSVG: true,
-    contentDispositionType: 'attachment',
+    contentDispositionType: "attachment",
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   env: {
-    PORT: "3001" // Convert number to string to fix type error
-  }
+    PORT: "3001", // Convert number to string to fix type error
+  },
 };
 
 export default nextConfig;

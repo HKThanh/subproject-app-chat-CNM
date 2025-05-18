@@ -540,7 +540,16 @@ export default function ContactList({
   }, [socket]);
 
   // Thêm hàm xử lý khi người dùng nhấp vào một người bạn trong danh sách
-  const handleContactClick = (contact: Contact) => {
+  const handleContactClick = (contact: Contact, e: React.MouseEvent) => {
+    // Ngăn chặn sự kiện lan truyền nếu đang nhấp vào dropdown hoặc các nút trong dropdown
+    if (
+      (e.target as HTMLElement).closest(".dropdown-trigger") ||
+      (e.target as HTMLElement).closest(".dropdown-menu-content") ||
+      activeDropdown !== null
+    ) {
+      return;
+    }
+
     if (!socket) {
       console.error("Socket is not initialized");
       toast.error("Không thể kết nối đến máy chủ");
@@ -674,10 +683,13 @@ export default function ContactList({
                 {group.contacts.map((contact) => (
                   <div
                     key={contact.id}
-                    className="flex items-center justify-between px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                    onClick={() => handleContactClick(contact)}
+                    className="flex items-center justify-between px-4 py-2 hover:bg-gray-100"
                   >
-                    <div className="flex items-center">
+                    {/* Phần thông tin người dùng có thể click để mở cuộc trò chuyện */}
+                    <div
+                      className="flex items-center cursor-pointer"
+                      onClick={(e) => handleContactClick(contact, e)}
+                    >
                       <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
                         <img
                           src={contact.urlavatar || "/default-avatar.png"}
@@ -698,12 +710,11 @@ export default function ContactList({
                         </div>
                       </div>
                     </div>
+
+                    {/* Phần dropdown menu tách biệt */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <button
-                          className="p-2 hover:bg-gray-200 rounded-full dropdown-trigger"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <button className="p-2 hover:bg-gray-200 rounded-full dropdown-trigger">
                           <MoreHorizontal className="w-5 h-5 text-gray-500" />
                         </button>
                       </DropdownMenuTrigger>
