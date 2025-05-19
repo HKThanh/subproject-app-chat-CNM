@@ -29,7 +29,7 @@ const authRoutes = (io) => {
     router.post('/reset-password-request', userController.resetPasswordRequest);
 
     router.post('/update-password', authMiddleware, userController.updatePassword);
-
+    router.get('/me', authController.getMe);
     return router;
 }
 module.exports = authRoutes;
