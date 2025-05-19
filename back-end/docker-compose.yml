@@ -60,17 +60,18 @@ services:
       - mongo
       - redis
     environment:
-      - AWS_ACCESS_KEY_ID=AKIAWMFUPRI3QPUSMTNK
-      - AWS_SECRET_ACCESS_KEY=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
-      - AWS_REGION=ap-southeast-1
-      - AWS_BUCKET_NAME=test-9-4
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_BUCKET_NAME=${AWS_BUCKET_NAME}
       - MONGO_URI=mongodb://mongo:27017/chat-app
-      - JWT_SECRET=123456
-      - JWT_REFRESH=123456
-      - EMAIL_USER=hkthanh.iuh@gmail.com
-      - EMAIL_PASSWORD=sbxa wyee cpwe nnsm
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH=${JWT_REFRESH}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=123456
     volumes:
       - ./:/app
       - /app/node_modules
