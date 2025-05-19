@@ -45,7 +45,8 @@ export const {
                 let response: any;
                 try {
                     const { email, password } = credentials;
-                    response = await fetch('http://localhost:3000/auth/login', {
+                    const api = `${process.env.NEXT_PUBLIC_API_URL}`;
+                    response = await fetch(`${api}/auth/login`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -117,8 +118,8 @@ export const {
                         const decoded = JSON.parse(jsonPayload);
                         console.log('Decoded refresh token in auth.ts:', decoded);
                         console.log("Refresh token in auth.ts:", refreshToken);
-
-                        const response = await fetch('http://localhost:3000/auth/refresh-token', {
+                        const api = `${process.env.NEXT_PUBLIC_API_URL}`;
+                        const response = await fetch(`${api}/auth/refresh-token`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',

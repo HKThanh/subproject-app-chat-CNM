@@ -104,8 +104,8 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
       const uploadPromises = selectedFiles.map(async (file, index) => {
         const formData = new FormData();
         formData.append("file", file);
-
-        const response = await fetch(`http://localhost:3000/upload/chat-file`, {
+        const api = `${process.env.NEXT_PUBLIC_API_URL}`;
+        const response = await fetch(`${api}/upload/chat-file`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${accessToken}`,

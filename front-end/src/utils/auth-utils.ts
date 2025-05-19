@@ -45,9 +45,9 @@ async function refreshAccessToken(refreshToken: string): Promise<{accessToken: s
 
     const decoded = JSON.parse(jsonPayload);
     console.log('Decoded refresh token:', decoded);
-
+    const api = process.env.NEXT_PUBLIC_API;
     // Gửi request refresh token với platform
-    const response = await fetch('http://localhost:3000/auth/refresh-token', {
+    const response = await fetch(`${api}/auth/refresh-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
