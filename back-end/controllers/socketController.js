@@ -1,7 +1,7 @@
 // const MessageController = require("./MessageController");
 const MessageDetailController = require("./MessageDetailController");
 const Conversation = require("../models/ConversationModel");
-const { v4: uuidv4 } = require("uuid");
+// const { v4: uuidv4 } = require("uuid");
 const s3 = require("../config/connectS3");
 const MessageDetail = require("../models/MessageDetailModel");
 const User = require("../models/UserModel");
@@ -259,28 +259,28 @@ const updateLastChangeConversation = async (idConversation, idMessage) => {
   }
 };
 
-const uploadFileToS3 = async (file, fileType) => {
-  const bucketMap = {
-    image: "imagetintin",
-    video: "videotintin",
-    document: "documenttintin",
-  };
+// const uploadFileToS3 = async (file, fileType) => {
+//   const bucketMap = {
+//     image: "imagetintin",
+//     video: "videotintin",
+//     document: "documenttintin",
+//   };
 
-  const params = {
-    Bucket: bucketMap[fileType] || "documenttintin",
-    Key: `${uuidv4()}_${file.fileName}`,
-    Body: file.content,
-    ContentType: file.mimeType,
-  };
+//   const params = {
+//     Bucket: bucketMap[fileType] || "documenttintin",
+//     Key: `${uuidv4()}_${file.fileName}`,
+//     Body: file.content,
+//     ContentType: file.mimeType,
+//   };
 
-  try {
-    const data = await s3.upload(params).promise();
-    return data.Location;
-  } catch (error) {
-    console.error("Error uploading to S3:", error);
-    throw error;
-  }
-};
+//   try {
+//     const data = await s3.upload(params).promise();
+//     return data.Location;
+//   } catch (error) {
+//     console.error("Error uploading to S3:", error);
+//     throw error;
+//   }
+// };
 
 const handleSendFile = async (io, socket) => {
   socket.on("send_file", async (payload) => {
