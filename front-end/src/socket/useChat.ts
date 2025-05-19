@@ -33,6 +33,20 @@ export interface Message {
     phone?: string;
     status?: string;
   };
+  reactions?: {
+    [key: string]: {
+      reaction: string;
+      totalCount: number;
+      userReactions: Array<{
+        user: {
+          id: string;
+          fullname: string;
+          urlavatar?: string;
+        };
+        count: number;
+      }>;
+    };
+  };
 }
 
 export interface Conversation {
@@ -129,6 +143,8 @@ type ChatAction =
   | { type: 'REMOVE_CONVERSATION', payload: { conversationId: string } }
   | { type: 'LOAD_MORE_MESSAGES_REQUEST' }
   | { type: 'LOAD_MORE_MESSAGES', payload: { conversationId: string, messages: Message[], hasMore: boolean } }
+  | { type: 'LOAD_MORE_MESSAGES_ERROR', payload: string }
+  | { type: 'UPDATE_MESSAGE_REACTIONS', payload: { conversationId: string, messageId: string, reactions: any } }
   | { type: 'LOAD_MORE_MESSAGES_ERROR', payload: string };
 
 const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
@@ -370,6 +386,33 @@ const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
         ...state,
         loadingMoreMessages: false,
         error: action.payload,
+      };
+    }
+    case 'UPDATE_MESSAGE_REACTIONS': {
+      const { conversationId, messageId, reactions } = action.payload;
+      const existingMessages = state.messages[conversationId] || [];
+      const olderMessages = state.olderMessages[conversationId] || [];
+      
+      // Cập nhật trong messages hiện tại
+      const updatedMessages = existingMessages.map(msg =>
+        msg.idMessage === messageId ? { ...msg, reactions } : msg
+      );
+      
+      // Cập nhật trong olderMessages
+      const updatedOlderMessages = olderMessages.map(msg =>
+        msg.idMessage === messageId ? { ...msg, reactions } : msg
+      );
+      
+      return {
+        ...state,
+        messages: {
+          ...state.messages,
+          [conversationId]: updatedMessages
+        },
+        olderMessages: {
+          ...state.olderMessages,
+          [conversationId]: updatedOlderMessages
+        }
       };
     }
     default:
@@ -2491,11 +2534,62 @@ export const useChat = (userId: string) => {
   //     });
   //   }
   // }, [dispatch, state.messages, userId]);
+  // Thêm hàm xử lý reaction
+  const addReaction = useCallback((messageId: string, reaction: string) => {
+    if (!socket || !isConnected) return;
+    
+    console.log(`Thêm reaction ${reaction} cho tin nhắn ${messageId}`);
+    socket.emit('add_reaction', {
+      IDUser: userId,
+      IDMessage: messageId,
+      reaction,
+      count: 1
+    });
+  }, [socket, isConnected, userId]);
+  const handleMessageReactionUpdated = (data: any) => {
+    console.log("Nhận cập nhật reaction:", data);
+    const { messageId, reactions } = data;
+    
+    // Tìm conversation chứa tin nhắn này
+    let targetConversationId = null;
+    
+    // Tìm trong messages hiện tại
+    for (const [conversationId, messages] of Object.entries(state.messages)) {
+      const found = messages.find(msg => msg.idMessage === messageId);
+      if (found) {
+        targetConversationId = conversationId;
+        break;
+      }
+    }
+    
+    // Nếu không tìm thấy trong messages hiện tại, tìm trong olderMessages
+    if (!targetConversationId) {
+      for (const [conversationId, messages] of Object.entries(state.olderMessages)) {
+        const found = messages.find(msg => msg.idMessage === messageId);
+        if (found) {
+          targetConversationId = conversationId;
+          break;
+        }
+      }
+    }
+    
+    if (targetConversationId) {
+      dispatch({
+        type: 'UPDATE_MESSAGE_REACTIONS',
+        payload: {
+          conversationId: targetConversationId,
+          messageId,
+          reactions
+        }
+      });
+    }
+  };
   // Gộp các useEffect đăng ký sự kiện socket
   useEffect(() => {
     if (!socket) return;
 
     // Đăng ký lắng nghe các sự kiện
+    socket.on('message_reaction_updated', handleMessageReactionUpdated);
     socket.on("load_conversations_response", handleLoadConversationsResponse);
     socket.on("load_group_conversations_response", handleLoadGroupConversationsResponse);
     socket.on("new_group_conversation", handleAddMemberToGroupResponse);
@@ -2989,6 +3083,7 @@ export const useChat = (userId: string) => {
 
     return () => {
       // Hủy đăng ký tất cả sự kiện khi unmount
+      socket.off('message_reaction_updated', handleMessageReactionUpdated);
       socket.off("load_conversations_response", handleLoadConversationsResponse);
       socket.off("load_group_conversations_response", handleLoadGroupConversationsResponse);
       socket.off("error", handleError);
@@ -3563,5 +3658,6 @@ export const useChat = (userId: string) => {
     changeGroupOwner,
     demoteMember,
     replyMessage,
+    addReaction
   };
 };

@@ -39,6 +39,7 @@ interface ChatDetailProps {
   onDeleteMessage?: (messageId: string) => void;
   onRecallMessage?: (messageId: string) => void;
   onForwardMessage?: (messageId: string, targetConversations: string[]) => void;
+  addReaction?: (messageId: string, reaction: string) => void;
   conversations: Conversation[];
   loading: boolean;
 
@@ -57,6 +58,7 @@ export default function ChatDetail({
   onDeleteMessage,
   onRecallMessage,
   onForwardMessage,
+  addReaction,
   conversations,
   loading,
 }: ChatDetailProps) {
@@ -479,7 +481,7 @@ export default function ChatDetail({
                       // Chuẩn bị nội dung tin nhắn gốc để hiển thị
                       let originalContent = originalMessage.content || "";
                       let originalType = originalMessage.type || "text";
-                      
+
                       if (originalType !== "text" && originalContent.includes("http")) {
                         const urlMatch = originalContent.match(/(https?:\/\/[^\s]+)/g);
                         const fileUrl = urlMatch ? urlMatch[0] : undefined;
@@ -544,6 +546,8 @@ export default function ChatDetail({
                       onDelete={handleDelete}
                       isReply={msg.isReply || false}
                       replyInfo={replyInfo || undefined}
+                      reactions={msg.reactions || {}}
+                      onAddReaction={addReaction}
                     />
                   );
                 })

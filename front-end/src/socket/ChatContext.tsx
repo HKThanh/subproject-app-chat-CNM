@@ -40,6 +40,7 @@ interface ChatContextType {
   changeGroupOwner: (conversationId: string, newOwnerId: string) => void;
   demoteMember: (conversationId: string, memberToDemote: string) => void;
   replyMessage:(conversationId: string, messageId: string, text: string, type?: string, fileUrl?: string) => void;
+  addReaction: (messageId: string, reaction: string) => void;
 }
 
 // Tạo context với giá trị mặc định
@@ -66,6 +67,7 @@ const ChatContext = createContext<ChatContextType>({
   changeGroupOwner: () => { },
   demoteMember: () => { },
   replyMessage: () => { },
+  addReaction: () => { },
 });
 
 // Hook để sử dụng chat context
@@ -103,7 +105,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     removeMembersFromGroup,
     changeGroupOwner,
     demoteMember,
-    replyMessage
+    replyMessage,
+    addReaction
   } = useChat(userId);
 
   return (
@@ -130,7 +133,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         removeMembersFromGroup,
         changeGroupOwner,
         demoteMember,
-        replyMessage
+        replyMessage,
+        addReaction
       }}
     >
       {children}

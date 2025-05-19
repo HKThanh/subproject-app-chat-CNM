@@ -37,7 +37,8 @@ export default function Home() {
     removeMembersFromGroup,
     changeGroupOwner,
     demoteMember,
-    replyMessage
+    replyMessage,
+    addReaction
   } = useChatContext();
 
   // Tải danh sách cuộc trò chuyện khi component được mount
@@ -49,7 +50,7 @@ export default function Home() {
       loadConversations();
       hasLoadedConversations = true;
     }
-  }, [isConnected, loadConversations]);
+  }, [isConnected, loadConversations, ]);
 
   // Tải tin nhắn khi chọn cuộc trò chuyện
   useEffect(() => {
@@ -194,7 +195,6 @@ export default function Home() {
           } flex flex-col border-r border-gray-200 transition-all duration-300`}
       >
         <ChatDetail
-
           onToggleInfo={() => setShowChatInfo(!showChatInfo)}
           showChatInfo={showChatInfo}
           activeConversation={
@@ -213,10 +213,11 @@ export default function Home() {
           onForwardMessage={handleForwardMessage}
           conversations={conversations}
           loading={loading}
-          loadingMoreMessages = {loadingMoreMessages}
-          hasMoreMessages = {hasMoreMessages}
-          loadMoreMessages = {loadMoreMessages}
-          combinedMessages = {combinedMessages}
+          loadingMoreMessages={loadingMoreMessages}
+          hasMoreMessages={hasMoreMessages}
+          loadMoreMessages={loadMoreMessages}
+          combinedMessages={combinedMessages}
+          addReaction={addReaction}
         />
       </div>
       {showChatInfo && (
