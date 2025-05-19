@@ -9,6 +9,7 @@ import {
     InvalidPhonePasswordError,
     ServerError,
 } from "./utils/errors";
+import { authApi } from "./lib/api/authApi";
 
 if (!process.env.AUTH_SECRET) {
     throw new Error('NEXTAUTH_SECRET must be defined');
@@ -42,36 +43,32 @@ export const {
                 ) {
                     throw new Error("Invalid credentials.");
                 }
-                let response: any;
-                try {
                     const { email, password } = credentials;
-                    const api = `${process.env.NEXT_PUBLIC_API_URL}`;
-                    response = await fetch(`${api}/auth/login`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ email, password, platform: "web" }),
-                    }).then(res => res.json());
-                    console.log("Authorize response:", response);
-                } catch (error) {
-                    console.error("Login error:", error);
-                    throw new ServerError();
-                }
-                if (!response.user || !response.accessToken) {
-                    if (response.message === "Nhập sai email hoặc mật khẩu") {
-                        throw new InvalidPhonePasswordError()
-                    }
-                    else if (response.message === "Nhập sai mật khẩu") {
-                        throw new InvalidPhonePasswordError()
+                    const result = await authApi.login(email, password);
+                    console.log("Authorize response:", result);
 
-                    } else if (response.message === "Người dùng đang đăng nhập")
-                        throw new AccountIsLoggedError();
-                    else {
+                    if (!result.success) {
+                        // Handle specific error messages
+                        if (result.message === "Nhập sai email hoặc mật khẩu") {
+                            throw new InvalidPhonePasswordError();
+                        }
+                        else if (result.message === "Nhập sai mật khẩu") {
+                            throw new InvalidPhonePasswordError();
+                        } 
+                        else if (result.message === "Người dùng đang đăng nhập") {
+                            throw new AccountIsLoggedError();
+                        }
+                        else {
+                            throw new ServerError();
+                        }
+                    }
+                    
+                    const response = result.data;
+                    
+                    if (!response.user || !response.accessToken) {
                         throw new ServerError();
                     }
-                }
-                else {
+                    
                     const user = {
                         id: response.user.id,
                         urlavatar: response.user.urlavatar,
@@ -83,12 +80,42 @@ export const {
                         bio: response.user.bio,
                         coverPhoto: response.user.coverPhoto,
                         ismale: response.user.ismale,
-                        accessToken: response.accessToken, // Add access token directly to user object
+                        accessToken: response.accessToken,
                         refreshToken: response.refreshToken,
-
                     };
+                    
                     return user;
-                }
+                // if (!response.user || !response.accessToken) {
+                //     if (response.message === "Nhập sai email hoặc mật khẩu") {
+                //         throw new InvalidPhonePasswordError()
+                //     }
+                //     else if (response.message === "Nhập sai mật khẩu") {
+                //         throw new InvalidPhonePasswordError()
+
+                //     } else if (response.message === "Người dùng đang đăng nhập")
+                //         throw new AccountIsLoggedError();
+                //     else {
+                //         throw new ServerError();
+                //     }
+                // }
+                // else {
+                //     const user = {
+                //         id: response.user.id,
+                //         urlavatar: response.user.urlavatar,
+                //         fullname: response.user.fullname,
+                //         birthday: response.user.birthday,
+                //         createdAt: response.user.createdAt,
+                //         email: response.user.email,
+                //         phone: response.user.phone,
+                //         bio: response.user.bio,
+                //         coverPhoto: response.user.coverPhoto,
+                //         ismale: response.user.ismale,
+                //         accessToken: response.accessToken, // Add access token directly to user object
+                //         refreshToken: response.refreshToken,
+
+                //     };
+                //     return user;
+                // }
             },
         }),
     ],
