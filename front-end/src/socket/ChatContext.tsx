@@ -10,6 +10,10 @@ interface ChatContextType {
   loading: boolean;
   error: string | null;
   unreadMessages: Message[];
+  loadingMoreMessages: boolean;
+  hasMoreMessages: { [conversationId: string]: boolean };  
+  loadMoreMessages:(conversationId: string, lastMessageId: string) => void;
+  combinedMessages:(conversationId: string) => Message[];
   loadConversations: () => void;
   loadMessages: (conversationId: string) => void;
   sendMessage: (
@@ -35,6 +39,8 @@ interface ChatContextType {
   ) => void;
   changeGroupOwner: (conversationId: string, newOwnerId: string) => void;
   demoteMember: (conversationId: string, memberToDemote: string) => void;
+  replyMessage:(conversationId: string, messageId: string, text: string, type?: string, fileUrl?: string) => void;
+  addReaction: (messageId: string, reaction: string) => void;
 }
 
 // Tạo context với giá trị mặc định
@@ -44,18 +50,24 @@ const ChatContext = createContext<ChatContextType>({
   loading: false,
   error: null,
   unreadMessages: [],
-  loadConversations: () => {},
-  loadMessages: () => {},
-  sendMessage: () => {},
-  markMessagesAsRead: () => {},
-  deleteMessage: () => {},
-  forwardMessage: () => {},
-  recallMessage: () => {},
-  createGroupConversation: () => {},
-  addMembersToGroup: () => {},
-  removeMembersFromGroup: () => {},
-  changeGroupOwner: () => {},
-  demoteMember: () => {},
+  loadingMoreMessages: false,
+  hasMoreMessages: {},
+  combinedMessages: () => [],
+  loadMoreMessages: () => { },
+  loadConversations: () => { },
+  loadMessages: () => { },
+  sendMessage: () => { },
+  markMessagesAsRead: () => { },
+  deleteMessage: () => { },
+  forwardMessage: () => { },
+  recallMessage: () => { },
+  createGroupConversation: () => { },
+  addMembersToGroup: () => { },
+  removeMembersFromGroup: () => { },
+  changeGroupOwner: () => { },
+  demoteMember: () => { },
+  replyMessage: () => { },
+  addReaction: () => { },
 });
 
 // Hook để sử dụng chat context
@@ -77,6 +89,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     loading,
     error,
     unreadMessages,
+    loadingMoreMessages,
+    hasMoreMessages,
+    combinedMessages,
+    loadMoreMessages,
     loadConversations,
     loadMessages,
     sendMessage,
@@ -88,7 +104,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
     addMembersToGroup,
     removeMembersFromGroup,
     changeGroupOwner,
-    demoteMember
+    demoteMember,
+    replyMessage,
+    addReaction
   } = useChat(userId);
 
   return (
@@ -99,6 +117,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         loading,
         error,
         unreadMessages,
+        loadingMoreMessages,
+        hasMoreMessages,
+        combinedMessages,
+        loadMoreMessages,
         loadConversations,
         loadMessages,
         sendMessage,
@@ -110,7 +132,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({
         addMembersToGroup,
         removeMembersFromGroup,
         changeGroupOwner,
-        demoteMember
+        demoteMember,
+        replyMessage,
+        addReaction
       }}
     >
       {children}

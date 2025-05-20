@@ -17,7 +17,10 @@ import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 
 interface ChatInputProps {
-  onSendMessage: (text: string, type?: string, fileUrl?: string) => void;
+  onSendMessage: (text: string, type?: string, fileUrl?: string, replyingTo?: {name: string;
+    messageId: string;
+    content: string;
+    type: string;}) => void;
   replyingTo?: {
     name: string;
     messageId: string;
@@ -61,7 +64,7 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
       handleFileUpload();
     } else if (message.trim()) {
       // If only text, send text message
-      onSendMessage(message.trim(), "text");
+      onSendMessage(message.trim(), "text", undefined, replyingTo || undefined);
       setMessage("");
       
       // Clear reply state if exists
@@ -101,8 +104,8 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
       const uploadPromises = selectedFiles.map(async (file, index) => {
         const formData = new FormData();
         formData.append("file", file);
-
-        const response = await fetch(`http://localhost:3000/upload/chat-file`, {
+        const api = `${process.env.NEXT_PUBLIC_API_URL}`;
+        const response = await fetch(`${api}/upload/chat-file`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${accessToken}`,

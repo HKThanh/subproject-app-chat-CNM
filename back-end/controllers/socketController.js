@@ -1,7 +1,7 @@
 // const MessageController = require("./MessageController");
-const MessageDetailController = require("./MessageDetailController");
+const MessageDetailController = require("./messageDetailController"); 
 const Conversation = require("../models/ConversationModel");
-const { v4: uuidv4 } = require("uuid");
+// const { v4: uuidv4 } = require("uuid");
 const s3 = require("../config/connectS3");
 const MessageDetail = require("../models/MessageDetailModel");
 const User = require("../models/UserModel");
@@ -259,28 +259,28 @@ const updateLastChangeConversation = async (idConversation, idMessage) => {
   }
 };
 
-const uploadFileToS3 = async (file, fileType) => {
-  const bucketMap = {
-    image: "imagetintin",
-    video: "videotintin",
-    document: "documenttintin",
-  };
+// const uploadFileToS3 = async (file, fileType) => {
+//   const bucketMap = {
+//     image: "imagetintin",
+//     video: "videotintin",
+//     document: "documenttintin",
+//   };
 
-  const params = {
-    Bucket: bucketMap[fileType] || "documenttintin",
-    Key: `${uuidv4()}_${file.fileName}`,
-    Body: file.content,
-    ContentType: file.mimeType,
-  };
+//   const params = {
+//     Bucket: bucketMap[fileType] || "documenttintin",
+//     Key: `${uuidv4()}_${file.fileName}`,
+//     Body: file.content,
+//     ContentType: file.mimeType,
+//   };
 
-  try {
-    const data = await s3.upload(params).promise();
-    return data.Location;
-  } catch (error) {
-    console.error("Error uploading to S3:", error);
-    throw error;
-  }
-};
+//   try {
+//     const data = await s3.upload(params).promise();
+//     return data.Location;
+//   } catch (error) {
+//     console.error("Error uploading to S3:", error);
+//     throw error;
+//   }
+// };
 
 const handleSendFile = async (io, socket) => {
   socket.on("send_file", async (payload) => {
@@ -792,10 +792,24 @@ const handleLoadMessages = (io, socket) => {
         .sort({ dateTime: firstMessageId ? 1 : -1 })
         .limit(limit);
 
-      // Chỉ format dateTime, không cần xử lý content vì đã được set khi recall
+      // Lấy thông tin người gửi cho mỗi tin nhắn
+      const senderIds = [...new Set(messages.map(msg => msg.idSender))];
+      const senders = await User.find({ id: { $in: senderIds } })
+        .select("id fullname urlavatar phone status");
+      
+      const senderMap = senders.reduce((map, sender) => {
+        map[sender.id] = sender;
+        return map;
+      }, {});
+
+      // Format tin nhắn với thông tin người gửi
       let processedMessages = messages.map((msg) => ({
         ...msg.toJSON(),
         dateTime: moment.tz(msg.dateTime, "Asia/Ho_Chi_Minh").format(),
+        senderInfo: senderMap[msg.idSender] || {
+          id: msg.idSender,
+          fullname: "Unknown User"
+        }
       }));
 
       // Sắp xếp lại nếu load tin nhắn mới
@@ -805,9 +819,21 @@ const handleLoadMessages = (io, socket) => {
         );
       }
 
+      // Kiểm tra xem còn tin nhắn cũ hơn không
+      const hasMoreOlder = lastMessageId ? await MessageDetail.exists({
+        idConversation: IDConversation,
+        dateTime: { $lt: messages[messages.length - 1]?.dateTime }
+      }) : false;
+
+      // Kiểm tra xem còn tin nhắn mới hơn không
+      const hasMoreNewer = firstMessageId ? await MessageDetail.exists({
+        idConversation: IDConversation,
+        dateTime: { $gt: messages[0]?.dateTime }
+      }) : false;
+
       socket.emit("load_messages_response", {
         messages: processedMessages,
-        hasMore: messages.length === limit,
+        hasMore: messages.length === limit || (lastMessageId ? hasMoreOlder : hasMoreNewer),
         conversationId: IDConversation,
         direction: lastMessageId ? "older" : "newer",
       });
@@ -1113,7 +1139,7 @@ const handleCreatGroupConversation = (io, socket) => {
     // groupMembers phải có cả IDOwner
     console.log("create_group_conversation payload:>>> ", payload);
     const { IDOwner, groupName, groupMembers, groupAvatarUrl } = payload;
-    const groupAvatar = groupAvatarUrl || null;
+    const groupAvatar = groupAvatarUrl || groupAvatar ||null;
 
     if (groupMembers.length < 2) {
       socket.emit("create_group_conversation_response", {
@@ -3391,7 +3417,6 @@ const handleMentionUser = (io, socket) => {
     }
   });
 };
-const { v4: uuidv4 } = require('uuid');
 const Poll = require('../models/PollModel');
 
 // Hàm xử lý tạo bình chọn

@@ -110,9 +110,6 @@ export default function ChatInfo({
       type: "video" as const
     }))
   ];
-useEffect(() => {
-    console.log("mediaItems>> ", mediaItems);
-  }, [mediaItems]);
   // Function to open image viewer with specific index
   const openImageViewer = (index: number) => {
     setSelectedImageIndex(index);

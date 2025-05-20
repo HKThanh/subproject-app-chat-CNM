@@ -7,6 +7,8 @@ import TabNavigation from "@/containers/chats/chat-list/tab-navigation";
 import ChatDetail from "@/containers/chats/chat-main/chat-detail";
 import { useChatContext } from "@/socket/ChatContext";
 import { useSocketContext } from "@/socket/SocketContext";
+import useUserStore from "@/stores/useUserStoree";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export default function Home() {
@@ -14,6 +16,10 @@ export default function Home() {
   const [activeConversation, setActiveConversation] = useState<string | null>(
     null
   );
+  const router = useRouter();
+
+  // Lấy thông tin user từ Zustand store
+  const { user, accessToken, isLoading } = useUserStore();
 
   // Lấy dữ liệu từ Socket.IO context
   const { socket, isConnected } = useSocketContext();
@@ -22,6 +28,10 @@ export default function Home() {
     messages,
     loading,
     error,
+    loadingMoreMessages,
+    hasMoreMessages,
+    combinedMessages,
+    loadMoreMessages,
     loadConversations,
     loadMessages,
     sendMessage,
@@ -32,196 +42,240 @@ export default function Home() {
     addMembersToGroup,
     removeMembersFromGroup,
     changeGroupOwner,
-    demoteMember
+    demoteMember,
+    replyMessage,
+    addReaction
   } = useChatContext();
 
-  // Tải danh sách cuộc trò chuyện khi component được mount
-  useEffect(() => {
-    let hasLoadedConversations = false;
+// Kiểm tra nếu không có user và không đang loading thì chuyển hướng về trang đăng nhập
+// useEffect(() => {
+//   if (!isLoading && !user) {
+//     console.log("Không tìm thấy thông tin user, chuyển hướng về trang đăng nhập");
+//     router.push("/auth/login");
+//   }
+// }, [user, isLoading, router]);
 
-    if (isConnected && !hasLoadedConversations) {
-      console.log("Tải danh sách cuộc trò chuyện lần đầu");
-      loadConversations();
-      hasLoadedConversations = true;
-    }
-  }, [isConnected, loadConversations]);
+// Tải danh sách cuộc trò chuyện khi component được mount và đã có thông tin user
+useEffect(() => {
+  let hasLoadedConversations = false;
 
-  // Tải tin nhắn khi chọn cuộc trò chuyện
-  useEffect(() => {
-    if (activeConversation && isConnected) {
-      loadMessages(activeConversation);
-    }
-  }, [activeConversation, isConnected, loadMessages]);
+  if (isConnected && !hasLoadedConversations && user) {
+    console.log("Tải danh sách cuộc trò chuyện lần đầu");
+    loadConversations();
+    hasLoadedConversations = true;
+  }
+}, [isConnected, loadConversations, user]);
 
-  // Lắng nghe sự kiện new_conversation từ backend
-  useEffect(() => {
-    if (!socket) return;
+// Tải tin nhắn khi chọn cuộc trò chuyện và đã có thông tin user
+useEffect(() => {
+  if (activeConversation && isConnected && user) {
+    loadMessages(activeConversation);
+  }
+}, [activeConversation, isConnected, loadMessages, user]);
 
-    socket.on("new_conversation", (data) => {
-      console.log("Nhận được cuộc trò chuyện mới:", data.conversation);
-      loadConversations(); // Cập nhật danh sách cuộc trò chuyện
+// Lắng nghe sự kiện new_conversation từ backend
+useEffect(() => {
+  if (!socket) return;
 
-      // Tự động chuyển đến cuộc trò chuyện mới
-      setActiveConversation(data.conversation.idConversation);
-    });
+  socket.on("new_conversation", (data) => {
+    console.log("Nhận được cuộc trò chuyện mới:", data.conversation);
+    loadConversations(); // Cập nhật danh sách cuộc trò chuyện
 
-    return () => {
-      socket.off("new_conversation");
-    };
-  }, [socket, loadConversations]);
+    // Tự động chuyển đến cuộc trò chuyện mới
+    setActiveConversation(data.conversation.idConversation);
+  });
 
-  // Thêm useEffect để đánh dấu tin nhắn đã đọc khi có tin nhắn mới trong cuộc trò chuyện đang mở
-  useEffect(() => {
-    if (activeConversation && messages[activeConversation]) {
-      const unreadMessages = messages[activeConversation].filter(
-        (msg) => !msg.isRead && !msg.isOwn
-      );
+  return () => {
+    socket.off("new_conversation");
+  };
+}, [socket, loadConversations]);
 
-      if (unreadMessages.length > 0) {
-        const unreadMessageIds = unreadMessages.map((msg) => msg.idMessage);
-        markMessagesAsRead(unreadMessageIds, activeConversation);
-
-        console.log(
-          `Đánh dấu ${unreadMessageIds.length} tin nhắn đã đọc trong cuộc trò chuyện đang mở`
-        );
-      }
-    }
-  }, [activeConversation, messages, markMessagesAsRead]);
-
-  // Xử lý khi chọn một cuộc trò chuyện
-  const handleSelectConversation = (conversationId: string) => {
-    setActiveConversation(conversationId);
-    loadMessages(conversationId);
-
-    const conversation = conversations.find(
-      (conv) => conv.idConversation === conversationId
+// Thêm useEffect để đánh dấu tin nhắn đã đọc khi có tin nhắn mới trong cuộc trò chuyện đang mở
+useEffect(() => {
+  if (activeConversation && messages[activeConversation]) {
+    const unreadMessages = messages[activeConversation].filter(
+      (msg) => !msg.isRead && !msg.isOwn
     );
-    if (conversation && (conversation.unreadCount ?? 0) > 0) {
-      const conversationMessages = messages[conversationId] || [];
-      const unreadMessageIds = conversationMessages
-        .filter((msg) => !msg.isRead && !msg.isOwn)
-        .map((msg) => msg.idMessage);
 
-      if (unreadMessageIds.length > 0) {
-        markMessagesAsRead(unreadMessageIds, conversationId);
-      }
-    }
-  };
+    if (unreadMessages.length > 0) {
+      const unreadMessageIds = unreadMessages.map((msg) => msg.idMessage);
+      markMessagesAsRead(unreadMessageIds, activeConversation);
 
-  // Xử lý gửi tin nhắn
-  const handleSendMessage = (
-    text: string,
-    type: string = "text",
-    fileUrl?: string
-  ) => {
-    if (activeConversation) {
-      console.log("check send message:", type, fileUrl, text);
-
-      if (type === "text") {
-        sendMessage(activeConversation, text);
-      } else {
-        sendMessage(
-          activeConversation,
-          text,
-          type as "image" | "video" | "document" | "file",
-          fileUrl
-        );
-      }
-    }
-  };
-
-  // Xử lý xóa tin nhắn
-  const handleDeleteMessage = (messageId: string) => {
-    if (activeConversation) {
-      const conversation = conversations.find(
-        (conv) => conv.idConversation === activeConversation
+      console.log(
+        `Đánh dấu ${unreadMessageIds.length} tin nhắn đã đọc trong cuộc trò chuyện đang mở`
       );
-
-      if (conversation) {
-        const receiverId =
-          conversation.idSender === conversation.otherUser?.id
-            ? conversation.idReceiver
-            : conversation.idSender;
-
-        deleteMessage(messageId, activeConversation);
-      }
     }
-  };
+  }
+}, [activeConversation, messages, markMessagesAsRead]);
 
-  // Xử lý thu hồi tin nhắn
-  const handleRecallMessage = (messageId: string) => {
-    if (activeConversation) {
-      recallMessage(messageId, activeConversation);
+// Xử lý khi chọn một cuộc trò chuyện
+const handleSelectConversation = (conversationId: string) => {
+  setActiveConversation(conversationId);
+  loadMessages(conversationId);
+
+  const conversation = conversations.find(
+    (conv) => conv.idConversation === conversationId
+  );
+  if (conversation && (conversation.unreadCount ?? 0) > 0) {
+    const conversationMessages = messages[conversationId] || [];
+    const unreadMessageIds = conversationMessages
+      .filter((msg) => !msg.isRead && !msg.isOwn)
+      .map((msg) => msg.idMessage);
+
+    if (unreadMessageIds.length > 0) {
+      markMessagesAsRead(unreadMessageIds, conversationId);
     }
-  };
+  }
+};
 
-  // Xử lý chuyển tin nhắn
-  const handleForwardMessage = (
-    messageId: string,
-    targetConversations: string[]
-  ) => {
-    if (activeConversation) {
-      forwardMessage(messageId, targetConversations);
+// Xử lý gửi tin nhắn
+const handleSendMessage = (
+  text: string,
+  type: string = "text",
+  fileUrl?: string,
+  replyingTo?: {
+    name: string;
+    messageId: string;
+    content: string;
+    type: string;
+  }
+) => {
+  if (activeConversation) {
+    console.log("check send message:", type, fileUrl, text, replyingTo);
+    if (replyingTo) {
+      replyMessage(activeConversation, replyingTo.messageId, text, type, fileUrl);
     }
-  };
+    else if (type === "text") {
+      sendMessage(activeConversation, text);
+    } else {
+      sendMessage(
+        activeConversation,
+        text,
+        type as "image" | "video" | "document" | "file",
+        fileUrl
+      );
+    }
+  }
+};
 
-  return (
-    <div className="flex h-screen bg-gray-50 text-gray-900">
-      <div
-        className={`${
-          showChatInfo ? "w-1/5" : "w-1/4"
+// Xử lý xóa tin nhắn
+const handleDeleteMessage = (messageId: string) => {
+  if (activeConversation) {
+    const conversation = conversations.find(
+      (conv) => conv.idConversation === activeConversation
+    );
+
+    if (conversation) {
+      const receiverId =
+        conversation.idSender === conversation.otherUser?.id
+          ? conversation.idReceiver
+          : conversation.idSender;
+
+      deleteMessage(messageId, activeConversation);
+    }
+  }
+};
+
+// Xử lý thu hồi tin nhắn
+const handleRecallMessage = (messageId: string) => {
+  if (activeConversation) {
+    recallMessage(messageId, activeConversation);
+  }
+};
+
+// Xử lý chuyển tin nhắn
+const handleForwardMessage = (
+  messageId: string,
+  targetConversations: string[]
+) => {
+  if (activeConversation) {
+    forwardMessage(messageId, targetConversations);
+  }
+};
+
+return (
+  <div className="flex h-screen bg-gray-50 text-gray-900">
+    <div
+      className={`${showChatInfo ? "w-1/5" : "w-1/4"
         } flex flex-col border-r border-gray-200 transition-all duration-300`}
-      >
-        <div className="flex-1 overflow-hidden flex flex-col">
-          <TabNavigation
-            onSelectConversation={handleSelectConversation}
-            activeConversationId={activeConversation}
-          />
-        </div>
+    >
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <TabNavigation
+          onSelectConversation={handleSelectConversation}
+          activeConversationId={activeConversation}
+        />
       </div>
-      <div
-        className={`${
-          showChatInfo ? "w-3/5" : "w-3/4"
+    </div>
+    <div
+      className={`${showChatInfo ? "w-3/5" : "w-3/4"
         } flex flex-col border-r border-gray-200 transition-all duration-300`}
-      >
-        <ChatDetail
-          onToggleInfo={() => setShowChatInfo(!showChatInfo)}
-          showChatInfo={showChatInfo}
+    >
+      <ChatDetail
+        onToggleInfo={() => setShowChatInfo(!showChatInfo)}
+        showChatInfo={showChatInfo}
+        activeConversation={
+          activeConversation
+            ? conversations.find(
+              (c) => c.idConversation === activeConversation
+            ) || null
+            : null
+        }
+        messages={
+          activeConversation ? messages[activeConversation] || [] : []
+        }
+        onSendMessage={handleSendMessage}
+        onDeleteMessage={handleDeleteMessage}
+        onRecallMessage={handleRecallMessage}
+        onForwardMessage={handleForwardMessage}
+        conversations={conversations}
+        loading={loading}
+        loadingMoreMessages={loadingMoreMessages}
+        hasMoreMessages={hasMoreMessages}
+        loadMoreMessages={loadMoreMessages}
+        combinedMessages={combinedMessages}
+        addReaction={addReaction}
+      />
+    </div>
+    {showChatInfo && (
+      <div className="w-1/5 flex flex-col transition-all duration-300">
+        <ChatInfo
           activeConversation={
             activeConversation
               ? conversations.find(
-                  (c) => c.idConversation === activeConversation
-                ) || null
+                (c) => c.idConversation === activeConversation
+              ) || null
               : null
           }
-          messages={
-            activeConversation ? messages[activeConversation] || [] : []
-          }
-          onSendMessage={handleSendMessage}
-          onDeleteMessage={handleDeleteMessage}
-          onRecallMessage={handleRecallMessage}
-          onForwardMessage={handleForwardMessage}
-          conversations={conversations}
-          loading={loading}
+          // addMembersToGroup={addMembersToGroup}
+          removeMembersFromGroup={removeMembersFromGroup}
+          changeGroupOwner={changeGroupOwner}
+          demoteMember={demoteMember}
         />
       </div>
-      {showChatInfo && (
-        <div className="w-1/5 flex flex-col transition-all duration-300">
-          <ChatInfo
-            activeConversation={
-              activeConversation
-                ? conversations.find(
-                    (c) => c.idConversation === activeConversation
-                  ) || null
-                : null
-            }
-            // addMembersToGroup={addMembersToGroup}
-            removeMembersFromGroup={removeMembersFromGroup}
-            changeGroupOwner={changeGroupOwner}
-            demoteMember = {demoteMember}
-          />
-        </div>
-      )}
+    )}
+  </div>
+);
+
+// Hiển thị trạng thái loading khi đang tải thông tin user
+if (isLoading) {
+  return (
+    <div className="flex h-screen items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="w-16 h-16 border-4 border-t-[#8A56FF] border-gray-200 rounded-full animate-spin mx-auto"></div>
+        <p className="mt-4 text-gray-600">Đang tải thông tin người dùng...</p>
+      </div>
     </div>
   );
+}
+
+// Nếu không có user và không đang loading, không hiển thị gì cả (sẽ chuyển hướng)
+if (!user) {
+  return null;
+}
+
+return (
+  <div className="flex h-screen bg-gray-50 text-gray-900">
+    {/* Phần code giao diện giữ nguyên */}
+  </div>
+);
 }

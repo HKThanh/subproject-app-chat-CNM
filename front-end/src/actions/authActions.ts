@@ -19,16 +19,27 @@ export async function loginUser(email: string, password: string) {
       password,
       redirect: false, // Không redirect tự động, xử lý bằng FE
     });
-
+    // Lấy thông tin user từ API để trả về cho client
+    const userResponse = await fetch(`${API_URL}/auth/me`, {
+      headers: {
+        Authorization: `Bearer ${result?.accessToken || ''}`,
+      },
+    });
+    
+    const userData = await userResponse.json();
     // Default successful login response
     return {
       error: false,
       success: true,
       message: "Đăng nhập thành công!",
-      redirectTo: "/",
+      user: userData.data,
+      accessToken: result?.accessToken,
+      refreshToken: result?.refreshToken,
+      redirectTo: "/chat  ",
       status: 200,
     };
   } catch (error: any) {
+    console.error("Login error:", error);
     // Handle specific error types
     if (error.name === "AccountNotActivatedError") {
       // Try to get user ID from error or response
