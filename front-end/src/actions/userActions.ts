@@ -3,6 +3,7 @@
 /**
  * Cập nhật thông tin cá nhân của người dùng
  */
+const api = `${process.env.NEXT_PUBLIC_API_URL}`;
 export async function updateProfile(phone: string, fullname: string, ismale: string, birthday: string, bio: string, token?: string) {
   try {
     // Sử dụng token được truyền vào hoặc lấy từ session/zustand trong component
@@ -10,7 +11,7 @@ export async function updateProfile(phone: string, fullname: string, ismale: str
       throw new Error('Không tìm thấy token xác thực. Vui lòng đăng nhập lại.');
     }
 
-    const response = await fetch(`http://localhost:3000/user/profile`, {
+    const response = await fetch(`${api}/user/profile`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -74,7 +75,7 @@ export async function updateAvatar(avatarFile: File, token?: string) {
 
     console.log('Sending avatar with token:', token);
 
-    const response = await fetch(`http://localhost:3000/user/avatar/upload`, {
+    const response = await fetch(`${api}/user/avatar/upload`, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -126,7 +127,7 @@ export async function updateCoverPhoto(coverFile: File, token?: string) {
 
     console.log('Sending cover with token:', token);
 
-    const response = await fetch(`http://localhost:3000/user/cover/upload`, {
+    const response = await fetch(`${api}/user/cover/upload`, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${token}`,

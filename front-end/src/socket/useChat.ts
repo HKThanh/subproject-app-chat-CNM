@@ -16,7 +16,8 @@ export interface Message {
   isRemove?: boolean;
   isRecall?: boolean;
   isFoward?: boolean; // Trường mới cho tin nhắn chuyển tiếp
-  originalMessageId?: string; // ID của tin nhắn gốc khi chuyển tiếp
+  isReply?: boolean; // Trường mới cho tin nhắn reply
+  idMessageReply?: string; // ID của tin nhắn gốc khi chuyển tiếp
   isOwn?: boolean; // Đánh dấu tin nhắn của người dùng hiện tại
   senderInfo?: {
     id?: string;
@@ -31,6 +32,20 @@ export interface Message {
     avatar?: string;
     phone?: string;
     status?: string;
+  };
+  reactions?: {
+    [key: string]: {
+      reaction: string;
+      totalCount: number;
+      userReactions: Array<{
+        user: {
+          id: string;
+          fullname: string;
+          urlavatar?: string;
+        };
+        count: number;
+      }>;
+    };
   };
 }
 
@@ -100,10 +115,13 @@ export interface Conversation {
 type ChatState = {
   conversations: Conversation[];
   messages: Record<string, Message[]>;
+  olderMessages: Record<string, Message[]>; // lưu tin nhắn cũ
   loading: boolean;
   error: string | null;
   unreadMessages: Message[];
   isUserConnected: boolean;
+  loadingMoreMessages: boolean;
+  hasMoreMessages: { [conversationId: string]: boolean };
 };
 
 type ChatAction =
@@ -123,9 +141,12 @@ type ChatAction =
   | { type: 'ADD_GROUP_CONVERSATION', payload: Conversation }
   | { type: 'UPDATE_GROUP_MEMBERS', payload: { conversationId: string, members: Array<any> } }
   | { type: 'REMOVE_CONVERSATION', payload: { conversationId: string } }
-  ;
+  | { type: 'LOAD_MORE_MESSAGES_REQUEST' }
+  | { type: 'LOAD_MORE_MESSAGES', payload: { conversationId: string, messages: Message[], hasMore: boolean } }
+  | { type: 'LOAD_MORE_MESSAGES_ERROR', payload: string }
+  | { type: 'UPDATE_MESSAGE_REACTIONS', payload: { conversationId: string, messageId: string, reactions: any } }
+  | { type: 'LOAD_MORE_MESSAGES_ERROR', payload: string };
 
-;
 const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
   switch (action.type) {
     case 'SET_CONVERSATIONS':
@@ -144,11 +165,7 @@ const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
       const { conversationId, message } = action.payload;
       const existingMessages = state.messages[conversationId] || [];
 
-      // Kiểm tra tin nhắn đã tồn tại chưa
-      const messageExists = existingMessages.some(msg =>
-        msg.idMessage === message.idMessage
-      );
-
+      const messageExists = existingMessages.some(msg => msg.idMessage === message.idMessage);
       if (messageExists) {
         return state;
       }
@@ -157,8 +174,25 @@ const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
         ...state,
         messages: {
           ...state.messages,
-          [conversationId]: [...existingMessages, message]
-        }
+          [conversationId]: [...existingMessages, message],
+        },
+      };
+    } 
+    case 'ADD_MESSAGE': {
+      const { conversationId, message } = action.payload;
+      const existingMessages = state.messages[conversationId] || [];
+
+      const messageExists = existingMessages.some(msg => msg.idMessage === message.idMessage);
+      if (messageExists) {
+        return state;
+      }
+
+      return {
+        ...state,
+        messages: {
+          ...state.messages,
+          [conversationId]: [...existingMessages, message],
+        },
       };
     }
 
@@ -304,27 +338,100 @@ const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
         )
       };
     }
-    case 'REMOVE_CONVERSATION':
+    case 'REMOVE_CONVERSATION': {
       return {
         ...state,
         conversations: state.conversations.filter(
           conversation => conversation.idConversation !== action.payload.conversationId
         )
       };
+    }
+    case 'LOAD_MORE_MESSAGES_REQUEST': {
+      return {
+        ...state,
+        loadingMoreMessages: true,
+      };
+    }
+    case 'LOAD_MORE_MESSAGES': {
+      const { conversationId, messages, hasMore } = action.payload;
+      const existingOlderMessages = state.olderMessages[conversationId] || [];
+
+      const existingMessageIds = new Set([
+        ...(state.messages[conversationId] || []).map(msg => msg.idMessage),
+        ...existingOlderMessages.map(msg => msg.idMessage),
+      ]);
+      const newMessages = messages.filter(msg => !existingMessageIds.has(msg.idMessage));
+
+      const updatedOlderMessages = [...newMessages, ...existingOlderMessages].sort((a, b) => {
+        const timeA = new Date(a.dateTime).getTime();
+        const timeB = new Date(b.dateTime).getTime();
+        return timeA - timeB;
+      });
+
+      return {
+        ...state,
+        olderMessages: {
+          ...state.olderMessages,
+          [conversationId]: updatedOlderMessages,
+        },
+        loadingMoreMessages: false,
+        hasMoreMessages: {
+          ...state.hasMoreMessages,
+          [conversationId]: hasMore,
+        },
+      };
+    }
+    case 'LOAD_MORE_MESSAGES_ERROR': {
+      return {
+        ...state,
+        loadingMoreMessages: false,
+        error: action.payload,
+      };
+    }
+    case 'UPDATE_MESSAGE_REACTIONS': {
+      const { conversationId, messageId, reactions } = action.payload;
+      const existingMessages = state.messages[conversationId] || [];
+      const olderMessages = state.olderMessages[conversationId] || [];
+      
+      // Cập nhật trong messages hiện tại
+      const updatedMessages = existingMessages.map(msg =>
+        msg.idMessage === messageId ? { ...msg, reactions } : msg
+      );
+      
+      // Cập nhật trong olderMessages
+      const updatedOlderMessages = olderMessages.map(msg =>
+        msg.idMessage === messageId ? { ...msg, reactions } : msg
+      );
+      
+      return {
+        ...state,
+        messages: {
+          ...state.messages,
+          [conversationId]: updatedMessages
+        },
+        olderMessages: {
+          ...state.olderMessages,
+          [conversationId]: updatedOlderMessages
+        }
+      };
+    }
     default:
       return state;
   }
-}; ``
+};
 export const useChat = (userId: string) => {
 
   const { socket, isConnected } = useSocketContext();
   const [state, dispatch] = useReducer(chatReducer, {
     conversations: [],
     messages: {},
+    olderMessages: {},
     loading: false,
     error: null,
     unreadMessages: [],
-    isUserConnected: false
+    isUserConnected: false,
+    loadingMoreMessages: false,
+    hasMoreMessages: {}
   });
 
   const { conversations, messages, loading, error, unreadMessages, isUserConnected } = state;
@@ -339,7 +446,40 @@ export const useChat = (userId: string) => {
     console.log("socket:", !!socket);
     console.log("isConnected:", isConnected);
   }, [userId, isValidUserId, socket, isConnected]);
-
+  //xử lý gộp tin nhắn cũ và mới
+  const combinedMessages = useCallback((conversationId: string) => {
+    if (!conversationId) return [];
+    
+    const older = state.olderMessages[conversationId] || [];
+    const recent = state.messages[conversationId] || [];
+    
+    // Gộp và sắp xếp tin nhắn theo thời gian tăng dần
+    const combined = [...older, ...recent].sort((a, b) => {
+      const timeA = new Date(a.dateTime).getTime();
+      const timeB = new Date(b.dateTime).getTime();
+      return timeA - timeB;
+    });
+    
+    // Loại bỏ tin nhắn trùng lặp (giữ lại tin nhắn đầu tiên)
+    // Đồng thời đảm bảo thuộc tính isOwn được thiết lập đúng
+    const uniqueMessageIds = new Set<string>();
+    const uniqueMessages = combined.filter(message => {
+      if (uniqueMessageIds.has(message.idMessage)) {
+        return false;
+      }
+      uniqueMessageIds.add(message.idMessage);
+      
+      // Đảm bảo thuộc tính isOwn được thiết lập đúng
+      if (message.idSender === userId) {
+        message.isOwn = true;
+      } else {
+        message.isOwn = false;
+      }
+      
+      return true;
+    });  
+    return uniqueMessages;
+  }, [state.olderMessages, state.messages, userId]);
   // Xử lý phản hồi tải cuộc trò chuyện - tối ưu dependencies
   const handleLoadConversationsResponse = useCallback((data: {
     Items: Conversation[];
@@ -420,6 +560,43 @@ export const useChat = (userId: string) => {
     };
   }, [socket, isConnected, userId, isValidUserId, isUserConnected]);
   // Xử lý phản hồi tải cuộc trò chuyện nhóm
+  const loadMoreMessages = useCallback((conversationId: string, lastMessageId: string) => {
+    if (!socket || !isConnected || state.loadingMoreMessages) return;
+
+    dispatch({ type: 'LOAD_MORE_MESSAGES_REQUEST' });
+
+    socket.emit('load_messages', {
+      IDConversation: conversationId,
+      lastMessageId,
+      limit: 20
+    });
+  }, [socket, isConnected, state.loadingMoreMessages]);
+  useEffect(() => {
+    if (!socket) return;
+    const handleLoadMessagesResponse = (data: any) => {
+      if (data.messages && data.conversationId) {
+        dispatch({
+          type: 'LOAD_MORE_MESSAGES',
+          payload: {
+            conversationId: data.conversationId,
+            messages: data.messages,
+            hasMore: data.hasMore
+          }
+        });
+      } else {
+        dispatch({
+          type: 'LOAD_MORE_MESSAGES_ERROR',
+          payload: 'Failed to load more messages'
+        });
+      }
+    };
+
+    socket.on('load_messages_response', handleLoadMessagesResponse);
+
+    return () => {
+      socket.off('load_messages_response', handleLoadMessagesResponse);
+    };
+  }, [socket]);
   const handleLoadGroupConversationsResponse = useCallback((data: {
     Items: Conversation[];
     LastEvaluatedKey: number;
@@ -1030,10 +1207,10 @@ export const useChat = (userId: string) => {
   }, [dispatch, state.conversations]);
   const handleMemberRemovedNotification = useCallback((data: any) => {
     console.log("Member removed notification:", data);
-  if(data.newOwner || data.oldOwner){
-    console.log("Member change owner notification");
-    return;
-  }
+    if (data.newOwner || data.oldOwner) {
+      console.log("Member change owner notification");
+      return;
+    }
     if (data.success && data.conversationId) {
       // Find the current conversation in state
       const currentConversation = state.conversations.find(
@@ -1294,15 +1471,15 @@ export const useChat = (userId: string) => {
       return;
     }
 
-   // Check if the member is already a co-owner to prevent duplicates
-   const isAlreadyCoOwner = (currentConversation.coOwners || []).some(
-    coOwner => coOwner.id === promotedMemberId
-  );
+    // Check if the member is already a co-owner to prevent duplicates
+    const isAlreadyCoOwner = (currentConversation.coOwners || []).some(
+      coOwner => coOwner.id === promotedMemberId
+    );
 
-  // Create updated coOwners array with the new coOwner (only if not already a co-owner)
-  const updatedCoOwners = isAlreadyCoOwner 
-    ? [...(currentConversation.coOwners || [])]
-    : [
+    // Create updated coOwners array with the new coOwner (only if not already a co-owner)
+    const updatedCoOwners = isAlreadyCoOwner
+      ? [...(currentConversation.coOwners || [])]
+      : [
         ...(currentConversation.coOwners || []),
         {
           id: promotedMember.id,
@@ -1311,29 +1488,29 @@ export const useChat = (userId: string) => {
         }
       ];
 
-  // Check if the member ID is already in the listIDCoOwner
-  const isIdAlreadyInList = (currentConversation.rules?.listIDCoOwner || []).includes(promotedMemberId);
+    // Check if the member ID is already in the listIDCoOwner
+    const isIdAlreadyInList = (currentConversation.rules?.listIDCoOwner || []).includes(promotedMemberId);
 
-  // Create updated rules with the new coOwner ID (only if not already in the list)
-  const updatedRules = {
-    ...currentConversation.rules,
-    listIDCoOwner: isIdAlreadyInList
-      ? [...(currentConversation.rules?.listIDCoOwner || [])]
-      : [...(currentConversation.rules?.listIDCoOwner || []), promotedMemberId]
-  };
+    // Create updated rules with the new coOwner ID (only if not already in the list)
+    const updatedRules = {
+      ...currentConversation.rules,
+      listIDCoOwner: isIdAlreadyInList
+        ? [...(currentConversation.rules?.listIDCoOwner || [])]
+        : [...(currentConversation.rules?.listIDCoOwner || []), promotedMemberId]
+    };
 
-  // Update the conversation
-  dispatch({
-    type: 'UPDATE_CONVERSATION',
-    payload: {
-      conversationId: data.conversationId,
-      updates: {
-        coOwners: updatedCoOwners,
-        rules: updatedRules,
-        lastChange: new Date().toISOString()
+    // Update the conversation
+    dispatch({
+      type: 'UPDATE_CONVERSATION',
+      payload: {
+        conversationId: data.conversationId,
+        updates: {
+          coOwners: updatedCoOwners,
+          rules: updatedRules,
+          lastChange: new Date().toISOString()
+        }
       }
-    }
-  });
+    });
 
     // Update the latest message in the conversation
     dispatch({
@@ -1397,13 +1574,13 @@ export const useChat = (userId: string) => {
         const updatedCoOwners = isAlreadyCoOwner
           ? [...(conversation.coOwners || [])]
           : [
-              ...(conversation.coOwners || []),
-              {
-                id: promotedMember.id,
-                fullname: promotedMember.fullname,
-                urlavatar: promotedMember.urlavatar || ""
-              }
-            ];
+            ...(conversation.coOwners || []),
+            {
+              id: promotedMember.id,
+              fullname: promotedMember.fullname,
+              urlavatar: promotedMember.urlavatar || ""
+            }
+          ];
 
         // Check if the member ID is already in the listIDCoOwner
         const isIdAlreadyInList = (conversation.rules?.listIDCoOwner || []).includes(data.memberId);
@@ -1944,19 +2121,19 @@ export const useChat = (userId: string) => {
       let currentUserInfo = currentConversation.regularMembers.find(
         member => member.id === userId
       );
-      
+
       // If not found in regularMembers, check in coOwners
       if (!currentUserInfo) {
         currentUserInfo = currentConversation.coOwners?.find(
           coOwner => coOwner.id === userId
         );
       }
-      
+
       // If not found in coOwners, check if user is the owner
       if (!currentUserInfo && currentConversation.owner?.id === userId) {
         currentUserInfo = currentConversation.owner;
       }
-      
+
       // If still not found, use default info
       if (!currentUserInfo) {
         currentUserInfo = {
@@ -2031,7 +2208,7 @@ export const useChat = (userId: string) => {
         return;
       }
       let demotedMemberInfo;
-      
+
       // If the backend provided the demoted member info, use it
       if (data.demotedMemberInfo) {
         demotedMemberInfo = data.demotedMemberInfo;
@@ -2055,13 +2232,13 @@ export const useChat = (userId: string) => {
       const updatedRegularMembers = isAlreadyRegularMember
         ? [...currentConversation.regularMembers]
         : [
-            ...currentConversation.regularMembers,
-            {
-              id: demotedMemberInfo.id,
-              fullname: demotedMemberInfo.fullname,
-              urlavatar: demotedMemberInfo.urlavatar || ""
-            }
-          ];
+          ...currentConversation.regularMembers,
+          {
+            id: demotedMemberInfo.id,
+            fullname: demotedMemberInfo.fullname,
+            urlavatar: demotedMemberInfo.urlavatar || ""
+          }
+        ];
 
       // Use the updated rules from the notification if available
       const updatedRules = data.updatedRules || {
@@ -2275,11 +2452,144 @@ export const useChat = (userId: string) => {
       }
     }
   }, [dispatch, conversations]);
+  //xử lý reply message
+  const replyMessage = useCallback(
+    (conversationId: string, messageId: string, text: string, type: string = "text", fileUrl?: string) => {
+      if (!socket) return;
+      console.log("Sending reply message...", conversationId, messageId, text, type, fileUrl);
+      const conversation = conversations.find(
+        (conv) => conv.idConversation === conversationId
+      );
+      
+      if (!conversation) return;
+      
+      const receiverId = conversation.isGroup 
+        ? "" 
+        : conversation.idSender === userId
+          ? conversation.idReceiver 
+          : conversation.idSender;
+      
+      socket.emit("reply_message", {
+        IDSender: userId,
+        IDReceiver: receiverId,
+        IDConversation: conversationId,
+        IDMessageReply: messageId,
+        textMessage: text,
+        type: type,
+        fileUrl: fileUrl
+      });
+    },
+    [socket, userId, conversations]
+  );
+  // const handleReceiveMessage = useCallback((message: Message) => {
+  //   // Xử lý tin nhắn nhận được, bao gồm cả tin nhắn reply
+  //   if (!message || !message.idConversation) {
+  //     console.error("Tin nhắn không hợp lệ:", message);
+  //     return;
+  //   }
+    
+  //   const conversationId = message.idConversation;
+  //   const conversationMessages = state.messages[conversationId] || [];
+    
+  //   // Kiểm tra xem tin nhắn đã tồn tại chưa
+  //   const messageExists = conversationMessages.some(
+  //     (msg) => msg.idMessage === message.idMessage
+  //   );
+    
+  //   if (messageExists) return;
+    
+  //   // Thêm trường isOwn để xác định tin nhắn của người dùng hiện tại
+  //   const newMessage = {
+  //     ...message,
+  //     isOwn: message.idSender === userId,
+  //   };
+    
+  //   // Sử dụng dispatch để cập nhật state
+  //   dispatch({
+  //     type: 'ADD_MESSAGE',
+  //     payload: {
+  //       conversationId,
+  //       message: newMessage
+  //     }
+  //   });
+    
+  //   // Cập nhật thông tin cuộc trò chuyện nếu cần
+  //   if (!newMessage.isOwn) {
+  //     dispatch({
+  //       type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+  //       payload: {
+  //         conversationId,
+  //         latestMessage: {
+  //           idMessage: `system-${Date.now()}`,
+  //           idConversation: message.idConversation,
+  //           content: message.content,
+  //           dateTime: message.dateTime,
+  //           isRead: false,
+  //           type: message.type || "text",
+  //           idSender: message.idSender,
+  //           idReceiver: message.idReceiver,
+  //           isReply: message.isReply
+  //         }
+  //       }
+  //     });
+  //   }
+  // }, [dispatch, state.messages, userId]);
+  // Thêm hàm xử lý reaction
+  const addReaction = useCallback((messageId: string, reaction: string) => {
+    if (!socket || !isConnected) return;
+    
+    console.log(`Thêm reaction ${reaction} cho tin nhắn ${messageId}`);
+    socket.emit('add_reaction', {
+      IDUser: userId,
+      IDMessage: messageId,
+      reaction,
+      count: 1
+    });
+  }, [socket, isConnected, userId]);
+  const handleMessageReactionUpdated = (data: any) => {
+    console.log("Nhận cập nhật reaction:", data);
+    const { messageId, reactions } = data;
+    
+    // Tìm conversation chứa tin nhắn này
+    let targetConversationId = null;
+    
+    // Tìm trong messages hiện tại
+    for (const [conversationId, messages] of Object.entries(state.messages)) {
+      const found = messages.find(msg => msg.idMessage === messageId);
+      if (found) {
+        targetConversationId = conversationId;
+        break;
+      }
+    }
+    
+    // Nếu không tìm thấy trong messages hiện tại, tìm trong olderMessages
+    if (!targetConversationId) {
+      for (const [conversationId, messages] of Object.entries(state.olderMessages)) {
+        const found = messages.find(msg => msg.idMessage === messageId);
+        if (found) {
+          targetConversationId = conversationId;
+          break;
+        }
+      }
+    }
+    
+    if (targetConversationId) {
+      dispatch({
+        type: 'UPDATE_MESSAGE_REACTIONS',
+        payload: {
+          conversationId: targetConversationId,
+          messageId,
+          reactions
+        }
+      });
+    }
+  };
   // Gộp các useEffect đăng ký sự kiện socket
   useEffect(() => {
     if (!socket) return;
 
     // Đăng ký lắng nghe các sự kiện
+    socket.on('message_reaction_updated', handleMessageReactionUpdated);
     socket.on("load_conversations_response", handleLoadConversationsResponse);
     socket.on("load_group_conversations_response", handleLoadGroupConversationsResponse);
     socket.on("new_group_conversation", handleAddMemberToGroupResponse);
@@ -2545,6 +2855,7 @@ export const useChat = (userId: string) => {
                   isRead: false,
                   idReceiver: message.idReceiver,
                   idSender: message.idSender,
+                  isReply: message.isReply,
                   type: message.type
                 },
                 lastChange: message.dateTime,
@@ -2666,6 +2977,13 @@ export const useChat = (userId: string) => {
             }
           }
         });
+        dispatch({
+          type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            latestMessage: data.systemMessage
+          }
+        });
       }
     };
 
@@ -2760,11 +3078,12 @@ export const useChat = (userId: string) => {
         });
       });
     };
-
+    socket.on("receive_message", handleReceiveMessage);
     socket.on('users_status', handleUsersStatus);
 
     return () => {
       // Hủy đăng ký tất cả sự kiện khi unmount
+      socket.off('message_reaction_updated', handleMessageReactionUpdated);
       socket.off("load_conversations_response", handleLoadConversationsResponse);
       socket.off("load_group_conversations_response", handleLoadGroupConversationsResponse);
       socket.off("error", handleError);
@@ -2804,6 +3123,8 @@ export const useChat = (userId: string) => {
       // Unregister the event listeners for change info group
       socket.off("update_group_info_response", handleUpdateGroupInfoResponse);
       socket.off("group_info_updated", handleGroupInfoUpdated);
+
+      socket.off("receive_message", handleReceiveMessage);
       socket.offAny();
     };
   }, [socket, userId, messages, conversations, loadConversations, handleGroupDeletedResponse, handleGroupDeletedNotification,
@@ -3320,6 +3641,10 @@ export const useChat = (userId: string) => {
     loading,
     error,
     unreadMessages,
+    loadingMoreMessages: state.loadingMoreMessages,
+    hasMoreMessages: state.hasMoreMessages,
+    loadMoreMessages,
+    combinedMessages,
     loadConversations,
     loadMessages,
     sendMessage,
@@ -3332,5 +3657,7 @@ export const useChat = (userId: string) => {
     removeMembersFromGroup,
     changeGroupOwner,
     demoteMember,
+    replyMessage,
+    addReaction
   };
 };

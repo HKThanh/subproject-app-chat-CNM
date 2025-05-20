@@ -9,6 +9,7 @@ import {
     InvalidPhonePasswordError,
     ServerError,
 } from "./utils/errors";
+import { authApi } from "./lib/api/authApi";
 
 if (!process.env.AUTH_SECRET) {
     throw new Error('NEXTAUTH_SECRET must be defined');
@@ -42,35 +43,32 @@ export const {
                 ) {
                     throw new Error("Invalid credentials.");
                 }
-                let response: any;
-                try {
                     const { email, password } = credentials;
-                    response = await fetch('http://localhost:3000/auth/login', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ email, password, platform:"web" }),
-                    }).then(res => res.json());
-                    console.log("Authorize response:", response);
-                } catch (error) {
-                    console.error("Login error:", error);
-                    throw new ServerError();
-                }
-                if (!response.user || !response.accessToken) {
-                    if (response.message === "Nhập sai email hoặc mật khẩu") {
-                        throw new InvalidPhonePasswordError()
-                    }
-                    else if (response.message === "Nhập sai mật khẩu") {
-                        throw new InvalidPhonePasswordError()
+                    const result = await authApi.login(email, password);
+                    console.log("Authorize response:", result);
 
-                    } else if (response.message === "Người dùng đang đăng nhập")
-                        throw new AccountIsLoggedError();
-                    else {
+                    if (!result.success) {
+                        // Handle specific error messages
+                        if (result.message === "Nhập sai email hoặc mật khẩu") {
+                            throw new InvalidPhonePasswordError();
+                        }
+                        else if (result.message === "Nhập sai mật khẩu") {
+                            throw new InvalidPhonePasswordError();
+                        } 
+                        else if (result.message === "Người dùng đang đăng nhập") {
+                            throw new AccountIsLoggedError();
+                        }
+                        else {
+                            throw new ServerError();
+                        }
+                    }
+                    
+                    const response = result.data;
+                    
+                    if (!response.user || !response.accessToken) {
                         throw new ServerError();
                     }
-                }
-                else {
+                    
                     const user = {
                         id: response.user.id,
                         urlavatar: response.user.urlavatar,
@@ -82,12 +80,42 @@ export const {
                         bio: response.user.bio,
                         coverPhoto: response.user.coverPhoto,
                         ismale: response.user.ismale,
-                        accessToken: response.accessToken, // Add access token directly to user object
+                        accessToken: response.accessToken,
                         refreshToken: response.refreshToken,
-
                     };
+                    
                     return user;
-                }
+                // if (!response.user || !response.accessToken) {
+                //     if (response.message === "Nhập sai email hoặc mật khẩu") {
+                //         throw new InvalidPhonePasswordError()
+                //     }
+                //     else if (response.message === "Nhập sai mật khẩu") {
+                //         throw new InvalidPhonePasswordError()
+
+                //     } else if (response.message === "Người dùng đang đăng nhập")
+                //         throw new AccountIsLoggedError();
+                //     else {
+                //         throw new ServerError();
+                //     }
+                // }
+                // else {
+                //     const user = {
+                //         id: response.user.id,
+                //         urlavatar: response.user.urlavatar,
+                //         fullname: response.user.fullname,
+                //         birthday: response.user.birthday,
+                //         createdAt: response.user.createdAt,
+                //         email: response.user.email,
+                //         phone: response.user.phone,
+                //         bio: response.user.bio,
+                //         coverPhoto: response.user.coverPhoto,
+                //         ismale: response.user.ismale,
+                //         accessToken: response.accessToken, // Add access token directly to user object
+                //         refreshToken: response.refreshToken,
+
+                //     };
+                //     return user;
+                // }
             },
         }),
     ],
@@ -100,6 +128,7 @@ export const {
     },
     callbacks: {
         async jwt({ token, user, session, trigger }) {
+            // console.log('Token callback:', { token, user, session, trigger });
             if (token.accessToken) {
 
                 const expired = typeof token.accessToken === 'string' && isTokenExpired(token.accessToken);
@@ -109,15 +138,15 @@ export const {
                         const refreshToken = token.refreshToken as string;
                         const base64Url = refreshToken.split('.')[1];
                         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
                             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
                         }).join(''));
 
                         const decoded = JSON.parse(jsonPayload);
                         console.log('Decoded refresh token in auth.ts:', decoded);
                         console.log("Refresh token in auth.ts:", refreshToken);
-                        
-                        const response = await fetch('http://localhost:3000/auth/refresh-token', {
+                        const api = `${process.env.NEXT_PUBLIC_API_URL}`;
+                        const response = await fetch(`${api}/auth/refresh-token`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -132,14 +161,14 @@ export const {
                         if (!response.ok) {
                             const errorData = await response.json().catch(() => ({}));
                             console.error('Refresh token error in auth.ts:', errorData);
-                            
+
                             // Clear all token data to force logout
-                            token = { 
+                            token = {
                                 ...token,
                                 accessToken: undefined,
                                 refreshToken: undefined
                             };
-                            
+
                             // This will trigger a redirect to login page on next request
                             throw new Error(`SESSION_EXPIRED`);
                         }
@@ -168,11 +197,11 @@ export const {
                         }
                     } catch (error) {
                         console.error('Error refreshing token:', error);
-                        
+
                         // Clear tokens on refresh error
                         token.accessToken = undefined;
                         token.refreshToken = undefined;
-                        
+
                         // If we have a SESSION_EXPIRED error, we'll let the error propagate
                         // to trigger the signOut in the error handler
                         if (error instanceof Error && error.message === 'SESSION_EXPIRED') {
@@ -180,6 +209,10 @@ export const {
                         }
                     }
                 }
+            }
+            else if (trigger !== 'signIn' && (!token.accessToken || !token.refreshToken)) {
+                console.error('No access token in token callback');
+                throw new Error(`SESSION_EXPIRED`);
             }
             if (trigger === 'update' && session?.user) {
                 // When updating via session, use session.user instead of user
@@ -254,7 +287,7 @@ function isTokenExpired(token: string): boolean {
         // Decode JWT payload
         const base64Url = token.split('.')[1];
         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
         }).join(''));
 
