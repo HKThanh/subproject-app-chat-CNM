@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/tooltip";
 import Image from "next/image";
 import ImageViewer from "@/components/chat/image-viewer";
+import useUserStore from "@/stores/useUserStoree";
 
 // Add senderName and isGroup props to the interface
 interface ChatMessageProps {
@@ -91,6 +92,7 @@ export default function ChatMessage({
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const reactionPickerRef = useRef<HTMLDivElement>(null);
+  const {user} = useUserStore();
   // Danh sách các reaction có sẵn
   const availableReactions = ['👍', '❤️', '😂', '😮', '😢', '😡'];
   // Tổng số reaction
@@ -153,19 +155,32 @@ export default function ChatMessage({
       <div
         className={`flex items-center gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}
       >
-        {Object.entries(reactions).map(([reaction, data]) => (
-          data.totalCount > 0 && (
+        {Object.entries(reactions).map(([reaction, data]) => {
+          // Check if current user has reacted with this emoji
+          const hasUserReacted = data.userReactions.some(
+            ur => ur.user.id === user?.id
+          );
+
+          return data.totalCount > 0 && (
             <div
               key={reaction}
-              className="flex items-center bg-white rounded-full shadow-sm px-1.5 py-0.5 border border-gray-100 cursor-pointer hover:bg-gray-50"
+              className={`flex items-center rounded-full shadow-sm px-1.5 py-0.5 border cursor-pointer 
+                ${hasUserReacted 
+                  ? 'bg-blue-50 border-blue-200 hover:bg-blue-100' 
+                  : 'bg-white border-gray-100 hover:bg-gray-50'
+                }`}
               onClick={() => handleReactionClick(reaction)}
-              title={data.userReactions.map(ur => ur.user.fullname).join(', ')}
+              title={data.userReactions
+                .map(ur => ur.user.fullname)
+                .join(', ')}
             >
               <span className="text-sm mr-1">{reaction}</span>
-              <span className="text-xs text-gray-600">{data.totalCount}</span>
+              <span className={`text-xs ${hasUserReacted ? 'text-blue-600' : 'text-gray-600'}`}>
+                {data.totalCount}
+              </span>
             </div>
-          )
-        ))}
+          );
+        })}
       </div>
     );
   };
