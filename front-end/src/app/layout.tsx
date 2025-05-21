@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import useUserStore from "@/stores/useUserStoree";
+import CallUI from "@/components/call/CallUI";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -57,6 +58,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <SessionProvider>
           <AuthSync />
+          <CallUI />
           <Toaster richColors position="top-right" />
           {children}
         </SessionProvider>

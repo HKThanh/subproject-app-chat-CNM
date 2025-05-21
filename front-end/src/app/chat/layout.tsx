@@ -1,6 +1,7 @@
 import NavigationSidebar from "@/components/chat/sidebar/NavigationSidebar";
 import UserDataLoader from "@/components/auth/user-data-loader";
 import SocketProviders from "@/components/providers/socket-providers";
+import CallUI from "@/components/call/CallUI";
 
 export default function chatLayout({
   children,
@@ -10,6 +11,7 @@ export default function chatLayout({
   return (
     <UserDataLoader>
       <SocketProviders>
+      <CallUI />
         <div className="h-screen flex flex-col sm:flex-row bg-background">
           <NavigationSidebar />
           <div className="ml-0 sm:ml-[70px] flex flex-1">

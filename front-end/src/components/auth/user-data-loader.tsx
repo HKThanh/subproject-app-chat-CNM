@@ -25,7 +25,7 @@ export default function UserDataLoader({ children }: UserDataLoaderProps) {
         if (storedData) {
           const parsedData = JSON.parse(storedData);
           if (parsedData.state && parsedData.state.user) {
-            console.log("Tìm thấy dữ liệu user trong localStorage");
+            
             // Khôi phục dữ liệu từ localStorage
             setUser(parsedData.state.user, parsedData.state.accessToken || "");
             if (parsedData.state.accessToken && parsedData.state.refreshToken) {
@@ -52,11 +52,11 @@ export default function UserDataLoader({ children }: UserDataLoaderProps) {
       try {
         // Nếu đã đăng nhập qua NextAuth
         if (status === "authenticated" && session) {
-          console.log("Session đã xác thực:", session);
+          
           
           // Nếu chưa có user trong store nhưng có trong session
           if (!user && session.user) {
-            console.log("Đang đồng bộ user từ session vào store");
+           
             
             // Lưu thông tin user từ session vào store
             setUser(session.user, session.accessToken);
@@ -72,7 +72,6 @@ export default function UserDataLoader({ children }: UserDataLoaderProps) {
         } 
         // Nếu chưa đăng nhập nhưng có dữ liệu trong store
         else if (status === "unauthenticated" && user) {
-          console.log("Session unauthenticated nhưng có user trong store, thử cập nhật session");
           
           // Thử cập nhật session từ dữ liệu store
           try {
