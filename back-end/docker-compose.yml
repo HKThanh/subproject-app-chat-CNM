@@ -1,4 +1,4 @@
-services:
+services: 
   mongo:
     image: mongo:latest
     ports:
@@ -9,7 +9,7 @@ services:
     environment:
       - MONGO_INITDB_DATABASE=chat-app
     networks:
-      - mongodb-net
+      - welo-network
     restart: always
 
   mongo-express:
@@ -30,7 +30,7 @@ services:
       - ME_CONFIG_BASICAUTH_USERNAME=admin
       - ME_CONFIG_BASICAUTH_PASSWORD=admin123
     networks:
-      - mongodb-net
+      - welo-network
     deploy:
       resources:
         limits:
@@ -47,11 +47,42 @@ services:
     volumes:
       - redis-data:/data
     command: redis-server --requirepass 123456
+    networks:
+      - welo-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongo
+      - redis
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_BUCKET_NAME=${AWS_BUCKET_NAME}
+      - MONGO_URI=mongodb://mongo:27017/chat-app
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH=${JWT_REFRESH}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=123456
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    networks:
+      - welo-network
+    restart: always
 
 volumes:
   mongo-data:
   redis-data:
 
 networks:
-  mongodb-net:
+  welo-network:
     driver: bridge
