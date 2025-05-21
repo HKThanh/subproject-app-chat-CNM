@@ -2,7 +2,7 @@ const { Server } = require("socket.io");
 const socketController = require("../controllers/socketController");
 const authController = require("../controllers/authController");
 const redisClient = require("../services/redisClient");
-
+const webRTCController = require("../controllers/webRTCController");
 let io;
 
 const initSocketIO = (server) => {
@@ -90,6 +90,9 @@ const initSocket = (server) => {
         socketController.handleReplyMessage(io, socket);
         socketController.handleMessageReaction(io, socket);
         socketController.handleMentionUser(io, socket);
+
+        // Đăng ký các sự kiện WebRTC
+        webRTCController.handleCall(io, socket);
         socket.on("disconnect", () => {
             console.log("Client disconnected: " + socket.id);
             const user = socketController.getUserBySocketId(socket.id);
