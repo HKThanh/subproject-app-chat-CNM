@@ -752,10 +752,13 @@ export default function ContactList({
             setFriendToRemove(null);
             setIsProcessing(false);
 
+            // Reset pointer-events ngay lập tức
+            document.body.style.pointerEvents = "auto";
+
             // Đảm bảo không có overlay nào còn tồn tại
             setTimeout(() => {
               document.body.style.pointerEvents = "auto";
-            }, 100);
+            }, 300); // Tăng thời gian timeout
           }
         }}
       >
