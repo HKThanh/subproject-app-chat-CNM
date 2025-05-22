@@ -34,7 +34,6 @@ const formSchema = z.object({
 });
 
 export default function LoginForm() {
-  const { setUser, setTokens } = useUserStore();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const userStore = useUserStore();
@@ -154,15 +153,6 @@ export default function LoginForm() {
         toast.error(result.message);
         setError(result.message);
       } else if (result.success) {
-        // Save user data to Zustand store
-        if (result.user && result.accessToken) {
-          setUser(result.user, result.accessToken);
-          
-          // Save tokens separately if needed
-          if (result.refreshToken) {
-            setTokens(result.accessToken, result.refreshToken);
-          }
-        }
         if (result.redirectTo) {
           router.push(result.redirectTo);
           toast.success(result.message);

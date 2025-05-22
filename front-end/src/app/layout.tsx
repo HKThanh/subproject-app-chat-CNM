@@ -8,31 +8,57 @@ import { Toaster } from "sonner";
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
-import { hydrateUserStore } from "@/stores/useUserStoree";
+import useUserStore from "@/stores/useUserStoree";
+import CallUI from "@/components/call/CallUI";
 
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
 });
-// Thêm component này vào layout
-function StoreHydration() {
-  useEffect(() => {
-    hydrateUserStore();
-  }, []);
-  return null;
-}
-
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
+  const router = useRouter();
+
+  useEffect(() => {
+    const handleAuthError = async (event: PromiseRejectionEvent): Promise<void> => {
+      if (event?.reason?.message?.includes('SESSION_EXPIRED')) {
+        console.log('Session expired, redirecting to login');
+        
+        try {
+          // Clear any stored auth data
+          const userStore = useUserStore.getState();
+          userStore.clearUser();
+          
+          // Sign out and redirect
+          await signOut({ 
+            redirect: false,
+          });
+          
+          // Force navigation to login
+          router.push('/auth/login');
+        } catch (error) {
+          console.error('Error during sign out:', error);
+          // Force navigation even if signOut fails
+          window.location.href = '/auth/login';
+        }
+      }
+    };
+
+    window.addEventListener('unhandledrejection', handleAuthError);
+    return () => {
+      window.removeEventListener('unhandledrejection', handleAuthError);
+    };
+  }, [router]);
+
   return (
     <html lang="en">
-      <body>
+      <body className={inter.className}>
         <SessionProvider>
-          <StoreHydration />
           <AuthSync />
+          <CallUI />
           <Toaster richColors position="top-right" />
           {children}
         </SessionProvider>

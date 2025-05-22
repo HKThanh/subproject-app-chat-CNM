@@ -4,7 +4,6 @@ import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import useUserStore from "@/stores/useUserStoree";
-import { authApi } from "@/lib/api/authApi";
 
 interface UserDataLoaderProps {
   children: React.ReactNode;
@@ -26,7 +25,7 @@ export default function UserDataLoader({ children }: UserDataLoaderProps) {
         if (storedData) {
           const parsedData = JSON.parse(storedData);
           if (parsedData.state && parsedData.state.user) {
-            console.log("Tìm thấy dữ liệu user trong localStorage");
+            
             // Khôi phục dữ liệu từ localStorage
             setUser(parsedData.state.user, parsedData.state.accessToken || "");
             if (parsedData.state.accessToken && parsedData.state.refreshToken) {
@@ -53,11 +52,11 @@ export default function UserDataLoader({ children }: UserDataLoaderProps) {
       try {
         // Nếu đã đăng nhập qua NextAuth
         if (status === "authenticated" && session) {
-          console.log("Session đã xác thực:", session);
+          
           
           // Nếu chưa có user trong store nhưng có trong session
           if (!user && session.user) {
-            console.log("Đang đồng bộ user từ session vào store");
+           
             
             // Lưu thông tin user từ session vào store
             setUser(session.user, session.accessToken);
@@ -66,18 +65,6 @@ export default function UserDataLoader({ children }: UserDataLoaderProps) {
             if (session.accessToken && session.refreshToken) {
               setTokens(session.accessToken, session.refreshToken);
             }
-            
-            // Tải thông tin user mới nhất từ API
-            if (session.accessToken) {
-              try {
-                const result = await authApi.getMe(session.accessToken);
-                if (!result.success) {
-                  console.error("Không thể tải thông tin user từ API:", result.message);
-                }
-              } catch (error) {
-                console.error("Lỗi khi tải thông tin user:", error);
-              }
-            }
           }
           
           setLoading(false);
@@ -85,7 +72,6 @@ export default function UserDataLoader({ children }: UserDataLoaderProps) {
         } 
         // Nếu chưa đăng nhập nhưng có dữ liệu trong store
         else if (status === "unauthenticated" && user) {
-          console.log("Session unauthenticated nhưng có user trong store, thử cập nhật session");
           
           // Thử cập nhật session từ dữ liệu store
           try {
@@ -125,7 +111,6 @@ export default function UserDataLoader({ children }: UserDataLoaderProps) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <p>status: {status} - isLoading: {isLoading.toString()} - isInitialized: {isInitialized.toString()}</p>
           <div className="w-16 h-16 border-4 border-t-[#8A56FF] border-gray-200 rounded-full animate-spin mx-auto"></div>
           <p className="mt-4 text-gray-600">Đang tải thông tin người dùng...</p>
         </div>
