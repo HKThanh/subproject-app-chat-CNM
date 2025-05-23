@@ -4,6 +4,7 @@ import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import useUserStore from "@/stores/useUserStoree";
+import { WindowIcon } from "@heroicons/react/24/solid";
 
 interface UserDataLoaderProps {
   children: React.ReactNode;
@@ -92,10 +93,11 @@ export default function UserDataLoader({ children }: UserDataLoaderProps) {
         }
         // Nếu chưa đăng nhập và không có dữ liệu trong store
         else if (status === "unauthenticated" && !user && !redirectAttempted) {
-          console.log("Chưa đăng nhập và không có dữ liệu user, chuyển hướng đến trang login");
-          setRedirectAttempted(true);
-          router.push("/auth/login");
-        }
+        //   console.log("Chưa đăng nhập và không có dữ liệu user, chuyển hướng đến trang login");
+        //   setRedirectAttempted(true);
+        //   router.push("/auth/login");
+          window.location.reload();
+      }
       } catch (error) {
         console.error("Lỗi khi khởi tạo dữ liệu user:", error);
         setLoading(false);
@@ -110,6 +112,7 @@ export default function UserDataLoader({ children }: UserDataLoaderProps) {
   if (status === "loading" || isLoading || !isInitialized) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
+        <p>status: {status}, isLoading: {isLoading.toString()}, isInitialized: {isInitialized.toString()}</p>
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-t-[#8A56FF] border-gray-200 rounded-full animate-spin mx-auto"></div>
           <p className="mt-4 text-gray-600">Đang tải thông tin người dùng...</p>
