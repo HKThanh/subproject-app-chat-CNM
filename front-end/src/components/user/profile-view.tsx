@@ -1,37 +1,46 @@
 "use client"
 
-import { X, PenSquare, Camera } from "lucide-react"
+import { X, PenSquare, Camera, Pencil, MessageSquare, UserPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import type { UserProfile } from "./profile-modal"
-import { motion } from "framer-motion"
 
 interface ProfileViewProps {
   profile: UserProfile
   onEdit: () => void
   onViewImage: (url: string, type: "avatar" | "cover") => void
+  isCurrentUser?: boolean
 }
 
-export default function ProfileView({ profile, onEdit, onViewImage }: ProfileViewProps) {
+export default function ProfileView({ profile, onEdit, onViewImage, isCurrentUser = true }: ProfileViewProps) {
   return (
-    <motion.div
-      className="relative"
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.3 }}
-    >
+    <div className="relative">
       {/* Header with close button */}
       <div className="flex items-center justify-between p-4 border-b">
         <h2 className="text-lg font-semibold">Thông tin tài khoản</h2>
       </div>
 
       {/* Cover photo */}
-      <div 
-        className="relative h-40 w-full cursor-pointer" 
-        onClick={() => onViewImage(profile.coverUrl || `https://ui-avatars.com/api/?name=${profile.fullname}`, "cover")}
-      >
-        <Image src={profile.coverUrl || `https://ui-avatars.com/api/?name=${profile.fullname}`} alt="Cover photo" fill className="object-cover" />
+      <div className="relative h-32 bg-gradient-to-r from-blue-100 to-purple-100">
+        {profile.coverUrl && (
+          <img
+            src={profile.coverUrl}
+            alt="Cover"
+            className="w-full h-full object-cover"
+            onClick={() => onViewImage(profile.coverUrl, "cover")}
+          />
+        )}
+        {/* Only show edit button for current user */}
+        {isCurrentUser && onEdit && (
+          <Button
+            onClick={onEdit}
+            size="sm"
+            className="absolute top-2 right-2 bg-white/80 hover:bg-white text-gray-800"
+          >
+            <Pencil className="h-4 w-4 mr-1" />
+            Chỉnh sửa
+          </Button>
+        )}
       </div>
 
       {/* Profile picture */}
@@ -48,7 +57,19 @@ export default function ProfileView({ profile, onEdit, onViewImage }: ProfileVie
           </div>
         </div>
       </div>
-
+        {/* Add contact/message buttons for other users' profiles */}
+      {!isCurrentUser && (
+        <div className="flex justify-center gap-3 mt-4 mb-6 px-4">
+          <Button className="flex-1 bg-blue-500 hover:bg-blue-600">
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Nhắn tin
+          </Button>
+          <Button variant="outline" className="flex-1">
+            <UserPlus className="h-4 w-4 mr-2" />
+            Kết bạn
+          </Button>
+        </div>
+      )}
       {/* User name */}
       <div className="mt-16 px-4">
         <div className="flex items-center">
@@ -90,16 +111,18 @@ export default function ProfileView({ profile, onEdit, onViewImage }: ProfileVie
         </div>
       </div>
 
-      {/* Update button */}
-      <div className="p-4 flex justify-center border-t">
-        <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="w-full">
-          <Button variant="outline" className="w-full flex items-center justify-center" onClick={onEdit}>
-            <PenSquare className="h-4 w-4 mr-2" />
-            Cập nhật
-          </Button>
-        </motion.div>
-      </div>
-    </motion.div>
+      {/* Update button - only show for current user */}
+      {isCurrentUser && (
+        <div className="p-4 flex justify-center border-t">
+          <div className="w-full">
+            <Button variant="outline" className="w-full flex items-center justify-center" onClick={onEdit}>
+              <PenSquare className="h-4 w-4 mr-2" />
+              Cập nhật
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

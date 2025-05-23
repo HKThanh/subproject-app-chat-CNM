@@ -19,6 +19,7 @@ interface ImageViewerProps {
   onClose: () => void
   onUpdate: (type: "avatar" | "cover", url: string) => void
   imageType: "avatar" | "cover"  // Thêm prop mới
+  readOnly?: boolean;
 }
 
 export default function ImageViewer({
@@ -26,7 +27,8 @@ export default function ImageViewer({
   isOpen,
   onClose,
     onUpdate,
-  imageType  // Sử dụng prop mới
+  imageType,
+  readOnly = false 
 }: ImageViewerProps) {
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
