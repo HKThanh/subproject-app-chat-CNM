@@ -94,8 +94,6 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
 
   const checkFriendStatus = async (userId: string) => {
     try {
-
-
       // 1. Kiểm tra danh sách bạn bè
       const friendsResponse = await fetch(
         `${END_POINT_URL}/user/friend/get-friends`,
@@ -110,8 +108,10 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
       console.log("danh sách bạn bè: ", friendsData)
       if (friendsData.message === 'Lấy danh sách bạn bè thành công') {
         // Kiểm tra xem userId có trong danh sách bạn bè không
-        const isFriend = friendsData.data.some((friend: any) => friend.id === selectedUser?.id);
+        const isFriend = friendsData.data.some((friend: any) => friend.id ===userId);
         console.log("isFriend: ", isFriend)
+        console.log("userId: ", userId)
+
         if (isFriend) {
           setFriendStatus("friends");
           setFriendRequestId(null);
@@ -269,7 +269,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
       })
 
       const data = await response.json()
-
+      console.log("data khi gửi yêu cầu kết bạn: ", data)
       if (data.code === 1) {
         const newRequest = {
           id: data.data.requestId,
@@ -321,6 +321,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   }
 
   const handleSelectUser = async (user: SearchResult) => {
+    console.log("Thông tin người được chọn: ", user.id)
     // Lưu thông tin người dùng được chọn
     setSelectedUser(user);
     // Kiểm tra trạng thái bạn bè
@@ -490,7 +491,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
               <X className="w-4 h-4 text-gray-500" />
             </button>
           )}
-          <div className="flex items-center gap-2 ml-2">
+          {/* <div className="flex items-center gap-2 ml-2">
             <button
               className={`p-1 rounded-full ${searchMode === "users" ? "bg-blue-100 text-blue-600" : "text-gray-500 hover:bg-gray-100"}`}
               onClick={() => setSearchMode("users")}
@@ -505,7 +506,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
             >
               <UsersIcon className="w-4 h-4" />
             </button>
-          </div>
+          </div> */}
         </div>
       </div>
 

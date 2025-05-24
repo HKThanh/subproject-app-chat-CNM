@@ -233,12 +233,28 @@ export default function LoginForm() {
                       <FormItem>
                         <FormControl>
                           <div className="relative">
-                          <Input
+                            <Input
                               type={showPassword ? "text" : "password"}
                               placeholder="Nhập mật khẩu"
                               className="rounded-full h-12 px-4 border-white/30 bg-white/30 backdrop-blur-lg focus:bg-white/40 transition-all pr-10 font-medium text-gray-900 placeholder:text-gray-500"
                               {...field}
                             />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-white/30"
+                              onClick={togglePasswordVisibility}
+                            >
+                              {showPassword ? (
+                                <EyeOff className="h-4 w-4 text-gray-700" />
+                              ) : (
+                                <Eye className="h-4 w-4 text-gray-700" />
+                              )}
+                              <span className="sr-only">
+                                {showPassword ? "Hide password" : "Show password"}
+                              </span>
+                            </Button>
                           </div>
                         </FormControl>
                         <FormMessage>
