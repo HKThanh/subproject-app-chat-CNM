@@ -1154,11 +1154,40 @@ export const useChat = (userId: string) => {
   }) => {
     console.log("Nhận danh sách cuộc trò chuyện nhóm:", data);
 
-    // Kết hợp cuộc trò chuyện nhóm với cuộc trò chuyện hiện có
+    // Xử lý tin nhắn mới nhất đã bị xóa
     if (data.Items && Array.isArray(data.Items)) {
+      const processedItems = data.Items.map(conversation => {
+        // Kiểm tra nếu tin nhắn mới nhất đã bị xóa hoặc thu hồi
+        if (conversation.latestMessage) {
+          if (conversation.latestMessage.isRemove) {
+            // Nếu tin nhắn đã bị xóa, thay đổi nội dung hiển thị
+            return {
+              ...conversation,
+              latestMessage: {
+                ...conversation.latestMessage,
+                content: "Tin nhắn đã bị xóa",
+                preview: "Tin nhắn đã bị xóa"
+              }
+            };
+          } else if (conversation.latestMessage.isRecall) {
+            // Nếu tin nhắn đã bị thu hồi, thay đổi nội dung hiển thị
+            return {
+              ...conversation,
+              latestMessage: {
+                ...conversation.latestMessage,
+                content: "Tin nhắn đã được thu hồi",
+                preview: "Tin nhắn đã được thu hồi"
+              }
+            };
+          }
+        }
+        return conversation;
+      });
+
+      // Kết hợp cuộc trò chuyện nhóm với cuộc trò chuyện hiện có
       dispatch({
         type: 'SET_CONVERSATIONS',
-        payload: [...state.conversations, ...data.Items].filter((conv, index, self) =>
+        payload: [...state.conversations, ...processedItems].filter((conv, index, self) =>
           // Loại bỏ các cuộc trò chuyện trùng lặp
           index === self.findIndex(c => c.idConversation === conv.idConversation)
         )
@@ -1166,7 +1195,7 @@ export const useChat = (userId: string) => {
     }
 
     dispatch({ type: 'SET_LOADING', payload: false });
-  }, [state.conversations]); // Phụ thuộc vào state.conversations để luôn có danh sách mới nhất
+  }, [state.conversations]); // Phụ thuộc vào state.conversations để luôn có danh sách mới nhất // Phụ thuộc vào state.conversations để luôn có danh sách mới nhất
   const createGroupConversation = useCallback((
     groupName: string,
     groupMembers: string[],
