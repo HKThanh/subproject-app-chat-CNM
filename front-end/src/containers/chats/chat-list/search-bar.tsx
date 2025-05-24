@@ -78,15 +78,14 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
 
     // Lắng nghe khi yêu cầu kết bạn bị từ chối
     socket.on("friendRequestDeclined", (data) => {
-      toast.error("Yêu cầu kết bạn đã bị từ chối")
-      console.log("data khi từ chối yêu cầu: ", data)
-      console.log("selectedUser khi từ chối yêu cầu: ", selectedUser)
+      // toast.error("Yêu cầu kết bạn đã bị từ chối")
+      // console.log("data khi từ chối yêu cầu: ", data)
+      // console.log("selectedUser khi từ chối yêu cầu: ", selectedUser)
       // Cập nhật trạng thái nếu đang xem profile của người này
       if (selectedUser && data.data.receiverId === selectedUser.id) {
         setFriendStatus("none")
         setFriendRequestId(null)
-        console.log("đã cập nhật lại trạng thái")
-
+        // console.log("đã cập nhật lại trạng thái")
       }
     })
 
@@ -114,12 +113,14 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
     })
 
     // Lắng nghe khi bị xóa khỏi danh sách bạn bè
-    socket.on("unfriend", (data) => {
+    socket.on("unFriend", (data) => {
+      console.log("data khi bị xóa khỏi danh sách bạn bè: ", data)
+      console.log("selectedUser khi bị xóa khỏi danh sách bạn bè: ", selectedUser)
       // Nếu đang xem profile của người đã xóa bạn
-      if (selectedUser && (data.senderId === selectedUser.id || data.receiverId === selectedUser.id)) {
+      // if (selectedUser && (data.senderId === selectedUser.id || data.receiverId === selectedUser.id)) {
         setFriendStatus("none")
         setFriendRequestId(null)
-      }
+      // }
     })
 
     return () => {
@@ -127,7 +128,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
       socket.off("friendRequestDeclined")
       socket.off("newFriendRequest")
       socket.off("friendRequestCancelled")
-      socket.off("unfriend")
+      socket.off("unFriend")
     }
   }, [socket, selectedUser])
 
@@ -571,7 +572,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
     try {
       // Nếu đang loading, không cho thực hiện thêm
       if (actionLoading) return;
-
+      console.log("friendId: ", friendId)
       // Set trạng thái loading
       setActionLoading("remove");
       const token = await getAuthToken();
