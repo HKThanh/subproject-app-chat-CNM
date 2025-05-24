@@ -267,6 +267,34 @@ class CallController {
         }
     }
 
+    async getCallStatus(callId) {
+        try {
+            const call = await Call.findOne({ idCall: callId });
+            return call ? call.status : null;
+        } catch (error) {
+            console.error('Error getting call status:', error);
+            return null;
+        }
+    }
+
+    async handleGetCallStatus(socket, payload) {
+        try {
+            const { callId } = payload;
+            const status = await this.getCallStatus(callId);
+            
+            socket.emit("call_status_response", {
+                success: true,
+                callId: callId,
+                status: status
+            });
+        } catch (error) {
+            socket.emit("call_error", { 
+                success: false,
+                message: error.message 
+            });
+        }
+    }
+
     // Socket event handlers
     async handleInitiateCall(io, socket, payload) {
         try {
@@ -278,13 +306,28 @@ class CallController {
                 throw new Error('Caller not found');
             }
 
+            const receiver = await User.findOne({ id: IDReceiver }).select('id fullname urlavatar');
+            if (!receiver) { 
+                throw new Error('Receiver not found');
+            }
+
             const call = await this.initiateCall(IDCaller, IDReceiver, callType);
             
             // Emit tới người gọi
             socket.emit("call_initiated", {
                 success: true,
                 call: call,
-                roomUrl: call.roomUrl
+                roomUrl: call.roomUrl,
+                caller: {
+                    id: caller.id,
+                    fullname: caller.fullname,
+                    urlavatar: caller.urlavatar
+                },
+                receiver: {
+                    id: receiver.id,
+                    fullname: receiver.fullname,
+                    urlavatar: receiver.urlavatar
+                }
             });
 
             // Emit tới người nhận
@@ -297,6 +340,11 @@ class CallController {
                         id: caller.id,
                         fullname: caller.fullname,
                         urlavatar: caller.urlavatar
+                    },
+                    receiver: {
+                        id: receiver.id,
+                        fullname: receiver.fullname,
+                        urlavatar: receiver.urlavatar
                     },
                     callType: call.callType,
                     roomUrl: call.roomUrl
@@ -314,11 +362,26 @@ class CallController {
         try {
             const { callId, userId } = payload;
             const call = await this.acceptCall(callId, userId);
+
+            const caller = await User.findOne({ id: call.callerId }).select('id fullname urlavatar');
+            if (!caller) {
+                throw new Error('Caller not found');
+            }
+
+            const receiver = await User.findOne({ id: call.receiverId }).select('id fullname urlavatar');
+            if (!receiver) { 
+                throw new Error('Receiver not found');
+            }
             
             socket.emit("call_accepted_confirmed", {
                 success: true,
                 call: call,
-                roomUrl: call.roomUrl
+                roomUrl: call.roomUrl,
+                caller: {
+                    id: caller.id,
+                    fullname: caller.fullname,
+                    urlavatar: caller.urlavatar
+                },
             });
 
             // Thông báo cho người gọi
@@ -327,7 +390,12 @@ class CallController {
             if (callerSocket) {
                 io.to(callerSocket.socketId).emit("call_accepted", {
                     callId: call.idCall,
-                    roomUrl: call.roomUrl
+                    roomUrl: call.roomUrl,
+                    receiver: {
+                        id: receiver.id,
+                        fullname: receiver.fullname,
+                        urlavatar: receiver.urlavatar
+                    },
                 });
             }
         } catch (error) {
@@ -353,9 +421,26 @@ class CallController {
             if (call) {
                 const socketController = require('./socketController');
                 const callerSocket = socketController.getUser(call.callerId);
+
+                const receiver = await User.findOne({ id: call.receiverId }).select('id fullname urlavatar');
+                if (!receiver) {
+                    throw new Error('Receiver not found');
+                }
+
                 if (callerSocket) {
                     io.to(callerSocket.socketId).emit("call_rejected", {
-                        callId: callId
+                        callId: callId,
+                        rejectedBy: {
+                            id: receiver.id,
+                            fullname: receiver.fullname,
+                            urlavatar: receiver.urlavatar
+                        },
+                        receiver: {
+                            id: receiver.id,
+                            fullname: receiver.fullname,
+                            urlavatar: receiver.urlavatar
+                        },
+                        timestamp: new Date()
                     });
                 }
             }
@@ -374,7 +459,7 @@ class CallController {
             
             socket.emit("call_ended_confirmed", {
                 success: true,
-                call: call
+                call: call,
             });
 
             // Thông báo cho người kia
@@ -413,6 +498,34 @@ class CallController {
         }
     }
 
+    async handleCallTimeout(io, socket, payload) {
+        try {
+            const { callId, userId } = payload;
+            const call = await this.endCall(callId, userId, 'missed');
+            
+            socket.emit("call_timeout_confirmed", {
+                success: true,
+                call: call
+            });
+
+            // Thông báo cho người gọi
+            const otherUserId = call.callerId === userId ? call.receiverId : call.callerId;
+            const socketController = require('./socketController');
+            const otherUserSocket = socketController.getUser(otherUserId);
+            if (otherUserSocket) {
+                io.to(otherUserSocket.socketId).emit("call_missed", {
+                    callId: callId,
+                    missedBy: userId
+                });
+            }
+        } catch (error) {
+            socket.emit("call_error", { 
+                success: false,
+                message: error.message 
+            });
+        }
+    }
+
     // Main socket handler
     handleCallEvents(io, socket) {
         // Khởi tạo cuộc gọi
@@ -438,6 +551,14 @@ class CallController {
         // Lấy cuộc gọi đang active
         socket.on("get_active_call", (payload) => {
             this.handleGetActiveCall(socket, payload);
+        });
+
+        socket.on("call_timeout", (payload) => {
+            this.handleCallTimeout(io, socket, payload);
+        });
+
+        socket.on("get_call_status", (payload) => {
+            this.handleGetCallStatus(socket, payload);
         });
     }
 

@@ -1,0 +1,420 @@
+**CALL SOCKET TESTING DOCUMENTATION**
+
+==============================================
+1. INITIATE CALL
+==============================================
+emit: initiate_call
+event: call_initiated (người gọi)
+input:
+{
+    "IDCaller": "user010",
+    "IDReceiver": "user003",
+    "callType": "video"
+}
+output:
+{
+    "success": true,
+    "call": {
+        "idCall": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+        "callerId": "user010",
+        "receiverId": "user003",
+        "callType": "video",
+        "status": "ringing",
+        "roomName": "call-user010-user003-1748089357721",
+        "roomUrl": "https://that909kk.daily.co/call-user010-user003-1748089357721",
+        "startTime": "2025-01-24T16:15:57.721Z"
+    },
+    "roomUrl": "https://that909kk.daily.co/call-user010-user003-1748089357721",
+    "caller": {
+        "id": "user010",
+        "fullname": "Hoàng Thị Lan",
+        "urlavatar": "https://example.com/avatars/lan.jpg"
+    },
+    "receiver": {
+        "id": "user003",
+        "fullname": "Alice Johnson",
+        "urlavatar": "https://example.com/avatars/alice.jpg"
+    }
+}
+
+event: incoming_call (người nhận)
+input: (auto triggered when initiate_call is emitted)
+output:
+{
+    "callId": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+    "caller": {
+        "id": "user010",
+        "fullname": "Hoàng Thị Lan",
+        "urlavatar": "https://example.com/avatars/lan.jpg"
+    },
+    "receiver": {
+        "id": "user003",
+        "fullname": "Alice Johnson",
+        "urlavatar": "https://example.com/avatars/alice.jpg"
+    },
+    "callType": "video",
+    "roomUrl": "https://that909kk.daily.co/call-user010-user003-1748089357721"
+}
+
+==============================================
+2. ACCEPT CALL
+==============================================
+emit: accept_call
+event: call_accepted_confirmed (người nhận)
+input:
+{
+    "callId": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+    "userId": "user003"
+}
+output:
+{
+    "success": true,
+    "call": {
+        "idCall": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+        "callerId": "user010",
+        "receiverId": "user003",
+        "callType": "video",
+        "status": "active",
+        "roomName": "call-user010-user003-1748089357721",
+        "roomUrl": "https://that909kk.daily.co/call-user010-user003-1748089357721",
+        "startTime": "2025-01-24T16:15:57.721Z"
+    },
+    "roomUrl": "https://that909kk.daily.co/call-user010-user003-1748089357721",
+    "caller": {
+        "id": "user010",
+        "fullname": "Hoàng Thị Lan",
+        "urlavatar": "https://example.com/avatars/lan.jpg"
+    }
+}
+
+event: call_accepted (người gọi)
+input: (auto triggered when accept_call is emitted)
+output:
+{
+    "callId": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+    "roomUrl": "https://that909kk.daily.co/call-user010-user003-1748089357721",
+    "receiver": {
+        "id": "user003",
+        "fullname": "Alice Johnson",
+        "urlavatar": "https://example.com/avatars/alice.jpg"
+    }
+}
+
+==============================================
+3. REJECT CALL
+==============================================
+emit: reject_call
+event: call_rejected_confirmed (người từ chối)
+input:
+{
+    "callId": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+    "userId": "user003"
+}
+output:
+{
+    "success": true,
+    "message": "Call rejected"
+}
+
+event: call_rejected (người gọi)
+input: (auto triggered when reject_call is emitted)
+output:
+{
+    "callId": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+    "receiver": {
+        "id": "user003",
+        "fullname": "Alice Johnson",
+        "urlavatar": "https://example.com/avatars/alice.jpg"
+    },
+    "receiver": {
+        "id": "user003",
+        "fullname": "Alice Johnson",
+        "urlavatar": "https://example.com/avatars/alice.jpg"
+    }
+    "timestamp": "2025-01-24T16:16:30.125Z"
+}
+
+==============================================
+4. END CALL
+==============================================
+emit: end_call
+event: call_ended_confirmed (người kết thúc)
+input:
+{
+    "callId": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+    "userId": "user010",
+    "reason": "normal"
+}
+output:
+{
+    "success": true,
+    "call": {
+        "idCall": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+        "callerId": "user010",
+        "receiverId": "user003",
+        "callType": "video",
+        "status": "ended",
+        "roomName": "call-user010-user003-1748089357721",
+        "roomUrl": "https://that909kk.daily.co/call-user010-user003-1748089357721",
+        "startTime": "2025-01-24T16:15:57.721Z",
+        "endTime": "2025-01-24T16:18:45.123Z",
+        "duration": 167,
+        "endReason": "normal"
+    }
+}
+
+event: call_ended (người còn lại)
+input: (auto triggered when end_call is emitted)
+output:
+{
+    "callId": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+    "reason": "normal",
+    "duration": 167
+}
+
+==============================================
+5. GET ACTIVE CALL
+==============================================
+emit: get_active_call
+event: active_call_response
+input:
+{
+    "userId": "user010"
+}
+output (có cuộc gọi active):
+{
+    "success": true,
+    "activeCall": {
+        "idCall": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+        "callerId": "user010",
+        "receiverId": "user003",
+        "callType": "video",
+        "status": "active",
+        "roomName": "call-user010-user003-1748089357721",
+        "roomUrl": "https://that909kk.daily.co/call-user010-user003-1748089357721",
+        "startTime": "2025-01-24T16:15:57.721Z"
+    }
+}
+
+output (không có cuộc gọi active):
+{
+    "success": true,
+    "activeCall": null
+}
+
+==============================================
+6. CALL TIMEOUT
+==============================================
+emit: call_timeout
+event: call_timeout_confirmed (người timeout)
+input:
+{
+    "callId": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+    "userId": "user010"
+}
+output:
+{
+    "success": true,
+    "call": {
+        "idCall": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+        "callerId": "user010",
+        "receiverId": "user003",
+        "callType": "video",
+        "status": "ended",
+        "roomName": "call-user010-user003-1748089357721",
+        "roomUrl": "https://that909kk.daily.co/call-user010-user003-1748089357721",
+        "startTime": "2025-01-24T16:15:57.721Z",
+        "endTime": "2025-01-24T16:18:45.123Z",
+        "duration": 167,
+        "endReason": "missed"
+    }
+}
+
+event: call_missed (người kia)
+input: (auto triggered when call_timeout is emitted)
+output:
+{
+    "callId": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+    "missedBy": "user010"
+}
+
+==============================================
+7. GET CALL STATUS
+==============================================
+emit: get_call_status
+event: call_status_response
+input:
+{
+    "callId": "6625bfdd-67c0-4d42-b620-2011fc7368e8"
+}
+output:
+{
+    "success": true,
+    "callId": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+    "status": "active"
+}
+
+==============================================
+8. ERROR CASES
+==============================================
+event: call_error
+Các trường hợp lỗi:
+
+User đã có cuộc gọi:
+input: initiate_call với user đang trong call khác
+output:
+{
+    "success": false,
+    "message": "User is already in a call"
+}
+
+Caller không tồn tại:
+input: initiate_call với IDCaller không hợp lệ
+output:
+{
+    "success": false,
+    "message": "Caller not found"
+}
+
+Receiver không tồn tại:
+input: initiate_call với IDReceiver không hợp lệ
+output:
+{
+    "success": false,
+    "message": "Receiver not found"
+}
+
+Không phải bạn bè:
+input: initiate_call với user không phải bạn bè
+output:
+{
+    "success": false,
+    "message": "Cannot call non-friend user"
+}
+
+Call không tồn tại:
+input: accept_call/reject_call/end_call với callId không hợp lệ
+output:
+{
+    "success": false,
+    "message": "Call not found"
+}
+
+Không có quyền accept:
+input: accept_call với userId không phải receiverId
+output:
+{
+    "success": false,
+    "message": "Unauthorized to accept this call"
+}
+
+Không có quyền reject:
+input: reject_call với userId không phải receiverId
+output:
+{
+    "success": false,
+    "message": "Unauthorized to reject this call"
+}
+
+Không có quyền end:
+input: end_call với userId không phải callerId hoặc receiverId
+output:
+{
+    "success": false,
+    "message": "Unauthorized to end this call"
+}
+
+==============================================
+9. DISCONNECT HANDLING
+==============================================
+Khi user disconnect:
+- Tự động gọi handleUserDisconnect(userId)
+- Kết thúc cuộc gọi active với reason "disconnected"
+- Gửi call_ended event cho user kia
+- Cleanup memory cache (activeCalls và userCalls)
+
+event: call_ended (auto triggered khi disconnect)
+output:
+{
+    "callId": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+    "reason": "disconnected",
+    "duration": 45
+}
+
+==============================================
+10. CALL REASONS
+==============================================
+Các loại reason trong end_call:
+- "normal": Kết thúc bình thường
+- "rejected": Đã từ chối
+- "missed": Cuộc gọi nhỡ
+- "disconnected": Mất kết nối
+- "error": Lỗi hệ thống
+
+Text hiển thị (getEndReasonText):
+- "normal" → "Kết thúc bình thường"
+- "rejected" → "Đã từ chối"
+- "missed" → "Cuộc gọi nhỡ"
+- "disconnected" → "Mất kết nối"
+- "error" → "Lỗi hệ thống"
+- default → "Đã kết thúc"
+
+==============================================
+11. CALL TYPES
+==============================================
+Supported callType values:
+- "video": Video call
+- "audio": Audio call (voice only)
+
+==============================================
+12. MESSAGE CREATION
+==============================================
+Mỗi hành động call sẽ tạo MessageDetail:
+- initiated: "Cuộc gọi video/thoại đã được khởi tạo"
+- accepted: "Cuộc gọi video/thoại đã được chấp nhận"
+- ended: "Thời gian: MM:SS - [EndReasonText]"
+
+MessageDetail fields:
+- type: "call"
+- callId: ID cuộc gọi
+- callType: "video" hoặc "audio"
+- callAction: "initiated", "accepted", "ended"
+
+==============================================
+13. MEMORY MANAGEMENT
+==============================================
+CallController sử dụng 2 Map:
+- activeCalls: Map<callId, callData>
+- userCalls: Map<userId, callId>
+
+Cleanup events:
+- Khi end_call: xóa khỏi cả 2 Map
+- Khi disconnect: gọi handleUserDisconnect
+- Khi reject_call: gọi endCall với reason "rejected"
+
+==============================================
+14. SOCKET EVENTS SUMMARY
+==============================================
+Events mà client có thể emit:
+- initiate_call
+- accept_call
+- reject_call
+- end_call
+- get_active_call
+- call_timeout
+- get_call_status
+
+Events mà server sẽ emit:
+- call_initiated (cho caller)
+- incoming_call (cho receiver)
+- call_accepted_confirmed (cho accepter)
+- call_accepted (cho caller)
+- call_rejected_confirmed (cho rejecter)
+- call_rejected (cho caller)
+- call_ended_confirmed (cho ender)
+- call_ended (cho user còn lại)
+- call_timeout_confirmed (cho timeout user)
+- call_missed (cho user kia)
+- call_status_response
+- active_call_response
+- call_error (cho mọi lỗi)
