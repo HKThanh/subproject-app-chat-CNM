@@ -40,7 +40,7 @@ export default function BlockedList() {
       setLoading(true);
       const token = await getAuthToken();
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/user/blocked-users`,
+        `${process.env.NEXT_PUBLIC_API_URL}/user/blocked/get-blocked`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
