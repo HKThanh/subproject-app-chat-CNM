@@ -102,10 +102,12 @@ export default function FriendRequests() {
       );
       const sentData = await sentResponse.json();
       if (sentData.success) {
-        setSentRequests((prev) =>
-          prev.filter((req) => req.id !== sentData.data.requestId)
-        );
-        // setSentRequests(sentData.data);
+        // setSentRequests((prev) =>
+        //   prev.filter((req) => req.id !== sentData.data.requestId)
+        // );
+        // console.log("danh sách lời mời đã gửi: ", sentData.data);
+        // console.log("danh sách lời mời đã nhận: ", sentRequests);
+        setSentRequests(sentData.data);
       }
     } catch (error) {
       toast.error("Không thể tải danh sách lời mời kết bạn");
