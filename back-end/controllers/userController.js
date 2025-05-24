@@ -303,7 +303,7 @@ userController.sendFriendRequest = async (req, res, io) => {
   return res.json({
     code: 1,
     message: "Request sent",
-    data: { senderId, receiverId },
+    data: { senderId, receiverId, requestId: newRequest.id },
   });
 };
 
