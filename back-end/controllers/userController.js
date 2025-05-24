@@ -263,12 +263,10 @@ userController.sendFriendRequest = async (req, res, io) => {
 
   console.log(existing);
 
-  if (existing.status === "PENDING") {
-    return res.json({
-      code: 0,
-      message: "Yêu cầu đã được gửi",
-      data: existing,
-    });
+  if(existing) {
+    if(existing.status === "PENDING") {
+      return res.json({ code: 0, message: "Yêu cầu kết bạn đã được gửi" });
+    }
   }
 
   const sender = await UserModel.get(senderId);
@@ -387,6 +385,8 @@ userController.handleFriendRequest = async (req, res, io) => {
         data: {
           requestId: request.id,
           userId: request.senderId,
+          senderId: request.senderId,
+          receiverId: request.receiverId,
         },
         error: null,
       });
@@ -407,6 +407,8 @@ userController.handleFriendRequest = async (req, res, io) => {
         message: "Yêu cầu kết bạn đã bị từ chối",
         data: {
           requestId: request.id,
+          senderId: request.senderId,
+          receiverId: request.receiverId,
         },
         error: null,
       });
