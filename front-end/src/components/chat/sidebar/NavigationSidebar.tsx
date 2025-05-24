@@ -105,8 +105,10 @@ export default function NavigationSidebar() {
   const handleNavigation = (id: string) => {
     setActiveItem(id);
     if (id === "contacts") {
+      console.log("Navigating to contacts");
       router.push("/contacts");
     } else if (id === "messages") {
+      console.log("Navigating to chat");
       router.push("/chat");
     }
     // Add other navigation cases as needed

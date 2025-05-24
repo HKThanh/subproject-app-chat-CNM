@@ -22,15 +22,26 @@ export type UserProfile = {
   avatarUrl: string
   coverUrl: string
   id?: string
+  email?: string
 }
 
 interface ProfileModalProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-  userId?: string; 
+  userId?: string;
+  userData?: UserProfile; // prop userData để nhận dữ liệu trực tiếp
+  onStartChat?: () => void; // callback để bắt đầu chat
+  onAddFriend?: (userId: string) => void; //  callback để thêm bạn
+  onCancelRequest?: (requestId: string) => void; // callback để thu hồi lời mời
+  onRemoveFriend?: (userId: string) => void; // callback để hủy kết bạn
+  friendStatus?: "none" | "pending" | "requested" | "friends"; // trạng thái bạn bè
+  friendRequestId?: string; // ID của lời mời kết bạn (nếu có)
 }
 
-export default function ProfileModal({ userId }: ProfileModalProps) {
+export default function ProfileModal({ userId, userData, onStartChat, onAddFriend, onCancelRequest,
+  onRemoveFriend,
+  friendStatus = "none",
+  friendRequestId }: ProfileModalProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [viewingImage, setViewingImage] = useState<string | null>(null)
   const [imageType, setImageType] = useState<"avatar" | "cover" | null>(null)
@@ -56,80 +67,34 @@ export default function ProfileModal({ userId }: ProfileModalProps) {
 
   // Fetch user profile data based on userId
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      // If no userId is provided or it matches current user's ID, show current user profile
-      if (!userId || (currentUser && userId === currentUser.id)) {
-        setIsCurrentUser(true)
-        if (currentUser) {
-          setProfile({
-            id: currentUser.id,
-            fullname: currentUser.fullname?.toString() || "",
-            bio: currentUser.bio?.toString() || "Hello là chào cậu 👋",
-            gender: currentUser.ismale === true ? "Nam" : "Nữ",
-            birthDay: currentUser.birthday?.split('-')[2] || "",
-            birthMonth: currentUser.birthday?.split('-')[1] || "",
-            birthYear: currentUser.birthday?.split('-')[0] || "",
-            phone: currentUser.phone?.toString() || "",
-            avatarUrl: currentUser.urlavatar?.toString() || "",
-            coverUrl: currentUser.coverPhoto?.toString() || "",
-          });
-        }
-      } else {
-        // Show another user's profile
-        setIsCurrentUser(false)
-        setIsLoading(true)
-        
-        try {
-          
-          if (!accessToken) {
-            console.error('Không tìm thấy token xác thực. Vui lòng đăng nhập lại.');
-            return;
-          }
-          
-          // Fetch user profile data from API
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${userId}`, {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-            },
-          });
-          
-          if (!response.ok) {
-            throw new Error('Failed to fetch user profile');
-          }
-          
-          const userData = await response.json();
-          
-          // Set profile data from API response
-          setProfile({
-            id: userData.id,
-            fullname: userData.fullname || "",
-            bio: userData.bio || "Hello là chào cậu 👋",
-            gender: userData.ismale === true ? "Nam" : "Nữ",
-            birthDay: userData.birthday?.split('-')[2] || "",
-            birthMonth: userData.birthday?.split('-')[1] || "",
-            birthYear: userData.birthday?.split('-')[0] || "",
-            phone: userData.phone || "",
-            avatarUrl: userData.urlavatar || "",
-            coverUrl: userData.coverPhoto || "",
-          });
-        } catch (error) {
-          console.error('Error fetching user profile:', error);
-        } finally {
-          setIsLoading(false);
-        }
-      }
-    };
-    
-    fetchUserProfile();
-  }, [userId, currentUser]);
+    if (userData) {
+      // Sử dụng dữ liệu được truyền vào trực tiếp
+      setIsCurrentUser(false) // Đây là profile của người khác
+      setProfile(userData);
+    } else if (currentUser) {
+      // Nếu không có userData, sử dụng dữ liệu người dùng hiện tại
+      setIsCurrentUser(true)
+      setProfile({
+        fullname: currentUser.fullname?.toString() || "",
+        bio: currentUser.bio?.toString() || "Hello là chào cậu 👋",
+        gender: currentUser.ismale === true ? "Nam" : "Nữ",
+        birthDay: currentUser.birthday?.split('-')[2] || "",
+        birthMonth: currentUser.birthday?.split('-')[1] || "",
+        birthYear: currentUser.birthday?.split('-')[0] || "",
+        phone: currentUser.phone?.toString() || "",
+        avatarUrl: currentUser.urlavatar?.toString() || "",
+        coverUrl: currentUser.coverPhoto?.toString() || "",
+        id: currentUser.id
+      });
+    }
+  }, [currentUser, userData])
 
   const handleUpdateProfile = async (updatedProfile: Partial<UserProfile>) => {
     const birthday = updatedProfile.birthYear && updatedProfile.birthMonth && updatedProfile.birthDay
       ? `${updatedProfile.birthYear}-${updatedProfile.birthMonth}-${updatedProfile.birthDay}`
       : profile.birthYear && profile.birthMonth && profile.birthDay
-      ? `${profile.birthYear}-${profile.birthMonth}-${profile.birthDay}`
-      : currentUser?.birthday || '';
+        ? `${profile.birthYear}-${profile.birthMonth}-${profile.birthDay}`
+        : currentUser?.birthday || '';
 
     // Lấy accessToken từ session hoặc zustand
     const accessToken = await getAuthToken();
@@ -237,6 +202,11 @@ export default function ProfileModal({ userId }: ProfileModalProps) {
                 onEdit={isCurrentUser ? () => setIsEditing(true) : () => {}}
                 onViewImage={handleViewImage}
                 isCurrentUser={isCurrentUser}
+                friendStatus={friendStatus}
+                onStartChat={onStartChat}
+                onAddFriend={onAddFriend && profile.id ? () => onAddFriend(profile.id!) : undefined}
+                onCancelRequest={onCancelRequest && friendRequestId ? () => onCancelRequest(friendRequestId) : undefined}
+                onRemoveFriend={onRemoveFriend && profile.id ? () => onRemoveFriend(profile.id!) : undefined}
               />
             )}
           </AnimatePresence>
@@ -251,7 +221,7 @@ export default function ProfileModal({ userId }: ProfileModalProps) {
             setViewingImage(null);
             setImageType(null);
           }}
-          onUpdate={isCurrentUser ? handleUpdateImage : () => {}}
+          onUpdate={isCurrentUser ? handleUpdateImage : () => { }}
           imageType={imageType || "avatar"}
           readOnly={!isCurrentUser}
         />

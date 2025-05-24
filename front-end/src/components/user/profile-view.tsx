@@ -1,20 +1,35 @@
 "use client"
 
-import { X, PenSquare, Camera, Pencil, MessageSquare, UserPlus } from "lucide-react"
+import { X, PenSquare, Camera, Pencil, MessageSquare, UserPlus, UserX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import type { UserProfile } from "./profile-modal"
+import { motion } from "framer-motion"
 
 interface ProfileViewProps {
   profile: UserProfile
   onEdit: () => void
   onViewImage: (url: string, type: "avatar" | "cover") => void
+  onStartChat?: () => void // callback để bắt đầu chat
+  onAddFriend?: () => void // callback để thêm bạn
+  onCancelRequest?: () => void // callback để thu hồi lời mời kết bạn
+  onRemoveFriend?: () => void // callback để hủy kết bạn
   isCurrentUser?: boolean
+  friendStatus?: "none" | "pending" | "requested" | "friends" // trạng thái bạn bè
 }
 
-export default function ProfileView({ profile, onEdit, onViewImage, isCurrentUser = true }: ProfileViewProps) {
+export default function ProfileView({ profile, onEdit, onViewImage, isCurrentUser = true, onStartChat,
+  onAddFriend, onCancelRequest,
+  onRemoveFriend,
+  friendStatus = "none" }: ProfileViewProps) {
   return (
-    <div className="relative">
+    <motion.div
+      className="relative"
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.3 }}
+    >
       {/* Header with close button */}
       <div className="flex items-center justify-between p-4 border-b">
         <h2 className="text-lg font-semibold">Thông tin tài khoản</h2>
@@ -31,7 +46,7 @@ export default function ProfileView({ profile, onEdit, onViewImage, isCurrentUse
           />
         )}
         {/* Only show edit button for current user */}
-        {isCurrentUser && onEdit && (
+        {/* {isCurrentUser && onEdit && (
           <Button
             onClick={onEdit}
             size="sm"
@@ -40,7 +55,7 @@ export default function ProfileView({ profile, onEdit, onViewImage, isCurrentUse
             <Pencil className="h-4 w-4 mr-1" />
             Chỉnh sửa
           </Button>
-        )}
+        )} */}
       </div>
 
       {/* Profile picture */}
@@ -57,17 +72,70 @@ export default function ProfileView({ profile, onEdit, onViewImage, isCurrentUse
           </div>
         </div>
       </div>
-        {/* Add contact/message buttons for other users' profiles */}
+      {/* Add contact/message buttons for other users' profiles */}
       {!isCurrentUser && (
         <div className="flex justify-center gap-3 mt-4 mb-6 px-4">
-          <Button className="flex-1 bg-blue-500 hover:bg-blue-600">
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Nhắn tin
-          </Button>
-          <Button variant="outline" className="flex-1">
-            <UserPlus className="h-4 w-4 mr-2" />
-            Kết bạn
-          </Button>
+          {friendStatus === "friends" && (
+            <>
+              <Button
+                className="flex-1 bg-blue-500 hover:bg-blue-600"
+                onClick={onStartChat}
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Nhắn tin
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 text-red-500 hover:text-red-600 hover:bg-red-50"
+                onClick={onRemoveFriend}
+              >
+                <UserX className="h-4 w-4 mr-2" />
+                Hủy kết bạn
+              </Button>
+            </>
+          )}
+
+          {friendStatus === "none" && (
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={onAddFriend}
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Kết bạn
+            </Button>
+          )}
+
+          {friendStatus === "pending" && (
+            <Button
+              variant="outline"
+              className="flex-1 text-amber-500 hover:text-amber-600 hover:bg-amber-50"
+              onClick={onCancelRequest}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Thu hồi lời mời
+            </Button>
+          )}
+
+          {friendStatus === "requested" && (
+            <div className="flex flex-col w-full gap-2">
+              <Button
+                className="w-full bg-blue-500 hover:bg-blue-600"
+                onClick={onAddFriend}
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Chấp nhận
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full text-red-500 hover:text-red-600 hover:bg-red-50"
+                onClick={onCancelRequest}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Từ chối
+              </Button>
+            </div>
+          )}
         </div>
       )}
       {/* User name */}
@@ -111,18 +179,16 @@ export default function ProfileView({ profile, onEdit, onViewImage, isCurrentUse
         </div>
       </div>
 
-      {/* Update button - only show for current user */}
-      {isCurrentUser && (
-        <div className="p-4 flex justify-center border-t">
-          <div className="w-full">
-            <Button variant="outline" className="w-full flex items-center justify-center" onClick={onEdit}>
-              <PenSquare className="h-4 w-4 mr-2" />
-              Cập nhật
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
+      {/* Update button */}
+      <div className="p-4 flex justify-center border-t">
+        <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="w-full">
+          <Button variant="outline" className="w-full flex items-center justify-center" onClick={onEdit}>
+            <PenSquare className="h-4 w-4 mr-2" />
+            Cập nhật
+          </Button>
+        </motion.div>
+      </div>
+    </motion.div>
   )
 }
 
