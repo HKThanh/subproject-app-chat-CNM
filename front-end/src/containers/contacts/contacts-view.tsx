@@ -4,8 +4,9 @@ import { useState } from "react";
 import ContactSidebar from "./components/contact-sidebar";
 import FriendRequests from "./components/friend-requests";
 
-import { Users, UsersRound, UserPlus } from "lucide-react";
+import { Users, UsersRound, UserPlus, Shield } from "lucide-react";
 import ContactList from "./contact-list";
+import BlockedList from "./components/blocked-list";
 
 export default function ContactsView() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -29,6 +30,10 @@ export default function ContactsView() {
     "group-invites": {
       icon: UsersRound,
       title: "Lời mời vào nhóm và cộng đồng",
+    },
+    blocked: {
+      icon: Shield,
+      title: "Danh sách chặn",
     },
   };
 
@@ -64,6 +69,14 @@ export default function ContactsView() {
                   searchQuery={searchQuery}
                   onSearchChange={setSearchQuery}
                 />
+              </div>
+            </div>
+          </div>
+        ) : activeSection === "blocked" ? (
+          <div className="flex-1">
+            <div className="p-4 bg-gray-50">
+              <div className="bg-white rounded-lg shadow-sm">
+                <BlockedList />
               </div>
             </div>
           </div>
