@@ -3543,16 +3543,57 @@ export const useChat = (userId: string) => {
     // Xử lý sự kiện xóa tin nhắn thành công
     const handleDeleteMessageSuccess = (data: { messageId: string, updatedMessage: Message }) => {
       console.log("Tin nhắn đã được xóa:", data);
-
+  
       if (data.updatedMessage && data.updatedMessage.idConversation) {
+        const conversationId = data.updatedMessage.idConversation;
+        
+        // Cập nhật tin nhắn trong state
         dispatch({
           type: 'UPDATE_MESSAGE',
           payload: {
-            conversationId: data.updatedMessage.idConversation,
+            conversationId: conversationId,
             messageId: data.messageId,
-            updates: { ...data.updatedMessage, isRemove: true }
+            updates: { isRemove: true }
           }
         });
+        
+        // Kiểm tra xem tin nhắn bị xóa có phải là tin nhắn mới nhất không
+        const conversation = state.conversations.find(conv => conv.idConversation === conversationId);
+        if (conversation && conversation.latestMessage && conversation.latestMessage.idMessage === data.messageId) {
+          // Tìm tin nhắn mới nhất tiếp theo (không bị xóa)
+          const conversationMessages = state.messages[conversationId] || [];
+          const nextLatestMessage = conversationMessages
+            .filter(msg => msg.idMessage !== data.messageId && !msg.isRemove)
+            .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())[0];
+          
+          // Cập nhật tin nhắn mới nhất của cuộc trò chuyện
+          if (nextLatestMessage) {
+            dispatch({
+              type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+              payload: {
+                conversationId: conversationId,
+                latestMessage: nextLatestMessage
+              }
+            });
+          } else {
+            // Nếu không còn tin nhắn nào, đặt latestMessage thành null hoặc tin nhắn trống
+            dispatch({
+              type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+              payload: {
+                conversationId: conversationId,
+                latestMessage: {
+                  idMessage: `system-${Date.now()}`,
+                  idSender: 'system',
+                  idConversation: conversationId,
+                  type: 'text',
+                  content: "Không có tin nhắn",
+                  dateTime: new Date().toISOString(),
+                  isRead: true
+                }
+              }
+            });
+          }
+        }
       }
     };
 

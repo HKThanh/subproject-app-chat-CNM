@@ -144,11 +144,12 @@ export default function Home() {
 
   // Xử lý xóa tin nhắn
   const handleDeleteMessage = (messageId: string) => {
+    console.log("check delete mId:", messageId);
     if (activeConversation) {
       const conversation = conversations.find(
         (conv) => conv.idConversation === activeConversation
       );
-
+      console.log("check delete message:", conversation);
       if (conversation) {
         const receiverId =
           conversation.idSender === conversation.otherUser?.id
