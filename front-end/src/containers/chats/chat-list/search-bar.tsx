@@ -26,6 +26,7 @@ interface SearchResult {
   phone: string
   coverPhoto: string
   ismale: boolean
+  isFriend: boolean
 }
 
 export default function SearchBar({ onSelectConversation }: SearchBarProps) {
@@ -42,7 +43,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   const [friendRequestId, setFriendRequestId] = useState<string | null>(null)
   const END_POINT_URL = process.env.NEXT_PUBLIC_API_URL || "localhost:3000"
   const token = useUserStore((state) => state.accessToken);
-  const [actionLoading, setActionLoading] = useState<"add" | "cancel" | "remove" | "accept" | "chat" | null>(null);
+  const [actionLoading, setActionLoading] = useState<"add" | "cancel" | "remove" | "accept" | "chat" | "decline" | null>(null);
   // Lắng nghe sự kiện click bên ngoài để đóng kết quả tìm kiếm
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -108,7 +109,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
       console.log("danh sách bạn bè: ", friendsData)
       if (friendsData.message === 'Lấy danh sách bạn bè thành công') {
         // Kiểm tra xem userId có trong danh sách bạn bè không
-        const isFriend = friendsData.data.some((friend: any) => friend.id ===userId);
+        const isFriend = friendsData.data.some((friend: any) => friend.id === userId);
         console.log("isFriend: ", isFriend)
         console.log("userId: ", userId)
 
@@ -201,7 +202,29 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
       const data = await response.json()
       console.log("data khi tìm kiến: ", data)
       if (data.code === 1) {
-        setSearchResults(data.data)
+        // Lấy danh sách bạn bè để kiểm tra
+        const friendsResponse = await fetch(
+          `${END_POINT_URL}/user/friend/get-friends`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const friendsData = await friendsResponse.json();
+        const friendIds = friendsData.message === 'Lấy danh sách bạn bè thành công'
+          ? friendsData.data.map((friend: any) => friend.id)
+          : [];
+        ;
+        console.log("friendIds: ", friendIds)
+        // Đánh dấu người dùng đã là bạn bè
+        const resultsWithFriendStatus = data.data.map((user: SearchResult) => ({
+          ...user,
+          isFriend: friendIds.includes(user.id)
+        }));
+
+        setSearchResults(resultsWithFriendStatus);
       } else {
         setSearchResults([])
       }
@@ -373,7 +396,65 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
       setActionLoading(null);
     }
   };
+  // Hàm xử lý từ chối lời mời kết bạn
+  const handleDeclineRequest = async (requestId: string) => {
+    try {
+      // Nếu đang loading, không cho thực hiện thêm
+      if (actionLoading) return;
 
+      // Set trạng thái loading
+      setActionLoading("decline");
+
+      const token = await getAuthToken();
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/user/handle`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            id: requestId,
+            type: "DECLINED",
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Cập nhật trạng thái UI
+        setFriendStatus("none");
+        setFriendRequestId(null);
+
+        // Thông báo thành công
+        toast.success("Đã từ chối lời mời kết bạn");
+
+        // Emit socket event để thông báo cho người gửi
+        socket?.emit("friendRequestDeclined", {
+          success: true,
+          data: {
+            requestId: requestId,
+            senderId: selectedUser?.id,
+            receiverId: data.data.receiverId,
+          },
+        });
+      } else if (data.code === 0) {
+        toast.error("Không tìm thấy yêu cầu kết bạn");
+      } else if (data.code === -2) {
+        toast.error("Loại yêu cầu không hợp lệ");
+      } else {
+        toast.error(data.message || "Không thể xử lý yêu cầu");
+      }
+    } catch (error) {
+      console.error("Error declining friend request:", error);
+      toast.error("Không thể từ chối lời mời kết bạn");
+    } finally {
+      // Reset trạng thái loading
+      setActionLoading(null);
+    }
+  };
   // Hàm xử lý hủy kết bạn
   const handleRemoveFriend = async (friendId: string) => {
     try {
@@ -419,7 +500,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
     } catch (error) {
       console.error("Error removing friend:", error);
       toast.error("Đã xảy ra lỗi khi xóa bạn");
-    }finally {
+    } finally {
       // Reset trạng thái loading
       setActionLoading(null);
     }
@@ -428,7 +509,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   const startConversation = (userId: string) => {
     // Nếu đang loading, không cho thực hiện thêm
     if (actionLoading) return;
-    
+
     // Set trạng thái loading
     setActionLoading("chat");
     if (!socket) {
@@ -538,13 +619,25 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
                       <div className="font-medium truncate">{result.fullname}</div>
                       <div className="text-sm text-gray-500 truncate">{result.email}</div>
                     </div>
-                    <button
-                      onClick={(e) => handleAddFriend(result.id, result, e)}
-                      className="ml-2 text-blue-500 p-2 rounded-full hover:bg-blue-50 transition-colors"
-                      title="Thêm bạn"
-                    >
-                      <UserAddIcon width={20} />
-                    </button>
+                    {/* Kiểm tra trạng thái bạn bè trước khi hiển thị nút */}
+                    {!result.isFriend && (
+                      <button
+                        onClick={(e) => handleAddFriend(result.id, result, e)}
+                        className={`ml-2 flex items-center gap-1 px-3 py-1.5 rounded-md transition-all ${actionLoading === "add"
+                          ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                          }`}
+                        title="Thêm bạn"
+                        disabled={actionLoading === "add"}
+                      >
+                        {actionLoading === "add" ? (
+                          <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin mr-1"></div>
+                        ) : (
+                          <UserAddIcon width={16} height={16} />
+                        )}
+                        <span className="text-xs font-medium">Thêm bạn</span>
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -591,6 +684,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
             onAddFriend={(userId) => handleAddFriend(userId, selectedUser, new MouseEvent('click') as any)}
             onCancelRequest={handleCancelRequest}
             onRemoveFriend={handleRemoveFriend}
+            onDeclineRequest={handleDeclineRequest}
           />
         )}
       </Dialog>

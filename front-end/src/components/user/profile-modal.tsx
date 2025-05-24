@@ -34,13 +34,14 @@ interface ProfileModalProps {
   onStartChat?: () => void; // callback để bắt đầu chat
   onAddFriend?: (userId: string) => void; //  callback để thêm bạn
   onCancelRequest?: (requestId: string) => void; // callback để thu hồi lời mời
+  onDeclineRequest?: (requestId: string) => void; // callback để từ chối lời mời
   onRemoveFriend?: (userId: string) => void; // callback để hủy kết bạn
   friendStatus?: "none" | "pending" | "requested" | "friends"; // trạng thái bạn bè
   friendRequestId?: string; // ID của lời mời kết bạn (nếu có)
 }
 
 export default function ProfileModal({ userId, userData, onStartChat, onAddFriend, onCancelRequest,
-  onRemoveFriend,
+  onRemoveFriend, onDeclineRequest,
   friendStatus = "none",
   friendRequestId }: ProfileModalProps) {
   const [isEditing, setIsEditing] = useState(false)
@@ -48,7 +49,7 @@ export default function ProfileModal({ userId, userData, onStartChat, onAddFrien
   const [imageType, setImageType] = useState<"avatar" | "cover" | null>(null)
   const [isCurrentUser, setIsCurrentUser] = useState(true) // Flag to determine if viewing own profile
   const [isLoading, setIsLoading] = useState(false)
-  const [loadingAction, setLoadingAction] = useState<"add" | "cancel" | "remove" | "accept" | "chat" | null>(null)
+  const [loadingAction, setLoadingAction] = useState<"add" | "cancel" | "remove" | "accept" | "chat" | "decline"| null>(null)
   const currentUser = useUserStore((state) => state.user)
   const accessToken = useUserStore((state) => state.accessToken)
   const [profile, setProfile] = useState<UserProfile>({
@@ -68,6 +69,7 @@ export default function ProfileModal({ userId, userData, onStartChat, onAddFrien
 
   // Fetch user profile data based on userId
   useEffect(() => {
+    console.log("friendRequestId:", friendRequestId);
     if (userData) {
       // Sử dụng dữ liệu được truyền vào trực tiếp
       setIsCurrentUser(false) // Đây là profile của người khác
@@ -126,6 +128,7 @@ export default function ProfileModal({ userId, userData, onStartChat, onAddFrien
   };
 
   const handleCancelRequest = (requestId: string) => {
+    console.log("handleCancelRequest called with requestId:", requestId);
     if (isLoading) return;
     setIsLoading(true);
     setLoadingAction("cancel");
@@ -141,7 +144,22 @@ export default function ProfileModal({ userId, userData, onStartChat, onAddFrien
       setLoadingAction(null);
     }, 1000);
   };
-
+  const handleDeclineRequest = (requestId: string) => {
+    if (isLoading) return;
+    setIsLoading(true);
+    setLoadingAction("decline");
+    
+    // Gọi callback gốc
+    if (onDeclineRequest) {
+      onDeclineRequest(requestId);
+    }
+    
+    // Reset loading state
+    setTimeout(() => {
+      setIsLoading(false);
+      setLoadingAction(null);
+    }, 1000); 
+  }
   const handleRemoveFriend = (userId: string) => {
     if (isLoading) return;
     setIsLoading(true);
@@ -278,6 +296,7 @@ export default function ProfileModal({ userId, userData, onStartChat, onAddFrien
                 onAddFriend={profile.id ? () => handleAddFriend(profile.id!) : undefined}
                 onCancelRequest={friendRequestId ? () => handleCancelRequest(friendRequestId) : undefined}
                 onRemoveFriend={profile.id ? () => handleRemoveFriend(profile.id!) : undefined}
+                onDeclineRequest={friendRequestId ? () => handleDeclineRequest(friendRequestId) : undefined}
               />
             )}
           </AnimatePresence>

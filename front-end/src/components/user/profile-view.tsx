@@ -25,12 +25,13 @@ interface ProfileViewProps {
   onViewImage: (url: string, type: "avatar" | "cover") => void
   onStartChat?: () => void
   onAddFriend?: () => void
-  onCancelRequest?: () => void
+  onDeclineRequest?: () => void
   onRemoveFriend?: () => void
+  onCancelRequest?: () => void
   isCurrentUser?: boolean
   friendStatus?: "none" | "pending" | "requested" | "friends"
   isLoading?: boolean
-  loadingAction?: "add" | "cancel" | "remove" | "accept" | "chat" | null
+  loadingAction?: "add" | "cancel" | "remove" | "accept" | "chat" | "decline" | null
 }
 
 export default function ProfileView({
@@ -40,8 +41,9 @@ export default function ProfileView({
   isCurrentUser = true,
   onStartChat,
   onAddFriend,
-  onCancelRequest,
   onRemoveFriend,
+  onCancelRequest,
+  onDeclineRequest,
   friendStatus = "none",
   isLoading = false,
   loadingAction = null,
@@ -261,6 +263,7 @@ export default function ProfileView({
                     <X className="h-4 w-4 mr-2" />
                   )}
                   Thu hồi lời mời
+                  <p>isLoading: {isLoading}, loadingAction{loadingAction}</p>
                 </Button>
               </motion.div>
             )}
@@ -285,10 +288,10 @@ export default function ProfileView({
                   <Button
                     variant="outline"
                     className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200 py-2"
-                    onClick={onCancelRequest}
-                    disabled={isLoading && loadingAction === "cancel"}
+                    onClick={onDeclineRequest}
+                    disabled={isLoading && loadingAction === "decline"}
                   >
-                    {isLoading && loadingAction === "cancel" ? (
+                    {isLoading && loadingAction === "decline" ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     ) : (
                       <X className="h-4 w-4 mr-2" />
@@ -348,7 +351,7 @@ export default function ProfileView({
             <div className="flex-1 min-w-0">
               <span className="text-xs text-gray-500 block">Ngày sinh</span>
               <span className="text-gray-900 text-sm font-medium">
-                {profile.birthDay} tháng {profile.birthMonth}, {profile.birthYear}
+                {profile.birthDay ? `${profile.birthDay} tháng ${profile.birthMonth}, ${profile.birthYear}` : "Chưa cập nhật"}
               </span>
             </div>
           </motion.div>
