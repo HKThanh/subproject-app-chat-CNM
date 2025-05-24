@@ -714,6 +714,7 @@ const handleLoadMessages = (io, socket) => {
         if (lastMessage) {
           query.dateTime = { $lt: lastMessage.dateTime }
         }
+
       } else if (firstMessageId) {
         const firstMessage = await MessageDetail.findOne({
           idMessage: firstMessageId,
@@ -723,53 +724,76 @@ const handleLoadMessages = (io, socket) => {
         }
       }
 
+      // Find messages
       const messages = await MessageDetail.find(query)
-        .sort({ dateTime: firstMessageId ? 1 : -1 })
-        .limit(limit)
-
-      // Lấy thông tin người gửi cho mỗi tin nhắn
-      const senderIds = [...new Set(messages.map((msg) => msg.idSender))]
-      const senders = await User.find({ id: { $in: senderIds } }).select("id fullname urlavatar phone status")
-
-      const senderMap = senders.reduce((map, sender) => {
-        map[sender.id] = sender
-        return map
-      }, {})
-
-      // Format tin nhắn với thông tin người gửi
-      let processedMessages = messages.map((msg) => ({
-        ...msg.toJSON(),
-        dateTime: moment.tz(msg.dateTime, "Asia/Ho_Chi_Minh").format(),
-        senderInfo: senderMap[msg.idSender] || {
-          id: msg.idSender,
-          fullname: "Unknown User",
-        },
-      }))
-
-      // Sắp xếp lại nếu load tin nhắn mới
-      if (firstMessageId) {
-        processedMessages = processedMessages.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime))
-      }
-
-      // Kiểm tra xem còn tin nhắn cũ hơn không
-      const hasMoreOlder = lastMessageId
-        ? await MessageDetail.exists({
-            idConversation: IDConversation,
-            dateTime: { $lt: messages[messages.length - 1]?.dateTime },
-          })
-        : false
-
-      // Kiểm tra xem còn tin nhắn mới hơn không
-      const hasMoreNewer = firstMessageId
-        ? await MessageDetail.exists({
-            idConversation: IDConversation,
-            dateTime: { $gt: messages[0]?.dateTime },
-          })
-        : false
-
+        .sort({ dateTime: -1 })
+        .limit(limit);
+      
+      // Get all user IDs from messages and reactions
+      const userIds = new Set();
+      messages.forEach(message => {
+        if (message.idSender) userIds.add(message.idSender);
+        
+        // Add users who reacted to messages
+        if (message.reactions) {
+          for (const [_, data] of message.reactions.entries()) {
+            data.userReactions.forEach(ur => userIds.add(ur.userId));
+          }
+        }
+      });
+      
+      // Get user information
+      const users = await User.find({ id: { $in: Array.from(userIds) } })
+        .select("id fullname urlavatar");
+      
+      // Create user map for easy access
+      const userMap = {};
+      users.forEach(user => {
+        userMap[user.id] = {
+          id: user.id,
+          fullname: user.fullname,
+          urlavatar: user.urlavatar
+        };
+      });
+      
+      // Process messages with user info and reactions
+      const processedMessages = messages.map(message => {
+        const messageObj = message.toObject();
+        
+        // Add sender info
+        messageObj.senderInfo = userMap[message.idSender] || { 
+          id: message.idSender, 
+          fullname: "Unknown User" 
+        };
+        
+        // Process reactions if they exist
+        if (message.reactions && message.reactions.size > 0) {
+          const reactionSummary = {};
+          
+          for (const [key, data] of message.reactions.entries()) {
+            if (data.totalCount > 0) {
+              reactionSummary[key] = {
+                reaction: data.reaction,
+                totalCount: data.totalCount,
+                userReactions: data.userReactions.map(ur => ({
+                  user: userMap[ur.userId] || { id: ur.userId, fullname: "Unknown User" },
+                  count: ur.count
+                }))
+              };
+            }
+          }
+          
+          messageObj.reactions = reactionSummary;
+        } else {
+          messageObj.reactions = {};
+        }
+        
+        return messageObj;
+      });
+      
       socket.emit("load_messages_response", {
         messages: processedMessages,
-        hasMore: messages.length === limit || (lastMessageId ? hasMoreOlder : hasMoreNewer),
+        hasMore: messages.length === limit,
         conversationId: IDConversation,
         direction: lastMessageId ? "older" : "newer",
       })
