@@ -112,7 +112,6 @@ export default function UserDataLoader({ children }: UserDataLoaderProps) {
   if (status === "loading" || isLoading || !isInitialized) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
-        <p>status: {status}, isLoading: {isLoading.toString()}, isInitialized: {isInitialized.toString()}</p>
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-t-[#8A56FF] border-gray-200 rounded-full animate-spin mx-auto"></div>
           <p className="mt-4 text-gray-600">Đang tải thông tin người dùng...</p>
