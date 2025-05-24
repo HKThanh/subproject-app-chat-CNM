@@ -1,4 +1,4 @@
-import { Users, UserPlus, UsersRound } from "lucide-react";
+import { Users, UserPlus, UsersRound, Shield } from "lucide-react";
 import SearchBar from "@/containers/chats/chat-list/search-bar";
 
 interface ContactSidebarProps {
@@ -52,6 +52,17 @@ export default function ContactSidebar({
         >
           <UserPlus className="w-5 h-5" />
           <span>Lời mời kết bạn</span>
+        </button>
+        <button
+          className={`w-full px-4 py-2 text-left flex items-center gap-3 ${
+            activeSection === "blocked"
+              ? "bg-blue-50 text-blue-600"
+              : "hover:bg-gray-100"
+          }`}
+          onClick={() => setActiveSection("blocked")}
+        >
+          <Shield className="w-5 h-5" />
+          <span>Danh sách chặn</span>
         </button>
         {/* <button
           className={`w-full px-4 py-2 text-left flex items-center gap-3 ${
