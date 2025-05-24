@@ -1,9 +1,27 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MoreHorizontal, Search } from "lucide-react";
+import { MoreHorizontal, Search, UserX, Shield } from "lucide-react";
 import { getAuthToken } from "@/utils/auth-utils";
 import { toast } from "sonner";
+import { createPortal } from "react-dom";
+import { useSocket } from "@/socket/useSocket";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 
 interface Contact {
   id: string;
@@ -30,6 +48,97 @@ export default function ContactList({
   const [contacts, setContacts] = useState<ContactGroup[]>([]);
   const [totalFriends, setTotalFriends] = useState(0);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({
+    top: 0,
+    right: 0,
+  });
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const { socket } = useSocket(); // Sử dụng socket hook
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [friendToRemove, setFriendToRemove] = useState<Contact | null>(null);
+  const [actionInProgress, setActionInProgress] = useState(false);
+  const [actionType, setActionType] = useState<"remove" | "block" | null>(null);
+
+  // Kiểm tra socket khi component mount
+  useEffect(() => {
+    if (socket) {
+      console.log("Socket connected:", socket.connected);
+    } else {
+      console.log("Socket not initialized");
+    }
+  }, [socket]);
+
+  // Xử lý sự kiện khi người dùng nhấn ra ngoài dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (activeDropdown !== null && !isProcessing) {
+        setActiveDropdown(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [activeDropdown, isProcessing]);
+
+  // Lắng nghe sự kiện unfriend từ socket
+  useEffect(() => {
+    if (!socket) {
+      console.log("Socket is not connected");
+      return;
+    }
+
+    console.log("Setting up socket listeners for friend updates");
+
+    // Xử lý khi người khác xóa mình khỏi danh sách bạn bè
+    const handleUnfriend = (data: { friendId: string; message: string }) => {
+      console.log("Unfriend event received:", data);
+      toast.info(data.message);
+
+      // Cập nhật danh sách bạn bè ngay lập tức
+      setContacts((prevGroups) => {
+        const newGroups = prevGroups
+          .map((group) => ({
+            ...group,
+            contacts: group.contacts.filter(
+              (contact) => contact.id !== data.friendId
+            ),
+          }))
+          .filter((group) => group.contacts.length > 0);
+
+        return newGroups;
+      });
+
+      // Cập nhật tổng số bạn bè
+      setTotalFriends((prev) => Math.max(0, prev - 1));
+    };
+
+    // Lắng nghe tất cả các biến thể có thể có của sự kiện unfriend
+    socket.on("unFriend", handleUnfriend);
+    socket.on("unfriend", handleUnfriend);
+    socket.on("removeFriend", handleUnfriend);
+    socket.on("friendRemoved", handleUnfriend);
+
+    // Kiểm tra kết nối socket
+    console.log("Socket connected:", socket.connected);
+
+    // Đảm bảo đã join vào room cá nhân để nhận thông báo
+    const userId = JSON.parse(sessionStorage.getItem("user-session") || "{}")
+      ?.state?.user?.id;
+    if (userId) {
+      console.log("Joining user room:", userId);
+      socket.emit("joinUserRoom", userId);
+    }
+
+    return () => {
+      console.log("Cleaning up friend update listeners");
+      socket.off("unFriend", handleUnfriend);
+      socket.off("unfriend", handleUnfriend);
+      socket.off("removeFriend", handleUnfriend);
+      socket.off("friendRemoved", handleUnfriend);
+    };
+  }, [socket]);
 
   const fetchFriendList = async () => {
     try {
@@ -102,6 +211,149 @@ export default function ContactList({
     };
   }, []);
 
+  // Hàm mở dropdown
+  const openDropdown = (e: React.MouseEvent, contact: Contact) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDropdownPosition({
+      top: rect.bottom + window.scrollY,
+      right: window.innerWidth - rect.right,
+    });
+
+    setSelectedContact(contact);
+    setActiveDropdown(contact.id);
+  };
+
+  // Đơn giản hóa cách xử lý dropdown và xóa bạn
+  const handleRemoveFriend = async (friendId: string) => {
+    console.log("Removing friend:", friendId);
+    setIsProcessing(true);
+
+    try {
+      const token = await getAuthToken();
+      const userId = JSON.parse(sessionStorage.getItem("user-session") || "{}")
+        ?.state?.user?.id;
+
+      // Cập nhật UI ngay lập tức (optimistic update)
+      setContacts((prevGroups) => {
+        const newGroups = prevGroups
+          .map((group) => ({
+            ...group,
+            contacts: group.contacts.filter(
+              (contact) => contact.id !== friendId
+            ),
+          }))
+          .filter((group) => group.contacts.length > 0);
+
+        return newGroups;
+      });
+
+      setTotalFriends((prev) => Math.max(0, prev - 1));
+
+      // Gửi yêu cầu xóa bạn đến server
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/user/friend/unfriend`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ friendId }),
+        }
+      );
+
+      const result = await response.json();
+      console.log("Unfriend result:", result);
+
+      if (result.code === 1) {
+        toast.success("Đã xóa bạn thành công");
+
+        // Đảm bảo socket emit sự kiện unfriend nếu server không tự động làm
+        if (socket && socket.connected) {
+          socket.emit("unfriend", {
+            senderId: userId,
+            receiverId: friendId,
+            message: "Bạn đã bị xóa khỏi danh sách bạn bè",
+          });
+        }
+      } else {
+        // Nếu API thất bại, hoàn tác UI (rollback optimistic update)
+        toast.error(result.message || "Không thể xóa bạn");
+        fetchFriendList(); // Tải lại danh sách bạn bè
+      }
+    } catch (error) {
+      console.error("Error removing friend:", error);
+      toast.error("Đã xảy ra lỗi khi xóa bạn");
+      fetchFriendList(); // Tải lại danh sách bạn bè nếu có lỗi
+    } finally {
+      // Đảm bảo reset state
+      setIsProcessing(false);
+      setActiveDropdown(null);
+      setConfirmDialogOpen(false);
+      setFriendToRemove(null);
+
+      // Đảm bảo không có overlay nào còn tồn tại
+      setTimeout(() => {
+        document.body.style.pointerEvents = "auto";
+      }, 100);
+    }
+  };
+
+  // Xử lý chặn người dùng
+  const handleBlockUser = async (userId: string) => {
+    setActionInProgress(true); // Đánh dấu đang có hành động xử lý
+
+    try {
+      const token = await getAuthToken();
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/user/blocked/block`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ blockedId: userId }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success("Đã chặn người dùng này");
+
+        // Cập nhật UI bằng cách xóa người dùng đã bị chặn khỏi danh sách bạn bè
+        setContacts((prevGroups) => {
+          const newGroups = prevGroups
+            .map((group) => ({
+              ...group,
+              contacts: group.contacts.filter(
+                (contact) => contact.id !== userId
+              ),
+            }))
+            .filter((group) => group.contacts.length > 0);
+
+          return newGroups;
+        });
+
+        // Cập nhật tổng số bạn bè
+        setTotalFriends((prev) => prev - 1);
+      } else {
+        toast.error(result.message || "Không thể chặn người dùng");
+      }
+    } catch (error) {
+      console.error("Error blocking user:", error);
+      toast.error("Đã xảy ra lỗi khi chặn người dùng");
+    } finally {
+      // Đóng dropdown
+      setActiveDropdown(null);
+      setActionInProgress(false); // Đánh dấu đã hoàn thành hành động
+    }
+  };
+
   // Lọc danh sách theo searchQuery
   const filteredContacts = contacts
     .map((group) => ({
@@ -111,6 +363,179 @@ export default function ContactList({
       ),
     }))
     .filter((group) => group.contacts.length > 0);
+
+  // Thêm style vào component
+  useEffect(() => {
+    // Thêm style để đảm bảo các nút dropdown luôn có thể nhấn được
+    const style = document.createElement("style");
+    style.innerHTML = `
+      .dropdown-trigger {
+        pointer-events: auto !important;
+        z-index: 50 !important;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  // Thêm useEffect để xử lý việc đóng dialog
+  useEffect(() => {
+    // Khi confirmDialogOpen thay đổi từ true sang false (đóng dialog)
+    if (!confirmDialogOpen) {
+      // Chỉ reset các state khi không có hành động đang xử lý
+      if (!actionInProgress) {
+        setIsProcessing(false);
+        setSelectedContact(null);
+      }
+    }
+  }, [confirmDialogOpen, actionInProgress]);
+
+  // Lắng nghe sự kiện khi có người chấp nhận lời mời kết bạn
+  useEffect(() => {
+    if (!socket) return;
+
+    // Xử lý khi có người chấp nhận lời mời kết bạn
+    const handleFriendRequestAccepted = (data: any) => {
+      console.log("Friend request accepted event received:", data);
+
+      try {
+        // Kiểm tra dữ liệu nhận được một cách an toàn
+        if (!data || typeof data !== "object") {
+          console.log(
+            "Empty or invalid data received, fetching friend list anyway"
+          );
+          fetchFriendList();
+          return;
+        }
+
+        // Kiểm tra xem data có phải là object rỗng không
+        if (Object.keys(data).length === 0) {
+          console.log("Empty object received, fetching friend list anyway");
+          fetchFriendList();
+          return;
+        }
+
+        // Kiểm tra xem data.sender có tồn tại không
+        if (!data.sender) {
+          console.log(
+            "Data without sender received, fetching friend list anyway"
+          );
+          fetchFriendList();
+          return;
+        }
+
+        // Lấy thông tin người dùng từ dữ liệu nhận được
+        const newFriend = data.sender;
+
+        // Tạo đối tượng contact từ dữ liệu nhận được
+        const newContact: Contact = {
+          id: newFriend.id,
+          fullname: newFriend.fullname || "Người dùng", // Sử dụng tên thật
+          urlavatar: newFriend.urlavatar || "/default-avatar.png",
+          email: newFriend.email,
+          phone: newFriend.phone,
+        };
+
+        console.log("Adding new friend to contact list:", newContact);
+
+        // Cập nhật danh sách bạn bè
+        setContacts((prevGroups) => {
+          // Xác định chữ cái đầu tiên của tên
+          const firstLetter = newContact.fullname.charAt(0).toUpperCase();
+
+          // Tìm nhóm tương ứng
+          const groupIndex = prevGroups.findIndex(
+            (group) => group.letter === firstLetter
+          );
+
+          // Tạo bản sao của mảng nhóm
+          const newGroups = [...prevGroups];
+
+          if (groupIndex >= 0) {
+            // Kiểm tra xem liên hệ đã tồn tại chưa
+            const contactExists = newGroups[groupIndex].contacts.some(
+              (contact) => contact.id === newContact.id
+            );
+
+            if (!contactExists) {
+              // Nếu nhóm đã tồn tại và liên hệ chưa tồn tại, thêm liên hệ mới vào nhóm đó
+              const updatedContacts = [
+                ...newGroups[groupIndex].contacts,
+                newContact,
+              ];
+
+              // Sắp xếp lại danh sách liên hệ theo tên
+              updatedContacts.sort((a, b) =>
+                a.fullname.localeCompare(b.fullname)
+              );
+
+              // Cập nhật nhóm
+              newGroups[groupIndex] = {
+                ...newGroups[groupIndex],
+                contacts: updatedContacts,
+              };
+            }
+          } else {
+            // Nếu nhóm chưa tồn tại, tạo nhóm mới
+            const newGroup = {
+              letter: firstLetter,
+              contacts: [newContact],
+            };
+
+            // Thêm nhóm mới vào mảng và sắp xếp lại
+            newGroups.push(newGroup);
+            newGroups.sort((a, b) => a.letter.localeCompare(b.letter));
+          }
+
+          return newGroups;
+        });
+
+        // Cập nhật tổng số bạn bè
+        setTotalFriends((prev) => prev + 1);
+
+        // Hiển thị thông báo
+        toast.success(
+          `${newContact.fullname} đã chấp nhận lời mời kết bạn của bạn`
+        );
+      } catch (error) {
+        console.log("Error processing friend request accepted data:", error);
+        // Luôn tải lại danh sách bạn bè nếu có lỗi
+        fetchFriendList();
+      }
+    };
+
+    // Đăng ký lắng nghe sự kiện
+    socket.on("friendRequestAccepted", handleFriendRequestAccepted);
+
+    // Đảm bảo hủy đăng ký khi component unmount
+    return () => {
+      socket.off("friendRequestAccepted", handleFriendRequestAccepted);
+    };
+  }, [socket]);
+
+  // Thêm listener cho sự kiện khi bạn chấp nhận lời mời kết bạn của người khác
+  useEffect(() => {
+    if (!socket) return;
+
+    // Xử lý khi bạn chấp nhận lời mời kết bạn của người khác
+    const handleYouAcceptedFriendRequest = (data: any) => {
+      console.log("You accepted friend request event received:", data);
+
+      // Nếu bạn vừa chấp nhận lời mời kết bạn, cập nhật danh sách bạn bè
+      fetchFriendList();
+    };
+
+    // Đăng ký lắng nghe sự kiện
+    socket.on("youAcceptedFriendRequest", handleYouAcceptedFriendRequest);
+
+    // Đảm bảo hủy đăng ký khi component unmount
+    return () => {
+      socket.off("youAcceptedFriendRequest", handleYouAcceptedFriendRequest);
+    };
+  }, [socket]);
 
   return (
     <div className="flex flex-col h-full p-4">
@@ -190,34 +615,61 @@ export default function ContactList({
             {searchQuery ? "Không tìm thấy bạn bè" : "Chưa có bạn bè nào"}
           </div>
         ) : (
-          filteredContacts.map((section) => (
-            <div key={section.letter} className="mb-6">
-              <div className="text-sm font-medium mb-2">{section.letter}</div>
-              <div className="space-y-1">
-                {section.contacts.map((contact) => (
+          filteredContacts.map((group) => (
+            <div key={group.letter} className="mb-4">
+              <h3 className="text-sm font-medium text-gray-500 mb-2">
+                {group.letter}
+              </h3>
+              <div className="space-y-2">
+                {group.contacts.map((contact) => (
                   <div
                     key={contact.id}
-                    className="flex items-center justify-between py-2 px-3 hover:bg-gray-100 rounded-lg"
+                    className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden">
-                        {contact.urlavatar ? (
-                          <img
-                            src={contact.urlavatar}
-                            alt={contact.fullname}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-500">
-                            {contact.fullname[0]}
-                          </div>
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
+                        <img
+                          src={contact.urlavatar}
+                          alt={contact.fullname}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div>
+                        <h4 className="font-medium">{contact.fullname}</h4>
+                        {contact.email && (
+                          <p className="text-sm text-gray-500">
+                            {contact.email}
+                          </p>
                         )}
                       </div>
-                      <div className="font-medium">{contact.fullname}</div>
                     </div>
-                    <button className="p-2 hover:bg-gray-200 rounded-full">
-                      <MoreHorizontal className="w-5 h-5 text-gray-500" />
-                    </button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          className="p-2 hover:bg-gray-200 rounded-full dropdown-trigger"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="w-5 h-5 text-gray-500" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => handleBlockUser(contact.id)}
+                        >
+                          <Shield className="w-4 h-4 mr-2" />
+                          <span>Chặn người này</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setConfirmDialogOpen(true);
+                            setFriendToRemove(contact);
+                          }}
+                        >
+                          <UserX className="w-4 h-4 mr-2 text-red-600" />
+                          <span className="text-red-600">Xóa bạn</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 ))}
               </div>
@@ -225,6 +677,59 @@ export default function ContactList({
           ))
         )}
       </div>
+      <AlertDialog
+        open={confirmDialogOpen}
+        onOpenChange={(open) => {
+          setConfirmDialogOpen(open);
+          if (!open) {
+            // Khi dialog đóng, reset các state
+            setFriendToRemove(null);
+            setIsProcessing(false);
+
+            // Đảm bảo không có overlay nào còn tồn tại
+            setTimeout(() => {
+              document.body.style.pointerEvents = "auto";
+            }, 100);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xác nhận xóa bạn</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc chắn muốn xóa {friendToRemove?.fullname} khỏi danh
+              sách bạn bè không? Hành động này không thể hoàn tác.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                // Đảm bảo reset state khi nhấn Hủy
+                setIsProcessing(false);
+                setFriendToRemove(null);
+                setConfirmDialogOpen(false);
+
+                // Đảm bảo không có overlay nào còn tồn tại
+                setTimeout(() => {
+                  document.body.style.pointerEvents = "auto";
+                }, 100);
+              }}
+            >
+              Hủy
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (friendToRemove) {
+                  handleRemoveFriend(friendToRemove.id);
+                }
+              }}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              Xóa bạn
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

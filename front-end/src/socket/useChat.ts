@@ -159,8 +159,8 @@ type ChatAction =
   | { type: 'LOAD_MORE_MESSAGES_ERROR', payload: string }
   | { type: 'UPDATE_MESSAGE_REACTIONS', payload: { conversationId: string, messageId: string, reactions: any } }
   | { type: 'LOAD_MORE_MESSAGES_ERROR', payload: string }
-  | { type: 'CALL_INCOMING', payload: { remoteUserId: string, remoteSocketId: string, callType: 'audio' | 'video', callLogId?: string | null  } } // xử lý khi có cuộc gọi đến
-  | { type: 'CALL_OUTGOING', payload: { remoteUserId: string, remoteSocketId: string, callType: 'audio' | 'video', callLogId?: string | null  } } // xử lý khi đang thực hiện cuộc gọi đi
+  | { type: 'CALL_INCOMING', payload: { remoteUserId: string, remoteSocketId: string, callType: 'audio' | 'video', callLogId?: string | null } } // xử lý khi có cuộc gọi đến
+  | { type: 'CALL_OUTGOING', payload: { remoteUserId: string, remoteSocketId: string, callType: 'audio' | 'video', callLogId?: string | null } } // xử lý khi đang thực hiện cuộc gọi đi
   | { type: 'CALL_ACCEPTED', payload: { callLogId: string } } // xử lý khi cuộc gọi được chấp nhận
   | { type: 'CALL_REJECTED' } // xử lý khi cuộc gọi bị từ chối
   | { type: 'CALL_ENDED' } // xử lý khi cuộc gọi kết thúc
@@ -581,18 +581,25 @@ export const useChat = (userId: string) => {
 
   // Khởi tạo kết nối WebRTC
   const initializePeerConnection = useCallback(() => {
-    // Cấu hình ICE servers (STUN/TURN)
     const configuration = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        {
+          urls: 'turn:relay1.expressturn.com:3480',
+          username: '174783613924561113',
+          credential: 'AHAByUn/KA+N63fjtQq7p/rhZrk='
+        }
+      ],
+      iceCandidatePoolSize: 10
     };
-
-    // Tạo kết nối mới
+  
     const pc = new RTCPeerConnection(configuration);
     console.log("Kết nối WebRTC đã được khởi tạo.");
-    // Xử lý sự kiện ICE candidate
+  
     pc.onicecandidate = (event) => {
       if (event.candidate && socket && state.call.remoteSocketId) {
         socket.emit('webRTC-signaling', {
@@ -604,68 +611,93 @@ export const useChat = (userId: string) => {
         });
       }
     };
-
-    // Xử lý sự kiện khi nhận được remote stream
-    pc.ontrack = (event) => {
-      dispatch({ type: 'SET_REMOTE_STREAM', payload: event.streams[0] });
+  
+    pc.oniceconnectionstatechange = () => {
+      console.log("ICE connection state:", pc.iceConnectionState);
+      if (pc.iceConnectionState === 'failed') {
+        dispatch({ type: 'CALL_ENDED' });
+        socket?.emit('end-call', {
+          connectedUserSocketId: state.call.remoteSocketId,
+          callLogId: state.call.callLogId
+        });
+      }
     };
-
+  
+    pc.onicegatheringstatechange = () => {
+      console.log("ICE gathering state:", pc.iceGatheringState);
+    };
+  
+    pc.ontrack = (event) => {
+      if (event.streams.length > 0) {
+        dispatch({ type: 'SET_REMOTE_STREAM', payload: event.streams[0] });
+      }
+    };
+  
+    // Đóng kết nối cũ nếu tồn tại
+    if (peerConnection.current) {
+      peerConnection.current.close();
+    }
     peerConnection.current = pc;
     return pc;
   }, [socket, state.call.remoteSocketId]);
 
   // Hàm bắt đầu cuộc gọi
   const startCall = useCallback(async (receiverId: string, callType: 'audio' | 'video' = 'audio') => {
-    if (!socket || !isConnected || !userId) {
-      console.error("Không thể bắt đầu cuộc gọi: Socket chưa kết nối hoặc chưa đăng nhập");
-      return;
+  if (!socket || !isConnected || !userId) {
+    console.error("Không thể bắt đầu cuộc gọi: Socket chưa kết nối hoặc chưa đăng nhập");
+    return;
+  }
+
+  try {
+    // Kiểm tra quyền
+    const micPermission = await navigator.permissions.query({ name: 'microphone' });
+    const camPermission = callType === 'video' ? await navigator.permissions.query({ name: 'camera' }) : { state: 'granted' };
+    if (micPermission.state === 'denied') {
+      throw new Error('Quyền truy cập microphone bị từ chối.');
+    }
+    if (callType === 'video' && camPermission.state === 'denied') {
+      throw new Error('Quyền truy cập camera bị từ chối.');
     }
 
-    try {
-      // Lấy stream từ thiết bị người dùng
-      const constraints = {
-        audio: true,
-        video: callType === 'video'
-      };
-      console.log("=== startCall được gọi ===");
-      try {
-        // Kiểm tra quyền trước
-        const permissions = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-        if (permissions.state === 'denied') {
-          // Hiển thị hướng dẫn cấp quyền
-          throw new Error('Quyền truy cập microphone đã bị từ chối. Vui lòng cấp quyền trong cài đặt trình duyệt.');
-        }
+    const constraints = { audio: true, video: callType === 'video' };
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    dispatch({ type: 'SET_LOCAL_STREAM', payload: stream });
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        dispatch({ type: 'SET_LOCAL_STREAM', payload: stream });
-      } catch (error) {
-        // Xử lý lỗi
-      }
-      console.log("=== Stream đã được lấy ===");
+    socket.emit('pre-offer-single', {
+      IDCaller: userId,
+      IDCallee: receiverId,
+      callType
+    });
 
-      // Gửi yêu cầu cuộc gọi đến server
-      socket.emit('pre-offer-single', {
-        IDCaller: userId,
-        IDCallee: receiverId,
+    dispatch({
+      type: 'CALL_OUTGOING',
+      payload: {
+        remoteUserId: receiverId,
+        remoteSocketId: '',
         callType
-      });
-      console.log("=== Yêu cầu cuộc gọi đã được gửi ===");
+      }
+    });
 
-      // Cập nhật trạng thái cuộc gọi đi
-      dispatch({
-        type: 'CALL_OUTGOING',
-        payload: {
-          remoteUserId: receiverId,
-          remoteSocketId: '', // Sẽ được cập nhật khi nhận phản hồi
-          callType
-        }
-      });
+    // Thêm timeout cho cuộc gọi
+    const timeout = setTimeout(() => {
+      if (!state.call.isCallInProgress) {
+        socket.emit('end-call', {
+          connectedUserSocketId: state.call.remoteSocketId,
+          callLogId: state.call.callLogId
+        });
+        dispatch({ type: 'CALL_ENDED' });
+      }
+    }, 30000); // Hủy sau 30 giây nếu không được trả lời
 
-    } catch (error) {
-      console.error("Lỗi khi bắt đầu cuộc gọi:", error);
-      dispatch({ type: 'RESET_CALL_STATE' });
-    }
-  }, [socket, isConnected, userId]);
+    return () => clearTimeout(timeout);
+  } catch (error) {
+    console.error("Lỗi khi bắt đầu cuộc gọi:", error);
+    import('sonner').then(({ toast }) => {
+      toast.error(error.message, { duration: 5000 });
+    });
+    dispatch({ type: 'RESET_CALL_STATE' });
+  }
+}, [socket, isConnected, userId, state.call]);
 
   // Hàm trả lời cuộc gọi
   const answerCall = useCallback(async (accept: boolean) => {
@@ -673,9 +705,8 @@ export const useChat = (userId: string) => {
       console.error("Không thể trả lời cuộc gọi: Không có cuộc gọi đến hoặc thiếu thông tin");
       return;
     }
-
+  
     if (!accept) {
-      // Từ chối cuộc gọi
       socket.emit('pre-offer-single-answer', {
         IDCaller: state.call.remoteUserId,
         socketIDCaller: state.call.remoteSocketId,
@@ -684,23 +715,29 @@ export const useChat = (userId: string) => {
         preOfferAnswer: 'CALL_REJECTED',
         callLogId: state.call.callLogId
       });
-
       dispatch({ type: 'CALL_REJECTED' });
       return;
     }
-
+  
     try {
-      // Chấp nhận cuộc gọi
-      const constraints = {
-        audio: true,
-        video: state.call.callType === 'video'
-      };
+      const micPermission = await navigator.permissions.query({ name: 'microphone' });
+      const camPermission = state.call.callType === 'video' ? await navigator.permissions.query({ name: 'camera' }) : { state: 'granted' };
+      if (micPermission.state === 'denied') {
+        throw new Error('Quyền truy cập microphone bị từ chối.');
+      }
+      if (state.call.callType === 'video' && camPermission.state === 'denied') {
+        throw new Error('Quyền truy cập camera bị từ chối.');
+      }
+  
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: state.call.callType === 'video'
       });
       dispatch({ type: 'SET_LOCAL_STREAM', payload: stream });
-
+  
+      const pc = initializePeerConnection();
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+  
       socket.emit('pre-offer-single-answer', {
         IDCaller: state.call.remoteUserId,
         socketIDCaller: state.call.remoteSocketId,
@@ -709,34 +746,27 @@ export const useChat = (userId: string) => {
         preOfferAnswer: 'CALL_ACCEPTED',
         callLogId: state.call.callLogId
       });
-
+  
       dispatch({
         type: 'CALL_ACCEPTED',
         payload: { callLogId: state.call.callLogId || '' }
       });
-
     } catch (error) {
       console.error("Lỗi khi trả lời cuộc gọi:", error);
-      if (typeof window !== 'undefined') {
-        import('sonner').then(({ toast }) => {
-          toast.error("Vui lòng cấp quyền truy cập microphone", {
-            duration: 5000,
-            description: "Vào Settings > Privacy & Security > Site permissions > Microphone"
-          });
-        });}
-        // Thông báo không thể trả lời
-        socket.emit('pre-offer-single-answer', {
-          IDCaller: state.call.remoteUserId,
-          socketIDCaller: state.call.remoteSocketId,
-          IDCallee: userId,
-          socketIDCallee: socket.id,
-          preOfferAnswer: 'CALL_UNAVAILABLE',
-          callLogId: state.call.callLogId
-        });
-
-        dispatch({ type: 'RESET_CALL_STATE' });
-      }
-    }, [socket, state.call, userId]);
+      import('sonner').then(({ toast }) => {
+        toast.error(error.message, { duration: 5000 });
+      });
+      socket.emit('pre-offer-single-answer', {
+        IDCaller: state.call.remoteUserId,
+        socketIDCaller: state.call.remoteSocketId,
+        IDCallee: userId,
+        socketIDCallee: socket.id,
+        preOfferAnswer: 'CALL_UNAVAILABLE',
+        callLogId: state.call.callLogId
+      });
+      dispatch({ type: 'RESET_CALL_STATE' });
+    }
+  }, [socket, state.call, userId]);
 
   // Hàm kết thúc cuộc gọi
   const endCall = useCallback(() => {
