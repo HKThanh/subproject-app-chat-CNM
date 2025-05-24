@@ -55,7 +55,7 @@ interface ChatMessageProps {
       totalCount: number;
       userReactions: Array<{
         user: {
-          id: string;
+          userId: string;
           fullname: string;
           urlavatar?: string;
         };
@@ -158,7 +158,7 @@ export default function ChatMessage({
         {Object.entries(reactions).map(([reaction, data]) => {
           // Check if current user has reacted with this emoji
           const hasUserReacted = data.userReactions.some(
-            ur => ur.user.id === user?.id
+            ur => ur.user.userId === user?.id
           );
 
           return data.totalCount > 0 && (

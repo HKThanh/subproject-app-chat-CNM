@@ -39,7 +39,7 @@ export interface Message {
       totalCount: number;
       userReactions: Array<{
         user: {
-          id: string;
+          userId: string;
           fullname: string;
           urlavatar?: string;
         };
