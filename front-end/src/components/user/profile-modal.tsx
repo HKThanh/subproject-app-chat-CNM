@@ -47,7 +47,7 @@ export default function ProfileModal({ userId, userData, onStartChat, onAddFrien
   const [imageType, setImageType] = useState<"avatar" | "cover" | null>(null)
   const [isCurrentUser, setIsCurrentUser] = useState(true) // Flag to determine if viewing own profile
   const [isLoading, setIsLoading] = useState(false)
-
+  const [loadingAction, setLoadingAction] = useState<"add" | "cancel" | "remove" | "accept" | "chat" | null>(null)
   const currentUser = useUserStore((state) => state.user)
   const accessToken = useUserStore((state) => state.accessToken)
   const [profile, setProfile] = useState<UserProfile>({
@@ -88,7 +88,75 @@ export default function ProfileModal({ userId, userData, onStartChat, onAddFrien
       });
     }
   }, [currentUser, userData])
+  // Tạo các hàm wrapper để xử lý loading state
+  const handleStartChat = () => {
+    if (isLoading) return;
+    setIsLoading(true);
+    setLoadingAction("chat");
+    
+    // Gọi callback gốc
+    if (onStartChat) {
+      onStartChat();
+    }
+    
+    // Reset loading state sau 1 khoảng thời gian (hoặc trong callback thành công)
+    setTimeout(() => {
+      setIsLoading(false);
+      setLoadingAction(null);
+    }, 1000);
+  };
 
+  const handleAddFriend = (userId: string) => {
+    if (isLoading) return;
+    setIsLoading(true);
+    setLoadingAction(friendStatus === "requested" ? "accept" : "add");
+    
+    // Gọi callback gốc
+    if (onAddFriend) {
+      onAddFriend(userId);
+    }
+    
+    // Reset loading state sau khi hoàn thành (nên được gọi trong callback thành công)
+    // Tạm thời dùng timeout để mô phỏng
+    setTimeout(() => {
+      setIsLoading(false);
+      setLoadingAction(null);
+    }, 1000);
+  };
+
+  const handleCancelRequest = (requestId: string) => {
+    if (isLoading) return;
+    setIsLoading(true);
+    setLoadingAction("cancel");
+    
+    // Gọi callback gốc
+    if (onCancelRequest) {
+      onCancelRequest(requestId);
+    }
+    
+    // Reset loading state
+    setTimeout(() => {
+      setIsLoading(false);
+      setLoadingAction(null);
+    }, 1000);
+  };
+
+  const handleRemoveFriend = (userId: string) => {
+    if (isLoading) return;
+    setIsLoading(true);
+    setLoadingAction("remove");
+    
+    // Gọi callback gốc
+    if (onRemoveFriend) {
+      onRemoveFriend(userId);
+    }
+    
+    // Reset loading state
+    setTimeout(() => {
+      setIsLoading(false);
+      setLoadingAction(null);
+    }, 1000);
+  };
   const handleUpdateProfile = async (updatedProfile: Partial<UserProfile>) => {
     const birthday = updatedProfile.birthYear && updatedProfile.birthMonth && updatedProfile.birthDay
       ? `${updatedProfile.birthYear}-${updatedProfile.birthMonth}-${updatedProfile.birthDay}`
@@ -182,7 +250,7 @@ export default function ProfileModal({ userId, userData, onStartChat, onAddFrien
     <>
       <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden">
         <DialogTitle className="sr-only">Thông tin tài khoản</DialogTitle>
-        {isLoading ? (
+        {isLoading && !loadingAction ? (
           <div className="flex items-center justify-center p-8">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
           </div>
@@ -203,10 +271,12 @@ export default function ProfileModal({ userId, userData, onStartChat, onAddFrien
                 onViewImage={handleViewImage}
                 isCurrentUser={isCurrentUser}
                 friendStatus={friendStatus}
-                onStartChat={onStartChat}
-                onAddFriend={onAddFriend && profile.id ? () => onAddFriend(profile.id!) : undefined}
-                onCancelRequest={onCancelRequest && friendRequestId ? () => onCancelRequest(friendRequestId) : undefined}
-                onRemoveFriend={onRemoveFriend && profile.id ? () => onRemoveFriend(profile.id!) : undefined}
+                isLoading={isLoading}
+                loadingAction={loadingAction}
+                onStartChat={handleStartChat}
+                onAddFriend={profile.id ? () => handleAddFriend(profile.id!) : undefined}
+                onCancelRequest={friendRequestId ? () => handleCancelRequest(friendRequestId) : undefined}
+                onRemoveFriend={profile.id ? () => handleRemoveFriend(profile.id!) : undefined}
               />
             )}
           </AnimatePresence>

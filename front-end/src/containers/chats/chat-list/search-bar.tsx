@@ -42,6 +42,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   const [friendRequestId, setFriendRequestId] = useState<string | null>(null)
   const END_POINT_URL = process.env.NEXT_PUBLIC_API_URL || "localhost:3000"
   const token = useUserStore((state) => state.accessToken);
+  const [actionLoading, setActionLoading] = useState<"add" | "cancel" | "remove" | "accept" | "chat" | null>(null);
   // Lắng nghe sự kiện click bên ngoài để đóng kết quả tìm kiếm
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -93,8 +94,8 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
 
   const checkFriendStatus = async (userId: string) => {
     try {
-      
-      
+
+
       // 1. Kiểm tra danh sách bạn bè
       const friendsResponse = await fetch(
         `${END_POINT_URL}/user/friend/get-friends`,
@@ -104,7 +105,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
           },
         }
       );
-      
+
       const friendsData = await friendsResponse.json();
       console.log("danh sách bạn bè: ", friendsData)
       if (friendsData.message === 'Lấy danh sách bạn bè thành công') {
@@ -117,7 +118,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
           return;
         }
       }
-      
+
       // 2. Kiểm tra lời mời đã gửi
       const sentResponse = await fetch(
         `${END_POINT_URL}/user/get-sended-friend-requests`,
@@ -127,21 +128,21 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
           },
         }
       );
-      
+
       const sentData = await sentResponse.json();
       console.log("danh sách lời mời đã gửi: ", sentData)
       if (sentData.success) {
         const pendingRequest = sentData.data.find(
           (req: any) => req.receiver?.id === userId && req.status === "PENDING"
         );
-        
+
         if (pendingRequest) {
           setFriendStatus("pending");
           setFriendRequestId(pendingRequest.id);
           return;
         }
       }
-      
+
       // 3. Kiểm tra lời mời đã nhận
       const receivedResponse = await fetch(
         `${END_POINT_URL}/user/get-received-friend-requests`,
@@ -151,25 +152,25 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
           },
         }
       );
-      
+
       const receivedData = await receivedResponse.json();
-      
+      console.log("danh sách lời mời đã nhận: ", receivedData)
       if (receivedData.success) {
         const requestedRequest = receivedData.data.find(
           (req: any) => req.sender?.id === userId && req.status === "PENDING"
         );
-        
+
         if (requestedRequest) {
           setFriendStatus("requested");
           setFriendRequestId(requestedRequest.id);
           return;
         }
       }
-      
+
       // Nếu không thuộc trường hợp nào ở trên
       setFriendStatus("none");
       setFriendRequestId(null);
-      
+
     } catch (error) {
       console.error("Lỗi khi kiểm tra trạng thái bạn bè:", error);
       setFriendStatus("none");
@@ -214,7 +215,11 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
 
   const handleAddFriend = async (userId: string, userData: SearchResult, e: React.MouseEvent) => {
     e.stopPropagation() // Ngăn chặn sự kiện click lan tỏa
+    // Nếu đang loading, không cho thực hiện thêm
+    if (actionLoading) return;
 
+    // Set trạng thái loading
+    setActionLoading("add");
     try {
       const token = await getAuthToken()
 
@@ -296,7 +301,8 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
           })
           window.dispatchEvent(refreshEvent)
         }
-
+        setFriendStatus("pending")
+        setFriendRequestId(data.data.requestId)
         toast.success("Đã gửi lời mời kết bạn")
       } else if (data.code === 0) {
         toast.info("Yêu cầu đã được gửi trước đó")
@@ -308,6 +314,9 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
     } catch (error) {
       console.error("Lỗi khi gửi lời mời kết bạn:", error)
       toast.error("Không thể gửi lời mời kết bạn")
+    } finally {
+      // Reset trạng thái loading
+      setActionLoading(null);
     }
   }
 
@@ -324,7 +333,11 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   // Hàm thu hồi lời mời kết bạn
   const handleCancelRequest = async (requestId: string) => {
     try {
-      const token = await getAuthToken();
+      // Nếu đang loading, không cho thực hiện thêm
+      if (actionLoading) return;
+
+      // Set trạng thái loading
+      setActionLoading("cancel");
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/user/cancel/${requestId}`,
         {
@@ -354,12 +367,20 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
     } catch (error) {
       console.error("Error cancelling friend request:", error);
       toast.error("Không thể thu hồi lời mời kết bạn");
+    } finally {
+      // Reset trạng thái loading
+      setActionLoading(null);
     }
   };
 
   // Hàm xử lý hủy kết bạn
   const handleRemoveFriend = async (friendId: string) => {
     try {
+      // Nếu đang loading, không cho thực hiện thêm
+      if (actionLoading) return;
+
+      // Set trạng thái loading
+      setActionLoading("remove");
       const token = await getAuthToken();
       const userId = JSON.parse(sessionStorage.getItem("user-session") || "{}")
         ?.state?.user?.id;
@@ -397,10 +418,18 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
     } catch (error) {
       console.error("Error removing friend:", error);
       toast.error("Đã xảy ra lỗi khi xóa bạn");
+    }finally {
+      // Reset trạng thái loading
+      setActionLoading(null);
     }
   };
   // Thêm hàm để bắt đầu cuộc trò chuyện từ profile
   const startConversation = (userId: string) => {
+    // Nếu đang loading, không cho thực hiện thêm
+    if (actionLoading) return;
+    
+    // Set trạng thái loading
+    setActionLoading("chat");
     if (!socket) {
       console.error("Socket chưa được khởi tạo")
       return
@@ -431,6 +460,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
       } else {
         toast.info("Bạn chưa kết bạn với người này!")
       }
+      setActionLoading(null);
     })
   }
 

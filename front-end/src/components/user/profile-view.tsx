@@ -1,6 +1,6 @@
 "use client"
 
-import { X, PenSquare, Camera, Pencil, MessageSquare, UserPlus, UserX } from "lucide-react"
+import { X, PenSquare, Camera, Pencil, MessageSquare, UserPlus, UserX, Loader2, Loader2Icon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import type { UserProfile } from "./profile-modal"
@@ -16,12 +16,17 @@ interface ProfileViewProps {
   onRemoveFriend?: () => void // callback để hủy kết bạn
   isCurrentUser?: boolean
   friendStatus?: "none" | "pending" | "requested" | "friends" // trạng thái bạn bè
+  isLoading?: boolean // trạng thái loading
+  loadingAction?: "add" | "cancel" | "remove" | "accept" | "chat" | null // hành động đang loading
 }
 
 export default function ProfileView({ profile, onEdit, onViewImage, isCurrentUser = true, onStartChat,
   onAddFriend, onCancelRequest,
   onRemoveFriend,
-  friendStatus = "none" }: ProfileViewProps) {
+  friendStatus = "none",
+  isLoading = false,
+  loadingAction = null,
+}: ProfileViewProps) {
   return (
     <motion.div
       className="relative"
@@ -72,24 +77,41 @@ export default function ProfileView({ profile, onEdit, onViewImage, isCurrentUse
           </div>
         </div>
       </div>
+      {/* User name */}
+      <div className="mt-16 px-4">
+        <div className="flex items-center">
+          <h1 className="text-xl font-bold">{profile.fullname}</h1>
+          {/* <PenSquare className="h-4 w-4 ml-2 text-gray-500" /> */}
+        </div>
+      </div>
       {/* Add contact/message buttons for other users' profiles */}
       {!isCurrentUser && (
-        <div className="flex justify-center gap-3 mt-4 mb-6 px-4">
+        <div className="flex justify-center gap-3 mt-2 mb-4 px-4">
           {friendStatus === "friends" && (
             <>
               <Button
                 className="flex-1 bg-blue-500 hover:bg-blue-600"
                 onClick={onStartChat}
+                disabled={isLoading && loadingAction === "chat"}
               >
-                <MessageSquare className="h-4 w-4 mr-2" />
+                {isLoading && loadingAction === "chat" ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                )}
                 Nhắn tin
               </Button>
               <Button
                 variant="outline"
                 className="flex-1 text-red-500 hover:text-red-600 hover:bg-red-50"
                 onClick={onRemoveFriend}
+                disabled={isLoading && loadingAction === "remove"}
               >
-                <UserX className="h-4 w-4 mr-2" />
+                {isLoading && loadingAction === "remove" ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <UserX className="h-4 w-4 mr-2" />
+                )}
                 Hủy kết bạn
               </Button>
             </>
@@ -100,8 +122,13 @@ export default function ProfileView({ profile, onEdit, onViewImage, isCurrentUse
               variant="outline"
               className="flex-1"
               onClick={onAddFriend}
+              disabled={isLoading && loadingAction === "add"}
             >
-              <UserPlus className="h-4 w-4 mr-2" />
+              {isLoading && loadingAction === "add" ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <UserPlus className="h-4 w-4 mr-2" />
+              )}
               Kết bạn
             </Button>
           )}
@@ -111,8 +138,13 @@ export default function ProfileView({ profile, onEdit, onViewImage, isCurrentUse
               variant="outline"
               className="flex-1 text-amber-500 hover:text-amber-600 hover:bg-amber-50"
               onClick={onCancelRequest}
+              disabled={isLoading && loadingAction === "cancel"}
             >
-              <X className="h-4 w-4 mr-2" />
+              {isLoading && loadingAction === "cancel" ? (
+                <Loader2Icon className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <X className="h-4 w-4 mr-2" />
+              )}
               Thu hồi lời mời
             </Button>
           )}
@@ -122,30 +154,32 @@ export default function ProfileView({ profile, onEdit, onViewImage, isCurrentUse
               <Button
                 className="w-full bg-blue-500 hover:bg-blue-600"
                 onClick={onAddFriend}
+                disabled={isLoading && loadingAction === "accept"}
               >
-                <UserPlus className="h-4 w-4 mr-2" />
+                {isLoading && loadingAction === "accept" ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <UserPlus className="h-4 w-4 mr-2" />
+                )}
                 Chấp nhận
               </Button>
               <Button
                 variant="outline"
                 className="w-full text-red-500 hover:text-red-600 hover:bg-red-50"
                 onClick={onCancelRequest}
+                disabled={isLoading && loadingAction === "cancel"}
               >
-                <X className="h-4 w-4 mr-2" />
+                {isLoading && loadingAction === "cancel" ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <X className="h-4 w-4 mr-2" />
+                )}
                 Từ chối
               </Button>
             </div>
           )}
         </div>
       )}
-      {/* User name */}
-      <div className="mt-16 px-4">
-        <div className="flex items-center">
-          <h1 className="text-xl font-bold">{profile.fullname}</h1>
-          <PenSquare className="h-4 w-4 ml-2 text-gray-500" />
-        </div>
-      </div>
-
       {/* User information */}
       <div className="p-4">
         <h3 className="font-semibold mb-4">Thông tin cá nhân</h3>
