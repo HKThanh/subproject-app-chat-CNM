@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator"
 import Image from "next/image"
 import type { UserProfile } from "./profile-modal"
 import { motion } from "framer-motion"
+import { on } from "events"
 
 interface ProfileViewProps {
   profile: UserProfile
@@ -28,6 +29,7 @@ interface ProfileViewProps {
   onDeclineRequest?: () => void
   onRemoveFriend?: () => void
   onCancelRequest?: () => void
+  onAcceptRequest?: () => void
   isCurrentUser?: boolean
   friendStatus?: "none" | "pending" | "requested" | "friends"
   isLoading?: boolean
@@ -44,6 +46,7 @@ export default function ProfileView({
   onRemoveFriend,
   onCancelRequest,
   onDeclineRequest,
+  onAcceptRequest,
   friendStatus = "none",
   isLoading = false,
   loadingAction = null,
@@ -263,7 +266,6 @@ export default function ProfileView({
                     <X className="h-4 w-4 mr-2" />
                   )}
                   Thu hồi lời mời
-                  <p>isLoading: {isLoading}, loadingAction{loadingAction}</p>
                 </Button>
               </motion.div>
             )}
@@ -273,7 +275,7 @@ export default function ProfileView({
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Button
                     className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg py-2"
-                    onClick={onAddFriend}
+                    onClick={onAcceptRequest}
                     disabled={isLoading && loadingAction === "accept"}
                   >
                     {isLoading && loadingAction === "accept" ? (

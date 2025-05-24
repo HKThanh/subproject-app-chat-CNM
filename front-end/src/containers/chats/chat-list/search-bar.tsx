@@ -67,18 +67,69 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
       toast.success("Yêu cầu kết bạn đã được chấp nhận", {
         description: "Các bạn đã trở thành bạn bè",
       })
+      console.log("data khi chấp nhận yêu cầu: ", data)
+      console.log("selectedUser khi chấp nhận yêu cầu: ", selectedUser)
+      // Cập nhật trạng thái nếu đang xem profile của người này
+      // if (selectedUser && data.senderId === selectedUser.id) {
+        setFriendStatus("friends")
+        setFriendRequestId(null)
+      // }
     })
 
     // Lắng nghe khi yêu cầu kết bạn bị từ chối
     socket.on("friendRequestDeclined", (data) => {
       toast.error("Yêu cầu kết bạn đã bị từ chối")
+      console.log("data khi từ chối yêu cầu: ", data)
+      console.log("selectedUser khi từ chối yêu cầu: ", selectedUser)
+      // Cập nhật trạng thái nếu đang xem profile của người này
+      if (selectedUser && data.data.receiverId === selectedUser.id) {
+        setFriendStatus("none")
+        setFriendRequestId(null)
+        console.log("đã cập nhật lại trạng thái")
+
+      }
+    })
+
+    // Lắng nghe khi có yêu cầu kết bạn mới
+    socket.on("newFriendRequest", (data) => {
+      toast.success("Có người mới gửi lời mời kết bạn cho bạn!")
+      // console.log("data khi có yêu cầu: ", data)
+      // console.log("selectedUser khi có yêu cầu: ", selectedUser)
+      // Nếu đang xem profile của người gửi yêu cầu
+      if (selectedUser && data.sender.id === selectedUser.id) {
+        setFriendStatus("requested")
+        setFriendRequestId(data.requestId)
+      }
+    })
+
+    // Lắng nghe khi yêu cầu kết bạn bị hủy
+    socket.on("friendRequestCancelled", (data) => {
+      // Nếu đang xem profile của người đã hủy yêu cầu
+      console.log("data khi hủy yêu cầu: ", data)
+      console.log("selectedUser khi hủy yêu cầu: ", selectedUser)
+      if (selectedUser) {
+        setFriendStatus("none")
+        setFriendRequestId(null)
+      }
+    })
+
+    // Lắng nghe khi bị xóa khỏi danh sách bạn bè
+    socket.on("unfriend", (data) => {
+      // Nếu đang xem profile của người đã xóa bạn
+      if (selectedUser && (data.senderId === selectedUser.id || data.receiverId === selectedUser.id)) {
+        setFriendStatus("none")
+        setFriendRequestId(null)
+      }
     })
 
     return () => {
       socket.off("friendRequestAccepted")
       socket.off("friendRequestDeclined")
+      socket.off("newFriendRequest")
+      socket.off("friendRequestCancelled")
+      socket.off("unfriend")
     }
-  }, [socket])
+  }, [socket, selectedUser])
 
   // Thêm debounce để tránh gọi API quá nhiều lần
   useEffect(() => {
@@ -455,6 +506,66 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
       setActionLoading(null);
     }
   };
+  // Hàm xử lý chấp thuận lời mời kết bạn
+  const handleAcceptRequest = async (requestId: string) => {
+    try {
+      // Nếu đang loading, không cho thực hiện thêm
+      if (actionLoading) return;
+
+      // Set trạng thái loading
+      setActionLoading("accept");
+
+      const token = await getAuthToken();
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/user/handle`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            id: requestId,
+            type: "ACCEPTED",
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Cập nhật trạng thái UI
+        setFriendStatus("friends");
+        setFriendRequestId(null);
+
+        // Thông báo thành công
+        toast.success("Đã chấp nhận lời mời kết bạn");
+
+        // Emit socket event để thông báo cho người gửi (không cần thiết vì server đã xử lý)
+        // Nhưng có thể thêm để đảm bảo
+        socket?.emit("friendRequestAccepted", {
+          success: true,
+          data: {
+            requestId: requestId,
+            senderId: selectedUser?.id,
+            receiverId: data.data.receiverId,
+          },
+        });
+      } else if (data.code === 0) {
+        toast.error("Không tìm thấy yêu cầu kết bạn");
+      } else if (data.code === -2) {
+        toast.error("Loại yêu cầu không hợp lệ");
+      } else {
+        toast.error(data.message || "Không thể xử lý yêu cầu");
+      }
+    } catch (error) {
+      console.error("Error accepting friend request:", error);
+      toast.error("Không thể chấp nhận lời mời kết bạn");
+    } finally {
+      // Reset trạng thái loading
+      setActionLoading(null);
+    }
+  };
   // Hàm xử lý hủy kết bạn
   const handleRemoveFriend = async (friendId: string) => {
     try {
@@ -685,6 +796,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
             onCancelRequest={handleCancelRequest}
             onRemoveFriend={handleRemoveFriend}
             onDeclineRequest={handleDeclineRequest}
+            onAcceptRequest={handleAcceptRequest}
           />
         )}
       </Dialog>

@@ -36,14 +36,15 @@ interface ProfileModalProps {
   onCancelRequest?: (requestId: string) => void; // callback để thu hồi lời mời
   onDeclineRequest?: (requestId: string) => void; // callback để từ chối lời mời
   onRemoveFriend?: (userId: string) => void; // callback để hủy kết bạn
+  onAcceptRequest?: (requestId: string) => void; // callback để chấp nhận lời mời
   friendStatus?: "none" | "pending" | "requested" | "friends"; // trạng thái bạn bè
   friendRequestId?: string; // ID của lời mời kết bạn (nếu có)
 }
 
 export default function ProfileModal({ userId, userData, onStartChat, onAddFriend, onCancelRequest,
-  onRemoveFriend, onDeclineRequest,
+  onRemoveFriend, onDeclineRequest, onAcceptRequest,
   friendStatus = "none",
-  friendRequestId }: ProfileModalProps) {
+  friendRequestId, }: ProfileModalProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [viewingImage, setViewingImage] = useState<string | null>(null)
   const [imageType, setImageType] = useState<"avatar" | "cover" | null>(null)
@@ -69,7 +70,6 @@ export default function ProfileModal({ userId, userData, onStartChat, onAddFrien
 
   // Fetch user profile data based on userId
   useEffect(() => {
-    console.log("friendRequestId:", friendRequestId);
     if (userData) {
       // Sử dụng dữ liệu được truyền vào trực tiếp
       setIsCurrentUser(false) // Đây là profile của người khác
@@ -152,6 +152,23 @@ export default function ProfileModal({ userId, userData, onStartChat, onAddFrien
     // Gọi callback gốc
     if (onDeclineRequest) {
       onDeclineRequest(requestId);
+    }
+    
+    // Reset loading state
+    setTimeout(() => {
+      setIsLoading(false);
+      setLoadingAction(null);
+    }, 1000); 
+  }
+
+  const handleAcceptRequest = (requestId: string) => {
+    if (isLoading) return;
+    setIsLoading(true);
+    setLoadingAction("accept");
+    
+    // Gọi callback gốc
+    if (onAcceptRequest) {
+      onAcceptRequest(requestId);
     }
     
     // Reset loading state
@@ -297,6 +314,7 @@ export default function ProfileModal({ userId, userData, onStartChat, onAddFrien
                 onCancelRequest={friendRequestId ? () => handleCancelRequest(friendRequestId) : undefined}
                 onRemoveFriend={profile.id ? () => handleRemoveFriend(profile.id!) : undefined}
                 onDeclineRequest={friendRequestId ? () => handleDeclineRequest(friendRequestId) : undefined}
+                onAcceptRequest={friendRequestId ? () => handleAcceptRequest(friendRequestId) : undefined}
               />
             )}
           </AnimatePresence>
