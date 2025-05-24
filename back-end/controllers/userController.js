@@ -259,18 +259,16 @@ userController.sendFriendRequest = async (req, res, io) => {
       { senderId, receiverId },
       { senderId: receiverId, receiverId: senderId },
     ],
-  });
+  }).sort({ createdAt: -1 }); // Sort by creation date, newest first
 
-  if (existing) {
-    if (existing.status === "ACCEPTED") {
-      return res.json({ code: 2, message: "Hai bạn đã kết bạn" });
-    } else if (existing.status === "PENDING") {
-      return res.json({
-        code: 0,
-        message: "Yêu cầu đã được gửi",
-        data: existing,
-      });
-    }
+  console.log(existing);
+
+  if (existing.status === "PENDING") {
+    return res.json({
+      code: 0,
+      message: "Yêu cầu đã được gửi",
+      data: existing,
+    });
   }
 
   const sender = await UserModel.get(senderId);
