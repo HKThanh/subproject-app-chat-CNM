@@ -4097,11 +4097,46 @@ export const useChat = (userId: string) => {
       if (data.success) {
         // Cập nhật tin nhắn trong state đã được thực hiện trong optimistic update
         console.log(`Tin nhắn ${data.messageId} đã được thu hồi thành công`);
+        if (data.conversationId && data.isLatestMessage) {
+          dispatch({
+            type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+            payload: {
+              conversationId: data.conversationId,
+              latestMessage: {
+                idMessage: `recall-${Date.now()}`,
+                idConversation: data.conversationId,
+                content: "Tin nhắn đã được thu hồi",
+                dateTime: new Date().toISOString(),
+                isRead: true,
+                idSender: userId,
+                isRecall: true,
+                type: "text"
+              }
+            }
+          });
+        }
       } else {
         console.error("Lỗi khi thu hồi tin nhắn:", data.error);
         // Khôi phục trạng thái tin nhắn nếu thu hồi thất bại
-        // Cần biết conversationId để khôi phục
-        // Có thể lưu trữ một bản đồ messageId -> conversationId để sử dụng ở đây
+        if (data.messageId && data.conversationId) {
+          // Khôi phục tin nhắn về trạng thái ban đầu
+          const conversationMessages = messages[data.conversationId] || [];
+          const originalMessage = conversationMessages.find(msg => msg.idMessage === data.messageId);
+          
+          if (originalMessage) {
+            dispatch({
+              type: 'UPDATE_MESSAGE',
+              payload: {
+                conversationId: data.conversationId,
+                messageId: data.messageId,
+                updates: {
+                  isRecall: false,
+                  content: originalMessage.content
+                }
+              }
+            });
+          }
+        }
       }
     };
 
@@ -4123,6 +4158,25 @@ export const useChat = (userId: string) => {
             updates: {
               isRecall: true,
               content: "Tin nhắn đã được thu hồi"
+            }
+          }
+        });
+      }
+      // Cập nhật tin nhắn mới nhất nếu tin nhắn bị thu hồi là tin nhắn mới nhất
+      if (data.isLatestMessage) {
+        dispatch({
+          type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            latestMessage: {
+              idMessage: `recall-${Date.now()}`,
+              idConversation: data.conversationId,
+              content: "Tin nhắn đã được thu hồi",
+              dateTime: new Date().toISOString(),
+              isRead: true,
+              idSender: data.senderId || "",
+              isRecall: true,
+              type: "text"
             }
           }
         });
