@@ -762,7 +762,7 @@ userController.findUserByText = async (req, res) => {
         ],
         id: { $ne: currentUserId }, // Loại bỏ người dùng hiện tại
       },
-      { _id: 0, id: 1, fullname: 1, urlavatar: 1, phone: 1, email: 1 }
+      { _id: 0, id: 1, fullname: 1, urlavatar: 1, phone: 1, email: 1, bio: 1, coverPhoto: 1, ismale: 1, birthday: 1 }
     );
 
     if (!users || users.length === 0) {
