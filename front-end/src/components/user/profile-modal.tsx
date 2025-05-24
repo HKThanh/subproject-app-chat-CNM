@@ -10,6 +10,7 @@ import useUserStore from "@/stores/useUserStoree"
 import { useSession } from "next-auth/react"
 import { updateProfile } from "@/actions/userActions"
 import { getAuthToken } from "@/utils/auth-utils"
+import { toast } from "sonner"
 
 export type UserProfile = {
   fullname: string
@@ -225,7 +226,7 @@ export default function ProfileModal({ userId, userData, onStartChat, onAddFrien
       // Làm mới session thủ công
       // const updatedSession = await fetch("/api/auth/session").then((res) => res.json());
       // console.log("Updated session:", updatedSession);
-
+      toast.success("Cập nhật thành công")
       setIsEditing(false);
     } else {
       console.error('Failed to update profile:', result.error);

@@ -228,50 +228,83 @@ export default function ChatMessage({
             </div>
           );
 
-        case "document":
-        case "file":
-          let fileName = "Tài liệu";
-          if (fileUrl) {
-            try {
-              const urlParts = fileUrl.split("/");
-              const rawFileName = urlParts[urlParts.length - 1];
-              const fileNameParts = rawFileName.split("?");
-              fileName = decodeURIComponent(fileNameParts[0]);
-              if (!fileName || fileName.length > 100) {
-                fileName = "Tài liệu đính kèm";
+          case "document":
+            case "file":
+              let fileName = "Tài liệu";
+              let fileExtension = "";
+              if (fileUrl) {
+                try {
+                  const urlParts = fileUrl.split("/");
+                  const rawFileName = urlParts[urlParts.length - 1];
+                  const fileNameParts = rawFileName.split("?");
+                  fileName = decodeURIComponent(fileNameParts[0]);
+                  
+                  // Lấy phần mở rộng của tệp
+                  const extensionMatch = fileName.match(/\.([^.]+)$/);
+                  fileExtension = extensionMatch ? extensionMatch[1].toLowerCase() : "";
+                  
+                  if (!fileName || fileName.length > 100) {
+                    fileName = "Tài liệu đính kèm";
+                  }
+                } catch (e) {
+                  console.error("Error parsing filename:", e);
+                  fileName = "Tài liệu đính kèm";
+                }
+              } else if (message && !message.includes("http")) {
+                fileName = message;
               }
-            } catch (e) {
-              console.error("Error parsing filename:", e);
-              fileName = "Tài liệu đính kèm";
-            }
-          } else if (message && !message.includes("http")) {
-            fileName = message;
-          }
-
-          return (
-            <div className="flex flex-col w-full">
-              <div className={`flex items-center rounded-md p-2 bg-gray-200`}>
-                <FileText className={`w-8 h-8 mr-2 text-gray-700`} />
-                <div className="flex-1 overflow-hidden">
-                  <p className={`text-sm font-medium truncate text-gray-800`}>
-                    {fileName}
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    Đã gửi một tệp đính kèm
-                  </p>
+    
+              // Xác định loại tệp để hiển thị preview phù hợp
+              const isPDF = fileExtension === "pdf";
+              const isTextFile = ["txt", "md", "json", "csv", "html", "css", "js", "ts", "jsx", "tsx"].includes(fileExtension);
+              const isAudio = ["mp3", "wav", "ogg", "m4a"].includes(fileExtension);
+              
+              return (
+                <div className="flex flex-col w-full">
+                  {/* Preview cho các loại tệp khác nhau */}
+                  {isPDF && fileUrl && (
+                    <div className="mb-2 border rounded-md overflow-hidden">
+                      <iframe 
+                        src={`${fileUrl}#view=FitH`} 
+                        className="w-full h-60" 
+                        title={fileName}
+                      />
+                    </div>
+                  )}
+                  
+                  {isAudio && fileUrl && (
+                    <div className="mb-2">
+                      <audio controls className="w-full">
+                        <source src={fileUrl} type={`audio/${fileExtension}`} />
+                        Trình duyệt của bạn không hỗ trợ phát âm thanh.
+                      </audio>
+                    </div>
+                  )}
+                  
+                  {/* Thông tin tệp */}
+                  <div className={`flex items-center rounded-md p-2 ${isPDF || isAudio ? 'bg-gray-100' : 'bg-gray-200'}`}>
+                    <FileText className={`w-8 h-8 mr-2 text-gray-700`} />
+                    <div className="flex-1 overflow-hidden">
+                      <p className={`text-sm font-medium truncate text-gray-800`}>
+                        {fileName}
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        {fileExtension ? `${fileExtension.toUpperCase()} - ` : ""}
+                        Đã gửi một tệp đính kèm
+                      </p>
+                    </div>
+                    <a
+                      href={fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`ml-2 p-1 rounded-full bg-blue-200 hover:bg-blue-300`}
+                      download
+                    >
+                      <Download className={`w-5 h-5 text-gray-700`} />
+                    </a>
+                  </div>
                 </div>
-                <a
-                  href={fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`ml-2 p-1 rounded-ful bg-blue-200 hover:bg-blue-300`}
-                  download
-                >
-                  <Download className={`w-5 h-5 text-gray-700`} />
-                </a>
-              </div>
-            </div>
-          );
+              );
 
         default:
           return (
