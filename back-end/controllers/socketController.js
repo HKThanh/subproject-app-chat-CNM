@@ -3047,14 +3047,17 @@ const handleMessageReaction = (io, socket) => {
         const userReaction = reactionData.userReactions[userReactionIndex]
         const oldCount = userReaction.count
 
-        // Update total count
-        reactionData.totalCount = reactionData.totalCount - oldCount + count
-
         // Update user's reaction count or remove if count is 0
         if (count > 0) {
-          userReaction.count = count
+          // Tăng số lượng reaction lên 1 mỗi khi người dùng thả cùng emoji
+          userReaction.count += 1;
+          
+          // Cập nhật lại tổng số reaction - chỉ cần tăng thêm 1 đơn vị
+          reactionData.totalCount += 1;
         } else {
           reactionData.userReactions.splice(userReactionIndex, 1)
+          // Giảm tổng số reaction khi xóa reaction
+          reactionData.totalCount -= oldCount;
         }
       } else if (count > 0) {
         // User doesn't have this reaction yet
