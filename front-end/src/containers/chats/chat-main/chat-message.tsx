@@ -1,69 +1,60 @@
-"use client";
+"use client"
 
 import {
-  ThumbsUp,
   FileText,
   Download,
   ImageIcon,
   Video,
-  Forward,
   MessageSquareQuote,
   MessageSquareX,
   RotateCcw,
   MessageSquareShare,
   Smile,
-} from "lucide-react";
-import { useState, useRef, useEffect } from "react";
-import {
-  Tooltip,
-  TooltipProvider,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/components/ui/tooltip";
-import Image from "next/image";
-import ImageViewer from "@/components/chat/image-viewer";
-import useUserStore from "@/stores/useUserStoree";
+} from "lucide-react"
+import { useState, useRef, useEffect } from "react"
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import Image from "next/image"
+import ImageViewer from "@/components/chat/image-viewer"
+import useUserStore from "@/stores/useUserStoree"
 
-// Add senderName and isGroup props to the interface
 interface ChatMessageProps {
-  message: string;
-  timestamp: string;
-  isOwn?: boolean;
-  type?: "text" | "image" | "video" | "document" | "file";
-  isReply?: boolean;
+  message: string
+  timestamp: string
+  isOwn?: boolean
+  type?: "text" | "image" | "video" | "document" | "file"
+  isReply?: boolean
   replyInfo?: {
-    name: string;
-    content: string;
-    type: string;
-  };
-  fileUrl?: string;
-  messageId?: string;
-  isRemove: boolean;
-  isRecall?: boolean;
-  isGroup?: boolean;
-  senderName?: string;
-  senderAvatar?: string; // Add this prop
-  showSenderInfo?: boolean;
-  onReply?: (messageId: string, content: string, type: string) => void;
-  onForward?: (messageId: string) => void;
-  onDelete?: (messageId: string) => void;
-  onRecallMessage?: (messageId: string) => void;
-  //props cho reaction
+    name: string
+    content: string
+    type: string
+  }
+  fileUrl?: string
+  messageId?: string
+  isRemove: boolean
+  isRecall?: boolean
+  isGroup?: boolean
+  senderName?: string
+  senderAvatar?: string
+  showSenderInfo?: boolean
+  onReply?: (messageId: string, content: string, type: string) => void
+  onForward?: (messageId: string) => void
+  onDelete?: (messageId: string) => void
+  onRecallMessage?: (messageId: string) => void
   reactions?: {
     [key: string]: {
-      reaction: string;
-      totalCount: number;
+      reaction: string
+      totalCount: number
       userReactions: Array<{
         user: {
-          userId: string;
-          fullname: string;
-          urlavatar?: string;
-        };
-        count: number;
-      }>;
-    };
-  };
-  onAddReaction?: (messageId: string, reaction: string) => void;
+          userId: string
+          fullname: string
+          urlavatar?: string
+        }
+        count: number
+      }>
+    }
+  }
+  onAddReaction?: (messageId: string, reaction: string) => void
 }
 
 export default function ChatMessage({
@@ -88,118 +79,297 @@ export default function ChatMessage({
   reactions = {},
   onAddReaction,
 }: ChatMessageProps) {
-  const [isHovered, setIsHovered] = useState(false);
-  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
-  const [showReactionPicker, setShowReactionPicker] = useState(false);
-  const reactionPickerRef = useRef<HTMLDivElement>(null);
-  const {user} = useUserStore();
-  // Danh sách các reaction có sẵn
-  const availableReactions = ['👍', '❤️', '😂', '😮', '😢', '😡'];
-  // Tổng số reaction
-  const totalReactions = Object.values(reactions).reduce(
-    (sum, reaction) => sum + reaction.totalCount,
-    0
-  );
-  // Xử lý click bên ngoài reaction picker để đóng
+  const [isHovered, setIsHovered] = useState(false)
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false)
+  const [showReactionPicker, setShowReactionPicker] = useState(false)
+  const reactionPickerRef = useRef<HTMLDivElement>(null)
+  const messageRef = useRef<HTMLDivElement>(null)
+  const { user } = useUserStore()
+
+  const availableReactions = ["👍", "❤️", "😂", "😮", "😢", "😡"]
+
+  const totalReactions = Object.values(reactions).reduce((sum, reaction) => sum + reaction.totalCount, 0)
+
+  // Xử lý click bên ngoài reaction picker
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (reactionPickerRef.current && !reactionPickerRef.current.contains(event.target as Node)) {
-        setShowReactionPicker(false);
+        setShowReactionPicker(false)
       }
     }
 
-    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside)
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
 
   // Thêm hàm xử lý reaction
   const handleReactionClick = (reaction: string) => {
     if (onAddReaction && messageId) {
-      onAddReaction(messageId, reaction);
-      setShowReactionPicker(false);
+      onAddReaction(messageId, reaction)
+      setShowReactionPicker(false)
     }
-  };
+  }
 
-  // Thêm hàm render reaction picker
+  //hàm render reaction picker
   const renderReactionPicker = () => {
-    if (!showReactionPicker) return null;
+    if (!showReactionPicker) return null
+
+    return (
+      <>
+        {/* Backdrop overlay */}
+        <div
+          className="fixed inset-0 z-40"
+          style={{
+            animation: "fadeIn 0.2s ease-out",
+          }}
+          onClick={() => setShowReactionPicker(false)}
+        />
+
+        {/* Reaction picker container */}
+        <div
+          ref={reactionPickerRef}
+          className="absolute bg-white rounded-2xl shadow-xl border border-gray-200 p-2 flex gap-1 z-50"
+          style={{
+            // Đối với tin nhắn của mình (bên phải) thì hiển thị bên trái
+            // Đối với tin nhắn nhận được (bên trái) thì hiển thị bên trên để tránh tràn màn hình
+            ...(isOwn
+              ? { right: "calc(100% + 10px)", top: "50%", transform: "translateY(-50%)" }
+              : { left: "0", bottom: "calc(100% + 10px)" }),
+            animation: isOwn
+              ? "slideInFromRight 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)"
+              : "slideInFromBottom 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+          }}
+        >
+          {availableReactions.map((reaction, index) => (
+            <button
+              key={reaction}
+              onClick={() => handleReactionClick(reaction)}
+              className="p-2 hover:bg-gray-100 rounded-xl transition-all duration-200 hover:scale-110 active:scale-95 relative overflow-hidden"
+              style={{
+                animation: `popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) ${index * 0.05}s both`,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.animation = "none"
+                e.currentTarget.style.transform = "scale(1.1)"
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)"
+              }}
+            >
+              <span
+                className="text-xl block transition-transform duration-200"
+                style={{
+                  animation: `wiggle 0.6s ease-in-out ${index * 0.1 + 0.3}s both`,
+                }}
+              >
+                {reaction}
+              </span>
+
+              {/* Ripple effect on click */}
+              <div className="absolute inset-0 rounded-xl opacity-0 bg-blue-200 pointer-events-none transition-opacity duration-200" />
+            </button>
+          ))}
+
+          {/* Arrow pointer */}
+          <div
+            className="absolute w-3 h-3 bg-white border transform rotate-45"
+            style={{
+              ...(isOwn
+                ? {
+                    left: "100%",
+                    top: "50%",
+                    marginLeft: "-6px",
+                    marginTop: "-6px",
+                    borderRight: "1px solid #e5e7eb",
+                    borderBottom: "1px solid #e5e7eb",
+                    borderLeft: "none",
+                    borderTop: "none",
+                  }
+                : {
+                    top: "100%",
+                    left: "20px",
+                    marginTop: "-6px",
+                    borderLeft: "1px solid #e5e7eb",
+                    borderTop: "1px solid #e5e7eb",
+                    borderRight: "none",
+                    borderBottom: "none",
+                  }),
+              animation: "arrowFadeIn 0.3s ease-out 0.2s both",
+            }}
+          />
+        </div>
+
+        {/* CSS animations */}
+        <style jsx>{`
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          
+          @keyframes slideInFromRight {
+            from {
+              opacity: 0;
+              transform: translateY(-50%) translateX(20px) scale(0.8);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(-50%) translateX(0) scale(1);
+            }
+          }
+          
+          @keyframes slideInFromBottom {
+            from {
+              opacity: 0;
+              transform: translateY(20px) scale(0.8);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+          
+          @keyframes popIn {
+            from {
+              opacity: 0;
+              transform: scale(0.3) rotate(-10deg);
+            }
+            50% {
+              transform: scale(1.1) rotate(5deg);
+            }
+            to {
+              opacity: 1;
+              transform: scale(1) rotate(0deg);
+            }
+          }
+          
+          @keyframes wiggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-5deg) scale(1.05); }
+            75% { transform: rotate(5deg) scale(1.05); }
+          }
+          
+          @keyframes arrowFadeIn {
+            from {
+              opacity: 0;
+              transform: rotate(45deg) scale(0.5);
+            }
+            to {
+              opacity: 1;
+              transform: rotate(45deg) scale(1);
+            }
+          }
+        `}</style>
+      </>
+    )
+  }
+
+
+  //hàm render reactions với animation và vị trí ngược lại
+  const renderReactions = () => {
+    if (totalReactions === 0) return null
 
     return (
       <div
-        ref={reactionPickerRef}
-        className="absolute bottom-full mb-2 bg-white rounded-full shadow-lg p-1 flex gap-1 z-20"
+        className={`flex items-center gap-1 mt-1 ${isOwn ? "justify-end" : "justify-start"}`}
         style={{
-          ...(isOwn ? { right: '0' } : { left: '0' }),
+          // Thêm animation fade in
+          animation: "fadeInUp 0.3s ease-out",
         }}
       >
-        {availableReactions.map((reaction) => (
-          <button
-            key={reaction}
-            onClick={() => handleReactionClick(reaction)}
-            className="p-1.5 hover:bg-gray-100 rounded-full transition-all duration-200"
-          >
-            <span className="text-lg">{reaction}</span>
-          </button>
-        ))}
-      </div>
-    );
-  };
-
-  // Thêm hàm render reactions hiện có
-  const renderReactions = () => {
-    if (totalReactions === 0) return null;
-
-    return (
-      <div
-        className={`flex items-center gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}
-      >
-        {Object.entries(reactions).map(([reaction, data]) => {
+        {Object.entries(reactions).map(([reaction, data], index) => {
           // Check if current user has reacted with this emoji
-          const hasUserReacted = data.userReactions.some(
-            ur => ur.user.userId === user?.id
-          );
+          const hasUserReacted = data.userReactions.some((ur) => ur.user.userId === user?.id)
 
-          return data.totalCount > 0 && (
-            <div
-              key={reaction}
-              className={`flex items-center rounded-full shadow-sm px-1.5 py-0.5 border cursor-pointer 
-                ${hasUserReacted 
-                  ? 'bg-blue-50 border-blue-200 hover:bg-blue-100' 
-                  : 'bg-white border-gray-100 hover:bg-gray-50'
+          return (
+            data.totalCount > 0 && (
+              <div
+                key={reaction}
+                className={`flex items-center rounded-full shadow-sm px-1.5 py-0.5 border cursor-pointer transition-all duration-300 hover:scale-105 ${
+                  hasUserReacted
+                    ? "bg-blue-50 border-blue-200 hover:bg-blue-100"
+                    : "bg-white border-gray-100 hover:bg-gray-50"
                 }`}
-              onClick={() => handleReactionClick(reaction)}
-              title={data.userReactions
-                .map(ur => ur.user.fullname)
-                .join(', ')}
-            >
-              <span className="text-sm mr-1">{reaction}</span>
-              <span className={`text-xs ${hasUserReacted ? 'text-blue-600' : 'text-gray-600'}`}>
-                {data.totalCount}
-              </span>
-            </div>
-          );
+                onClick={() => handleReactionClick(reaction)}
+                title={data.userReactions.map((ur) => ur.user.fullname).join(", ")}
+                style={{
+                  // Thêm animation stagger cho từng reaction
+                  animation: `slideInScale 0.4s ease-out ${index * 0.1}s both`,
+                  transformOrigin: isOwn ? "right center" : "left center",
+                }}
+              >
+                <span
+                  className="text-sm mr-1 transition-transform duration-200 hover:scale-110"
+                  style={{
+                    animation: `bounce 0.6s ease-out ${index * 0.1 + 0.2}s both`,
+                  }}
+                >
+                  {reaction}
+                </span>
+                <span
+                  className={`text-xs transition-colors duration-200 ${
+                    hasUserReacted ? "text-blue-600 font-semibold" : "text-gray-600"
+                  }`}
+                >
+                  {data.totalCount}
+                </span>
+              </div>
+            )
+          )
         })}
+
+        {/* Thêm CSS animations inline */}
+        <style jsx>{`
+          @keyframes fadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(10px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          
+          @keyframes slideInScale {
+            from {
+              opacity: 0;
+              transform: scale(0.8) translateY(5px);
+            }
+            to {
+              opacity: 1;
+              transform: scale(1) translateY(0);
+            }
+          }
+          
+          @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {
+              transform: translateY(0);
+            }
+            40% {
+              transform: translateY(-3px);
+            }
+            60% {
+              transform: translateY(-1px);
+            }
+          }
+        `}</style>
       </div>
-    );
-  };
+    )
+  }
+
   const renderContent = () => {
     if (isRemove && isOwn) {
-      return <div className="italic text-gray-500">Tin nhắn đã bị xóa</div>;
+      return <div className="italic text-gray-500">Tin nhắn đã bị xóa</div>
     } else if (isRecall) {
-      return (
-        <div className="italic text-gray-500">Tin nhắn đã được thu hồi</div>
-      );
+      return <div className="italic text-gray-500">Tin nhắn đã được thu hồi</div>
     } else {
       switch (type) {
         case "image":
           return (
             <div className="relative">
-              <div
-                className="cursor-pointer"
-                onClick={() => setIsImageViewerOpen(true)}
-              >
+              <div className="cursor-pointer" onClick={() => setIsImageViewerOpen(true)}>
                 <img
                   src={fileUrl || "/placeholder.svg"}
                   alt={message}
@@ -211,111 +381,101 @@ export default function ChatMessage({
                 <span className="text-sm text-gray-800">{message}</span>
               </div>
             </div>
-          );
+          )
 
         case "video":
           return (
             <div>
-              <video
-                src={fileUrl}
-                controls
-                className="rounded-md max-h-60 max-w-full"
-              />
+              <video src={fileUrl} controls className="rounded-md max-h-60 max-w-full" />
               <div className="mt-2 flex items-center">
                 <Video className="w-4 h-4 mr-1" />
                 <span className="text-sm">{message}</span>
               </div>
             </div>
-          );
+          )
 
-          case "document":
-            case "file":
-              let fileName = "Tài liệu";
-              let fileExtension = "";
-              if (fileUrl) {
-                try {
-                  const urlParts = fileUrl.split("/");
-                  const rawFileName = urlParts[urlParts.length - 1];
-                  const fileNameParts = rawFileName.split("?");
-                  fileName = decodeURIComponent(fileNameParts[0]);
-                  
-                  // Lấy phần mở rộng của tệp
-                  const extensionMatch = fileName.match(/\.([^.]+)$/);
-                  fileExtension = extensionMatch ? extensionMatch[1].toLowerCase() : "";
-                  
-                  if (!fileName || fileName.length > 100) {
-                    fileName = "Tài liệu đính kèm";
-                  }
-                } catch (e) {
-                  console.error("Error parsing filename:", e);
-                  fileName = "Tài liệu đính kèm";
-                }
-              } else if (message && !message.includes("http")) {
-                fileName = message;
+        case "document":
+        case "file":
+          let fileName = "Tài liệu"
+          let fileExtension = ""
+          if (fileUrl) {
+            try {
+              const urlParts = fileUrl.split("/")
+              const rawFileName = urlParts[urlParts.length - 1]
+              const fileNameParts = rawFileName.split("?")
+              fileName = decodeURIComponent(fileNameParts[0])
+
+              // Lấy phần mở rộng của tệp
+              const extensionMatch = fileName.match(/\.([^.]+)$/)
+              fileExtension = extensionMatch ? extensionMatch[1].toLowerCase() : ""
+
+              if (!fileName || fileName.length > 100) {
+                fileName = "Tài liệu đính kèm"
               }
-    
-              // Xác định loại tệp để hiển thị preview phù hợp
-              const isPDF = fileExtension === "pdf";
-              const isTextFile = ["txt", "md", "json", "csv", "html", "css", "js", "ts", "jsx", "tsx"].includes(fileExtension);
-              const isAudio = ["mp3", "wav", "ogg", "m4a"].includes(fileExtension);
-              
-              return (
-                <div className="flex flex-col w-full">
-                  {/* Preview cho các loại tệp khác nhau */}
-                  {isPDF && fileUrl && (
-                    <div className="mb-2 border rounded-md overflow-hidden">
-                      <iframe 
-                        src={`${fileUrl}#view=FitH`} 
-                        className="w-full h-60" 
-                        title={fileName}
-                      />
-                    </div>
-                  )}
-                  
-                  {isAudio && fileUrl && (
-                    <div className="mb-2">
-                      <audio controls className="w-full">
-                        <source src={fileUrl} type={`audio/${fileExtension}`} />
-                        Trình duyệt của bạn không hỗ trợ phát âm thanh.
-                      </audio>
-                    </div>
-                  )}
-                  
-                  {/* Thông tin tệp */}
-                  <div className={`flex items-center rounded-md p-2 ${isPDF || isAudio ? 'bg-gray-100' : 'bg-gray-200'}`}>
-                    <FileText className={`w-8 h-8 mr-2 text-gray-700`} />
-                    <div className="flex-1 overflow-hidden">
-                      <p className={`text-sm font-medium truncate text-gray-800`}>
-                        {fileName}
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        {fileExtension ? `${fileExtension.toUpperCase()} - ` : ""}
-                        Đã gửi một tệp đính kèm
-                      </p>
-                    </div>
-                    <a
-                      href={fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`ml-2 p-1 rounded-full bg-blue-200 hover:bg-blue-300`}
-                      download
-                    >
-                      <Download className={`w-5 h-5 text-gray-700`} />
-                    </a>
-                  </div>
+            } catch (e) {
+              console.error("Error parsing filename:", e)
+              fileName = "Tài liệu đính kèm"
+            }
+          } else if (message && !message.includes("http")) {
+            fileName = message
+          }
+
+          // Xác định loại tệp để hiển thị preview phù hợp
+          const isPDF = fileExtension === "pdf"
+          const isTextFile = ["txt", "md", "json", "csv", "html", "css", "js", "ts", "jsx", "tsx"].includes(
+            fileExtension,
+          )
+          const isAudio = ["mp3", "wav", "ogg", "m4a"].includes(fileExtension)
+
+          return (
+            <div className="flex flex-col w-full">
+              {/* Preview cho các loại tệp khác nhau */}
+              {isPDF && fileUrl && (
+                <div className="mb-2 border rounded-md overflow-hidden">
+                  <iframe src={`${fileUrl}#view=FitH`} className="w-full h-60" title={fileName} />
                 </div>
-              );
+              )}
+
+              {isAudio && fileUrl && (
+                <div className="mb-2">
+                  <audio controls className="w-full">
+                    <source src={fileUrl} type={`audio/${fileExtension}`} />
+                    Trình duyệt của bạn không hỗ trợ phát âm thanh.
+                  </audio>
+                </div>
+              )}
+
+              {/* Thông tin tệp */}
+              <div className={`flex items-center rounded-md p-2 ${isPDF || isAudio ? "bg-gray-100" : "bg-gray-200"}`}>
+                <FileText className={`w-8 h-8 mr-2 text-gray-700`} />
+                <div className="flex-1 overflow-hidden">
+                  <p className={`text-sm font-medium truncate text-gray-800`}>{fileName}</p>
+                  <p className="text-xs text-gray-600">
+                    {fileExtension ? `${fileExtension.toUpperCase()} - ` : ""}
+                    Đã gửi một tệp đính kèm
+                  </p>
+                </div>
+                <a
+                  href={fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`ml-2 p-1 rounded-full bg-blue-200 hover:bg-blue-300`}
+                  download
+                >
+                  <Download className={`w-5 h-5 text-gray-700`} />
+                </a>
+              </div>
+            </div>
+          )
 
         default:
-          return (
-            <div className="whitespace-pre-wrap break-words">{message}</div>
-          );
+          return <div className="whitespace-pre-wrap break-words">{message}</div>
       }
     }
-  };
+  }
 
   const renderActionButtons = () => {
-    if (!isHovered || isRecall || (isRemove && isOwn)) return null;
+    if (!isHovered || isRecall || (isRemove && isOwn)) return null
 
     return (
       <div
@@ -348,10 +508,7 @@ export default function ChatMessage({
                   onClick={() => onReply && onReply(messageId, message, type)}
                   className="p-1.5 rounded-full hover:bg-gray-100 transition-all duration-200 flex items-center justify-center"
                 >
-                  <MessageSquareQuote
-                    className="w-4 h-4 text-gray-600"
-                    color="gray"
-                  />
+                  <MessageSquareQuote className="w-4 h-4 text-gray-600" color="gray" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs font-medium">
@@ -383,15 +540,10 @@ export default function ChatMessage({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
-                      onClick={() =>
-                        onRecallMessage && onRecallMessage(messageId)
-                      }
+                      onClick={() => onRecallMessage && onRecallMessage(messageId)}
                       className="p-1.5 rounded-full hover:bg-blue-50 transition-all duration-200 flex items-center justify-center"
                     >
-                      <RotateCcw
-                        className="w-4 h-4 text-blue-500"
-                        color="gray"
-                      />
+                      <RotateCcw className="w-4 h-4 text-blue-500" color="gray" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="text-xs font-medium">
@@ -407,10 +559,7 @@ export default function ChatMessage({
                       onClick={() => onDelete && onDelete(messageId)}
                       className="p-1.5 rounded-full hover:bg-red-50 transition-all duration-200 flex items-center justify-center"
                     >
-                      <MessageSquareX
-                        className="w-4 h-4 text-red-500"
-                        color="gray"
-                      />
+                      <MessageSquareX className="w-4 h-4 text-red-500" color="gray" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="text-xs font-medium">
@@ -422,21 +571,18 @@ export default function ChatMessage({
           )}
         </div>
       </div>
-    );
-  };
+    )
+  }
   const renderReplyPreview = () => {
-    if (!isReply || !replyInfo) return null;
+    if (!isReply || !replyInfo) return null
 
     return (
       <div
-        className={`mb-2 p-2 rounded border-l-4 ${isOwn
-          ? 'bg-[#7649d9] border-[#6a40c7] text-white/90'
-          : 'bg-gray-200 border-gray-300 text-gray-700'
-          }`}
+        className={`mb-2 p-2 rounded border-l-4 ${
+          isOwn ? "bg-[#7649d9] border-[#6a40c7] text-white/90" : "bg-gray-200 border-gray-300 text-gray-700"
+        }`}
       >
-        <div className="text-xs font-medium">
-          {replyInfo.name}
-        </div>
+        <div className="text-xs font-medium">{replyInfo.name}</div>
         <div className="text-xs truncate">
           {replyInfo.type !== "text" ? (
             <span className="flex items-center">
@@ -447,16 +593,15 @@ export default function ChatMessage({
               ) : (
                 <FileText className="h-3 w-3 mr-1" />
               )}
-              {replyInfo.type === "image" ? "Hình ảnh" :
-                replyInfo.type === "video" ? "Video" : "Tệp đính kèm"}
+              {replyInfo.type === "image" ? "Hình ảnh" : replyInfo.type === "video" ? "Video" : "Tệp đính kèm"}
             </span>
           ) : (
             replyInfo.content
           )}
         </div>
       </div>
-    );
-  };
+    )
+  }
   return (
     <>
       <div
@@ -471,7 +616,7 @@ export default function ChatMessage({
               {senderAvatar ? (
                 <div className="w-6 h-6 rounded-full overflow-hidden mr-1">
                   <Image
-                    src={senderAvatar}
+                    src={senderAvatar || "/placeholder.svg"}
                     alt={senderName || "User"}
                     width={24}
                     height={24}
@@ -480,37 +625,26 @@ export default function ChatMessage({
                 </div>
               ) : (
                 <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center mr-1">
-                  <span className="text-xs text-gray-600">
-                    {senderName?.charAt(0) || "U"}
-                  </span>
+                  <span className="text-xs text-gray-600">{senderName?.charAt(0) || "U"}</span>
                 </div>
               )}
-              <span className="text-xs font-medium text-gray-700">
-                {senderName}
-              </span>
+              <span className="text-xs font-medium text-gray-700">{senderName}</span>
             </div>
           )}
           {/* Hiển thị reaction picker */}
           {renderReactionPicker()}
           {/* Container cho nội dung tin nhắn */}
           <div
-            className={`rounded-lg p-3 ${type !== "text"
-              ? "bg-transparent"
-              : isOwn
-                ? "bg-[#8A56FF] text-white max-w-xs md:max-w-md lg:max-w-lg"
-                : "bg-gray-100 text-gray-800 inline-block"
-              }`}
+            className={`rounded-lg p-3 ${
+              type !== "text"
+                ? "bg-transparent"
+                : isOwn
+                  ? "bg-[#8A56FF] text-white max-w-xs md:max-w-md lg:max-w-lg"
+                  : "bg-gray-100 text-gray-800 inline-block"
+            }`}
             style={{
-              backgroundColor:
-                type !== "text" ? "transparent" : isOwn ? "#8A56FF" : "",
-              color:
-                type !== "text"
-                  ? isOwn
-                    ? "white"
-                    : "black"
-                  : isOwn
-                    ? "white"
-                    : "",
+              backgroundColor: type !== "text" ? "transparent" : isOwn ? "#8A56FF" : "",
+              color: type !== "text" ? (isOwn ? "white" : "black") : isOwn ? "white" : "",
               maxWidth: !isOwn ? "80%" : "",
             }}
           >
@@ -529,14 +663,6 @@ export default function ChatMessage({
           {/* Container cho các nút hành động */}
           {renderActionButtons()}
         </div>
-
-        {/* {!isOwn && (
-        <div className="flex items-center mt-1 ml-2">
-          <button className="p-1 rounded-full hover:bg-gray-200">
-            <ThumbsUp className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
-      )} */}
       </div>
       {/* Image Viewer */}
       {type === "image" && fileUrl && (
@@ -548,5 +674,5 @@ export default function ChatMessage({
         />
       )}
     </>
-  );
+  )
 }
