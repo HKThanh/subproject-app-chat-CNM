@@ -47,9 +47,40 @@ export default function NavigationSidebar() {
   const user = useUserStore((state) => state.user);
   const clearUser = useUserStore((state) => state.clearUser);
   const userId = user?.id || session?.user?.id || "";
-
+  const token = useUserStore((state) => state.accessToken);
   const { conversations } = useChat(userId);
-  
+  // Inside the NavigationSidebar component, add:
+  const [friendRequestCount, setFriendRequestCount] = useState(0);
+
+  // Add this useEffect to fetch friend request count
+  useEffect(() => {
+    const fetchFriendRequests = async () => {
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/user/get-received-friend-requests`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await response.json();
+        if (data.success) {
+          setFriendRequestCount(data.data.length || 0);
+        }
+      } catch (error) {
+        console.error("Error fetching friend requests:", error);
+      }
+    };
+
+    fetchFriendRequests();
+
+    // Set up interval to refresh friend requests every minute
+    const interval = setInterval(fetchFriendRequests, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
   // Calculate total unread messages
   const totalUnreadMessages = conversations.reduce((total, conversation) => {
     return total + (conversation.unreadCount || 0);
@@ -104,18 +135,18 @@ export default function NavigationSidebar() {
 
   const handleNavigation = (id: string) => {
     // Nếu đang ở trang hiện tại, không cần điều hướng lại
-    if ((id === "contacts" && pathname.includes("/contacts")) || 
-        (id === "messages" && pathname.includes("/chat"))) {
+    if ((id === "contacts" && pathname.includes("/contacts")) ||
+      (id === "messages" && pathname.includes("/chat"))) {
       setActiveItem(id);
       return;
     }
-    
+
     // Cập nhật trạng thái active trước khi điều hướng
     setActiveItem(id);
-    
+
     // Hiển thị trạng thái loading
     const toastId = toast.loading(`Đang chuyển đến ${id === "contacts" ? "danh bạ" : "tin nhắn"}...`);
-    
+
     // Sử dụng window.location để chuyển trang thay vì router
     try {
       if (id === "contacts") {
@@ -134,7 +165,7 @@ export default function NavigationSidebar() {
 
   const navigationItems = [
     { id: "messages", icon: MessageSquare, label: "Tin nhắn", badge: totalUnreadMessages > 0 ? totalUnreadMessages : null },
-    { id: "contacts", icon: Users, label: "Danh bạ" },
+    { id: "contacts", icon: Users, label: "Danh bạ",badge: friendRequestCount > 0 ? friendRequestCount : null },
     // { id: "tasks", icon: CheckSquare, label: "Công việc" },
     // { id: "cloud", icon: Cloud, label: "Cloud" },
     // { id: "documents", icon: FolderOpen, label: "Tài liệu" },
@@ -208,9 +239,8 @@ export default function NavigationSidebar() {
               <Tooltip key={item.id}>
                 <TooltipTrigger asChild>
                   <button
-                    className={`relative p-3 rounded-lg hover:bg-[#1d4ed8] transition-colors ${
-                      activeItem === item.id ? "bg-[#1d4ed8]" : ""
-                    }`}
+                    className={`relative p-3 rounded-lg hover:bg-[#1d4ed8] transition-colors ${activeItem === item.id ? "bg-[#1d4ed8]" : ""
+                      }`}
                     onClick={() => handleNavigation(item.id)}
                   >
                     <item.icon className="h-6 w-6 text-white" />
