@@ -1,0 +1,339 @@
+**ROOM API TESTING DOCUMENTATION**
+
+==============================================
+1. CREATE ROOM
+==============================================
+Method: POST
+Endpoint: localhost:3000/room/create-room
+Headers: Authorization: Bearer <accessToken>
+input: (không cần body)
+output (thành công):
+{
+    "roomUrl": "https://that909kk.daily.co/room-1748089357721",
+    "roomName": "room-1748089357721"
+}
+
+output (lỗi):
+{
+    "error": "Failed to create room"
+}
+
+==============================================
+2. INITIATE CALL
+==============================================
+Method: POST
+Endpoint: localhost:3000/room/initiate-call
+Headers: Authorization: Bearer <accessToken>
+input:
+{
+    "receiverId": "user003",
+    "callType": "video"
+}
+output (thành công):
+{
+    "success": true,
+    "call": {
+        "idCall": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+        "callerId": "user010",
+        "receiverId": "user003",
+        "callType": "video",
+        "status": "ringing",
+        "roomName": "call-user010-user003-1748089357721",
+        "roomUrl": "https://that909kk.daily.co/call-user010-user003-1748089357721",
+        "startTime": "2025-01-24T16:15:57.721Z"
+    }
+}
+
+output (lỗi - user đã có cuộc gọi):
+{
+    "success": false,
+    "error": "User is already in a call"
+}
+
+output (lỗi - receiver không tồn tại):
+{
+    "success": false,
+    "error": "Receiver not found"
+}
+
+output (lỗi - không phải bạn bè):
+{
+    "success": false,
+    "error": "Cannot call non-friend user"
+}
+
+input (callType audio):
+{
+    "receiverId": "user003",
+    "callType": "audio"
+}
+output:
+{
+    "success": true,
+    "call": {
+        "idCall": "7725bfdd-67c0-4d42-b620-2011fc7368e9",
+        "callerId": "user010",
+        "receiverId": "user003",
+        "callType": "audio",
+        "status": "ringing",
+        "roomName": "call-user010-user003-1748089357722",
+        "roomUrl": "https://that909kk.daily.co/call-user010-user003-1748089357722",
+        "startTime": "2025-01-24T16:16:12.445Z"
+    }
+}
+
+==============================================
+3. GET CALL HISTORY
+==============================================
+Method: GET
+Endpoint: localhost:3000/room/call-history
+Headers: Authorization: Bearer <accessToken>
+Query Parameters: ?limit=10&skip=0
+
+input (với query params):
+GET localhost:3000/room/call-history?limit=10&skip=0
+
+output (có lịch sử):
+{
+    "success": true,
+    "history": [
+        {
+            "idCall": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+            "callerId": "user010",
+            "receiverId": "user003",
+            "callType": "video",
+            "status": "ended",
+            "roomName": "call-user010-user003-1748089357721",
+            "roomUrl": "https://that909kk.daily.co/call-user010-user003-1748089357721",
+            "startTime": "2025-01-24T16:15:57.721Z",
+            "endTime": "2025-01-24T16:18:45.123Z",
+            "duration": 167,
+            "endReason": "normal"
+        },
+        {
+            "idCall": "5525bfdd-67c0-4d42-b620-2011fc7368e7",
+            "callerId": "user003",
+            "receiverId": "user010",
+            "callType": "audio",
+            "status": "ended",
+            "roomName": "call-user003-user010-1748089257621",
+            "roomUrl": "https://that909kk.daily.co/call-user003-user010-1748089257621",
+            "startTime": "2025-01-24T15:45:12.321Z",
+            "endTime": "2025-01-24T15:47:30.456Z",
+            "duration": 138,
+            "endReason": "normal"
+        }
+    ]
+}
+
+input (không có query params - sử dụng default):
+GET localhost:3000/room/call-history
+
+output (default limit=20, skip=0):
+{
+    "success": true,
+    "history": []
+}
+
+output (lỗi):
+{
+    "success": false,
+    "error": "Error message"
+}
+
+==============================================
+4. GET ACTIVE CALL
+==============================================
+Method: GET
+Endpoint: localhost:3000/room/active-call
+Headers: Authorization: Bearer <accessToken>
+input: (không cần params)
+
+output (có cuộc gọi đang active):
+{
+    "success": true,
+    "activeCall": {
+        "idCall": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+        "callerId": "user010",
+        "receiverId": "user003",
+        "callType": "video",
+        "status": "active",
+        "roomName": "call-user010-user003-1748089357721",
+        "roomUrl": "https://that909kk.daily.co/call-user010-user003-1748089357721",
+        "startTime": "2025-01-24T16:15:57.721Z"
+    }
+}
+
+output (không có cuộc gọi active):
+{
+    "success": true,
+    "activeCall": null
+}
+
+output (lỗi):
+{
+    "success": false,
+    "error": "Error message"
+}
+
+==============================================
+5. GET CALL STATUS
+==============================================
+Method: GET
+Endpoint: localhost:3000/room/call-status
+Headers: Authorization: Bearer <accessToken>
+input: (không cần params)
+
+output (có cuộc gọi active):
+{
+    "success": true,
+    "hasActiveCall": true,
+    "activeCall": {
+        "idCall": "6625bfdd-67c0-4d42-b620-2011fc7368e8",
+        "callerId": "user010",
+        "receiverId": "user003",
+        "callType": "video",
+        "status": "active",
+        "roomName": "call-user010-user003-1748089357721",
+        "roomUrl": "https://that909kk.daily.co/call-user010-user003-1748089357721",
+        "startTime": "2025-01-24T16:15:57.721Z"
+    },
+    "userCallId": "6625bfdd-67c0-4d42-b620-2011fc7368e8"
+}
+
+output (không có cuộc gọi active):
+{
+    "success": true,
+    "hasActiveCall": false,
+    "activeCall": null,
+    "userCallId": null
+}
+
+output (có callId nhưng call đã kết thúc):
+{
+    "success": true,
+    "hasActiveCall": false,
+    "activeCall": null,
+    "userCallId": "6625bfdd-67c0-4d42-b620-2011fc7368e8"
+}
+
+output (lỗi):
+{
+    "success": false,
+    "error": "Error message"
+}
+
+==============================================
+6. ERROR CASES
+==============================================
+
+Unauthorized (thiếu accessToken):
+Headers: (không có Authorization)
+output:
+{
+    "message": "Access token is required"
+}
+
+Invalid token:
+Headers: Authorization: Bearer invalid_token
+output:
+{
+    "message": "Invalid token"
+}
+
+Token expired:
+Headers: Authorization: Bearer expired_token
+output:
+{
+    "message": "Token expired"
+}
+
+Server errors (500):
+{
+    "success": false,
+    "error": "Internal server error message"
+}
+
+==============================================
+7. TESTING SCENARIOS
+==============================================
+
+Scenario 1: Tạo room và khởi tạo cuộc gọi
+1. POST /room/create-room → Tạo room thành công
+2. POST /room/initiate-call → Khởi tạo cuộc gọi với room
+
+Scenario 2: Kiểm tra trạng thái cuộc gọi
+1. GET /room/call-status → Kiểm tra trạng thái hiện tại
+2. GET /room/active-call → Lấy thông tin cuộc gọi active
+
+Scenario 3: Xem lịch sử cuộc gọi
+1. GET /room/call-history → Lấy 20 cuộc gọi gần nhất
+2. GET /room/call-history?limit=5&skip=10 → Phân trang
+
+Scenario 4: Luồng cuộc gọi hoàn chỉnh
+1. POST /room/initiate-call → Khởi tạo
+2. GET /room/call-status → Kiểm tra đang ringing
+3. (Socket: accept_call) → Chấp nhận qua socket
+4. GET /room/active-call → Kiểm tra đang active
+5. (Socket: end_call) → Kết thúc qua socket
+6. GET /room/call-history → Xem lịch sử
+
+==============================================
+8. API RESPONSE FORMATS
+==============================================
+
+Success Response Format:
+{
+    "success": true,
+    "data": {},
+    "message": "Optional message"
+}
+
+Error Response Format:
+{
+    "success": false,
+    "error": "Error message",
+    "code": "ERROR_CODE (optional)"
+}
+
+==============================================
+9. CALL STATUS VALUES
+==============================================
+
+Call Status trong database:
+- "ringing": Đang gọi
+- "active": Đang trong cuộc gọi
+- "ended": Đã kết thúc
+- "rejected": Đã từ chối
+- "missed": Cuộc gọi nhỡ
+
+Call Types:
+- "video": Video call
+- "audio": Audio call
+
+End Reasons:
+- "normal": Kết thúc bình thường
+- "rejected": Từ chối
+- "missed": Nhỡ cuộc gọi
+- "disconnected": Mất kết nối
+- "error": Lỗi hệ thống
+
+==============================================
+10. INTEGRATION WITH SOCKET
+==============================================
+
+API endpoints thường được sử dụng kết hợp với Socket events:
+
+1. Khởi tạo cuộc gọi:
+   - API: POST /room/initiate-call
+   - Socket: emit("initiate_call")
+
+2. Kiểm tra trạng thái:
+   - API: GET /room/call-status
+   - Socket: emit("get_call_status")
+
+3. Lấy cuộc gọi active:
+   - API: GET /room/active-call
+   - Socket: emit("get_active_call")
+
+Note: API endpoints chủ yếu để kiểm tra trạng thái, còn các hành động chính (accept, reject, end) thường thông qua Socket.IO
