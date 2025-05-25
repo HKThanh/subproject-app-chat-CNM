@@ -29,6 +29,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+import { BlockedAvatar } from "@/components/ui/blocked-avatar";
 
 interface Contact {
   id: string;
@@ -379,6 +380,13 @@ export default function ContactList({
           ...prev,
           { ...userToBlock, isBlocked: true },
         ]);
+
+        // Emit event để cập nhật conversation status
+        window.dispatchEvent(
+          new CustomEvent("userBlocked", {
+            detail: { userId: userId, isBlocked: true },
+          })
+        );
       } else {
         toast.error(result.message || "Không thể chặn người dùng");
       }
@@ -426,6 +434,13 @@ export default function ContactList({
 
         // Xóa khỏi danh sách người dùng bị chặn
         setBlockedUsers((prev) => prev.filter((user) => user.id !== userId));
+
+        // Emit event để cập nhật conversation status
+        window.dispatchEvent(
+          new CustomEvent("userBlocked", {
+            detail: { userId: userId, isBlocked: false },
+          })
+        );
       } else {
         toast.error(result.message || "Không thể bỏ chặn người dùng");
       }
@@ -823,44 +838,26 @@ export default function ContactList({
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div
-                            className={`flex items-center ${
-                              contact.isBlocked
-                                ? "cursor-default"
-                                : "cursor-pointer"
-                            }`}
+                            className="flex items-center cursor-pointer"
                             onClick={(e) => {
-                              if (!contact.isBlocked) {
-                                handleContactClick(contact, e);
-                              }
+                              handleContactClick(contact, e);
                             }}
                           >
-                            <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
-                              <img
-                                src={contact.urlavatar || "/default-avatar.png"}
-                                alt={contact.fullname}
-                                className={`w-full h-full object-cover ${
-                                  contact.isBlocked ? "opacity-60" : ""
-                                }`}
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src =
-                                    "/default-avatar.png";
-                                }}
-                              />
-                            </div>
+                            <BlockedAvatar
+                              src={contact.urlavatar}
+                              alt={contact.fullname}
+                              isBlocked={contact.isBlocked}
+                              size="md"
+                              className="mr-3"
+                            />
                             <div>
-                              <div
-                                className={`font-medium ${
-                                  contact.isBlocked ? "text-gray-500" : ""
-                                }`}
-                              >
+                              <div className="font-medium">
                                 {contact.fullname}
                               </div>
                               <div className="text-sm text-gray-500">
-                                {contact.isBlocked
-                                  ? "Đã chặn"
-                                  : contact.phone ||
-                                    contact.email ||
-                                    "Không có thông tin liên hệ"}
+                                {contact.phone ||
+                                  contact.email ||
+                                  "Không có thông tin liên hệ"}
                               </div>
                             </div>
                           </div>
@@ -870,7 +867,7 @@ export default function ContactList({
                             side="top"
                             className="bg-gray-800 text-white"
                           >
-                            <p>Bạn đã chặn tin nhắn và cuộc gọi từ người này</p>
+                            <p>Bạn đã chặn người này</p>
                           </TooltipContent>
                         )}
                       </Tooltip>

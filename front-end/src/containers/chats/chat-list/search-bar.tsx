@@ -8,6 +8,7 @@ import { useSocketContext } from "@/socket/SocketContext";
 import { UserIcon, UsersIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { BlockedAvatar } from "@/components/ui/blocked-avatar";
 
 interface SearchBarProps {
   onSelectConversation: (id: string) => void;
@@ -19,6 +20,7 @@ interface SearchResult {
   email: string;
   urlavatar: string;
   isFriend?: boolean; // Thêm trường để xác định trạng thái kết bạn
+  isBlocked?: boolean; // Thêm trường để xác định trạng thái chặn
 }
 
 export default function SearchBar({ onSelectConversation }: SearchBarProps) {
@@ -90,13 +92,26 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
             ? friendsData.data.map((friend: any) => friend.id)
             : [];
 
-        // Đánh dấu người dùng đã là bạn bè
-        const resultsWithFriendStatus = data.data.map((user: SearchResult) => ({
+        // Lấy danh sách người dùng bị chặn
+        const blockedResponse = await fetch(
+          `${END_POINT_URL}/user/blocked/get-blocked`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        const blockedData = await blockedResponse.json();
+        const blockedIds = blockedData.success
+          ? blockedData.data.map((user: any) => user.id)
+          : [];
+
+        // Đánh dấu người dùng đã là bạn bè và bị chặn
+        const resultsWithStatus = data.data.map((user: SearchResult) => ({
           ...user,
           isFriend: friendIds.includes(user.id),
+          isBlocked: blockedIds.includes(user.id),
         }));
 
-        setSearchResults(resultsWithFriendStatus);
+        setSearchResults(resultsWithStatus);
       } else {
         setSearchResults([]);
       }
@@ -314,10 +329,12 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
                       result.isFriend ? handleSelectUser(result.id) : null
                     }
                   >
-                    <img
+                    <BlockedAvatar
                       src={result.urlavatar || "https://via.placeholder.com/40"}
                       alt={result.fullname}
-                      className="w-10 h-10 rounded-full mr-3"
+                      isBlocked={result.isBlocked}
+                      size="md"
+                      className="mr-3"
                     />
                     <div>
                       <div className="font-medium">{result.fullname}</div>
