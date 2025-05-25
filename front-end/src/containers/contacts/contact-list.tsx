@@ -8,6 +8,12 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useSocketContext } from "@/socket/SocketContext";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -30,6 +36,7 @@ interface Contact {
   urlavatar: string;
   email?: string;
   phone?: string;
+  isBlocked?: boolean;
 }
 
 interface ContactGroup {
@@ -49,19 +56,13 @@ export default function ContactList({
   const router = useRouter();
   const [contacts, setContacts] = useState<ContactGroup[]>([]);
   const [totalFriends, setTotalFriends] = useState(0);
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [blockedUsers, setBlockedUsers] = useState<Contact[]>([]);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState({
-    top: 0,
-    right: 0,
-  });
   const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const { socket } = useSocketContext(); // Sử dụng socket hook
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [friendToRemove, setFriendToRemove] = useState<Contact | null>(null);
   const [actionInProgress, setActionInProgress] = useState(false);
-  const [actionType, setActionType] = useState<"remove" | "block" | null>(null);
 
   // Kiểm tra socket khi component mount
   useEffect(() => {
@@ -122,6 +123,26 @@ export default function ContactList({
     socket.on("removeFriend", handleUnfriend);
     socket.on("friendRemoved", handleUnfriend);
 
+    // Lắng nghe sự kiện block/unblock
+    const handleBlockedByUser = (data: {
+      blockerId: string;
+      message: string;
+    }) => {
+      console.log("Blocked by user event received:", data);
+      toast.info(data.message);
+    };
+
+    const handleUnblockedByUser = (data: {
+      blockerId: string;
+      message: string;
+    }) => {
+      console.log("Unblocked by user event received:", data);
+      toast.info(data.message);
+    };
+
+    socket.on("blockedByUser", handleBlockedByUser);
+    socket.on("unblockedByUser", handleUnblockedByUser);
+
     // Kiểm tra kết nối socket
     console.log("Socket connected:", socket.connected);
 
@@ -139,6 +160,8 @@ export default function ContactList({
       socket.off("unfriend", handleUnfriend);
       socket.off("removeFriend", handleUnfriend);
       socket.off("friendRemoved", handleUnfriend);
+      socket.off("blockedByUser", handleBlockedByUser);
+      socket.off("unblockedByUser", handleUnblockedByUser);
     };
   }, [socket]);
 
@@ -194,6 +217,7 @@ export default function ContactList({
   // Thêm useEffect để lắng nghe sự kiện cập nhật danh sách bạn bè
   useEffect(() => {
     fetchFriendList();
+    fetchBlockedUsers();
 
     // Lắng nghe sự kiện friendRequestAccepted để cập nhật danh sách
     const handleFriendRequestAccepted = () => {
@@ -213,19 +237,27 @@ export default function ContactList({
     };
   }, []);
 
-  // Hàm mở dropdown
-  const openDropdown = (e: React.MouseEvent, contact: Contact) => {
-    e.stopPropagation();
-    e.preventDefault();
+  // Fetch danh sách người dùng bị chặn
+  const fetchBlockedUsers = async () => {
+    try {
+      const token = await getAuthToken();
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/user/blocked/get-blocked`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    setDropdownPosition({
-      top: rect.bottom + window.scrollY,
-      right: window.innerWidth - rect.right,
-    });
+      const result = await response.json();
 
-    setSelectedContact(contact);
-    setActiveDropdown(contact.id);
+      if (result.success) {
+        setBlockedUsers(result.data || []);
+      } else {
+        console.error("Failed to fetch blocked users:", result.message);
+      }
+    } catch (error) {
+      console.error("Error fetching blocked users:", error);
+    }
   };
 
   // Đơn giản hóa cách xử lý dropdown và xóa bạn
@@ -306,10 +338,22 @@ export default function ContactList({
 
   // Xử lý chặn người dùng
   const handleBlockUser = async (userId: string) => {
-    setActionInProgress(true); // Đánh dấu đang có hành động xử lý
+    setActionInProgress(true);
 
     try {
       const token = await getAuthToken();
+
+      // Tìm thông tin người dùng sẽ bị chặn
+      const userToBlock = contacts
+        .flatMap((group) => group.contacts)
+        .find((contact) => contact.id === userId);
+
+      if (!userToBlock) {
+        toast.error("Không tìm thấy thông tin người dùng");
+        return;
+      }
+
+      // Gọi API chặn người dùng với body {userId}
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/user/blocked/block`,
         {
@@ -318,7 +362,7 @@ export default function ContactList({
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ blockedId: userId }),
+          body: JSON.stringify({ userId: userId }),
         }
       );
 
@@ -327,7 +371,7 @@ export default function ContactList({
       if (result.success) {
         toast.success("Đã chặn người dùng này");
 
-        // Cập nhật UI bằng cách xóa người dùng đã bị chặn khỏi danh sách bạn bè
+        // Cập nhật danh sách bạn bè - xóa khỏi danh sách bạn bè
         setContacts((prevGroups) => {
           const newGroups = prevGroups
             .map((group) => ({
@@ -341,6 +385,12 @@ export default function ContactList({
           return newGroups;
         });
 
+        // Thêm vào danh sách người dùng bị chặn
+        setBlockedUsers((prev) => [
+          ...prev,
+          { ...userToBlock, isBlocked: true },
+        ]);
+
         // Cập nhật tổng số bạn bè
         setTotalFriends((prev) => prev - 1);
       } else {
@@ -350,13 +400,59 @@ export default function ContactList({
       console.error("Error blocking user:", error);
       toast.error("Đã xảy ra lỗi khi chặn người dùng");
     } finally {
-      // Đóng dropdown
       setActiveDropdown(null);
-      setActionInProgress(false); // Đánh dấu đã hoàn thành hành động
+      setActionInProgress(false);
     }
   };
 
-  // Lọc danh sách theo searchQuery
+  // Xử lý bỏ chặn người dùng
+  const handleUnblockUser = async (userId: string) => {
+    setActionInProgress(true);
+
+    try {
+      const token = await getAuthToken();
+
+      // Tìm thông tin người dùng sẽ bỏ chặn
+      const userToUnblock = blockedUsers.find((user) => user.id === userId);
+
+      if (!userToUnblock) {
+        toast.error("Không tìm thấy thông tin người dùng");
+        return;
+      }
+
+      // Gọi API bỏ chặn người dùng
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/user/blocked/unblock`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ userId: userId }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success("Đã bỏ chặn người dùng này");
+
+        // Xóa khỏi danh sách người dùng bị chặn
+        setBlockedUsers((prev) => prev.filter((user) => user.id !== userId));
+      } else {
+        toast.error(result.message || "Không thể bỏ chặn người dùng");
+      }
+    } catch (error) {
+      console.error("Error unblocking user:", error);
+      toast.error("Đã xảy ra lỗi khi bỏ chặn người dùng");
+    } finally {
+      setActiveDropdown(null);
+      setActionInProgress(false);
+    }
+  };
+
+  // Lọc danh sách theo searchQuery và bao gồm cả người dùng bị chặn
   const filteredContacts = contacts
     .map((group) => ({
       ...group,
@@ -365,6 +461,51 @@ export default function ContactList({
       ),
     }))
     .filter((group) => group.contacts.length > 0);
+
+  // Thêm người dùng bị chặn vào danh sách hiển thị
+  const blockedContactGroups = blockedUsers
+    .filter((user) =>
+      user.fullname.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .reduce((groups: ContactGroup[], user) => {
+      const firstLetter = user.fullname.charAt(0).toUpperCase();
+      const existingGroup = groups.find(
+        (group) => group.letter === firstLetter
+      );
+
+      if (existingGroup) {
+        existingGroup.contacts.push({ ...user, isBlocked: true });
+      } else {
+        groups.push({
+          letter: firstLetter,
+          contacts: [{ ...user, isBlocked: true }],
+        });
+      }
+
+      return groups;
+    }, []);
+
+  // Kết hợp danh sách bạn bè và người dùng bị chặn
+  const allContactGroups = [...filteredContacts];
+
+  blockedContactGroups.forEach((blockedGroup) => {
+    const existingGroup = allContactGroups.find(
+      (group) => group.letter === blockedGroup.letter
+    );
+
+    if (existingGroup) {
+      existingGroup.contacts.push(...blockedGroup.contacts);
+      // Sắp xếp lại theo tên
+      existingGroup.contacts.sort((a, b) =>
+        a.fullname.localeCompare(b.fullname)
+      );
+    } else {
+      allContactGroups.push(blockedGroup);
+    }
+  });
+
+  // Sắp xếp các nhóm theo alphabet
+  allContactGroups.sort((a, b) => a.letter.localeCompare(b.letter));
 
   // Thêm style vào component
   useEffect(() => {
@@ -390,7 +531,6 @@ export default function ContactList({
       // Chỉ reset các state khi không có hành động đang xử lý
       if (!actionInProgress) {
         setIsProcessing(false);
-        setSelectedContact(null);
       }
     }
   }, [confirmDialogOpen, actionInProgress]);
@@ -600,7 +740,13 @@ export default function ContactList({
     <div className="flex flex-col h-full p-4">
       {/* Header with total friends count */}
       <div className="mb-4">
-        <h2 className="text-xl font-semibold">Bạn bè ({totalFriends})</h2>
+        <h2 className="text-xl font-semibold">
+          Liên hệ ({totalFriends + blockedUsers.length})
+        </h2>
+        <p className="text-sm text-gray-500">
+          {totalFriends} bạn bè
+          {blockedUsers.length > 0 && `, ${blockedUsers.length} đã chặn`}
+        </p>
       </div>
 
       {/* Search and Filter Controls */}
@@ -669,12 +815,12 @@ export default function ContactList({
 
       {/* Contact List */}
       <div className="flex-1 overflow-y-auto">
-        {filteredContacts.length === 0 ? (
+        {allContactGroups.length === 0 ? (
           <div className="text-center text-gray-500 mt-4">
-            {searchQuery ? "Không tìm thấy bạn bè" : "Chưa có bạn bè nào"}
+            {searchQuery ? "Không tìm thấy liên hệ" : "Chưa có liên hệ nào"}
           </div>
         ) : (
-          filteredContacts.map((group) => (
+          allContactGroups.map((group) => (
             <div key={group.letter} className="mb-4">
               <div className="sticky top-0 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-500">
                 {group.letter}
@@ -683,33 +829,67 @@ export default function ContactList({
                 {group.contacts.map((contact) => (
                   <div
                     key={contact.id}
-                    className="flex items-center justify-between px-4 py-2 hover:bg-gray-100"
+                    className={`flex items-center justify-between px-4 py-2 hover:bg-gray-100 ${
+                      contact.isBlocked ? "relative" : ""
+                    }`}
                   >
-                    {/* Phần thông tin người dùng có thể click để mở cuộc trò chuyện */}
-                    <div
-                      className="flex items-center cursor-pointer"
-                      onClick={(e) => handleContactClick(contact, e)}
-                    >
-                      <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
-                        <img
-                          src={contact.urlavatar || "/default-avatar.png"}
-                          alt={contact.fullname}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src =
-                              "/default-avatar.png";
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <div className="font-medium">{contact.fullname}</div>
-                        <div className="text-sm text-gray-500">
-                          {contact.phone ||
-                            contact.email ||
-                            "Không có thông tin liên hệ"}
-                        </div>
-                      </div>
-                    </div>
+                    {/* Phần thông tin người dùng */}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div
+                            className={`flex items-center ${
+                              contact.isBlocked
+                                ? "cursor-default"
+                                : "cursor-pointer"
+                            }`}
+                            onClick={(e) => {
+                              if (!contact.isBlocked) {
+                                handleContactClick(contact, e);
+                              }
+                            }}
+                          >
+                            <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
+                              <img
+                                src={contact.urlavatar || "/default-avatar.png"}
+                                alt={contact.fullname}
+                                className={`w-full h-full object-cover ${
+                                  contact.isBlocked ? "opacity-60" : ""
+                                }`}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src =
+                                    "/default-avatar.png";
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <div
+                                className={`font-medium ${
+                                  contact.isBlocked ? "text-gray-500" : ""
+                                }`}
+                              >
+                                {contact.fullname}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {contact.isBlocked
+                                  ? "Đã chặn"
+                                  : contact.phone ||
+                                    contact.email ||
+                                    "Không có thông tin liên hệ"}
+                              </div>
+                            </div>
+                          </div>
+                        </TooltipTrigger>
+                        {contact.isBlocked && (
+                          <TooltipContent
+                            side="top"
+                            className="bg-gray-800 text-white"
+                          >
+                            <p>Bạn đã chặn tin nhắn và cuộc gọi từ người này</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
 
                     {/* Phần dropdown menu tách biệt */}
                     <DropdownMenu>
@@ -719,21 +899,32 @@ export default function ContactList({
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handleBlockUser(contact.id)}
-                        >
-                          <Shield className="w-4 h-4 mr-2" />
-                          <span>Chặn người này</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setConfirmDialogOpen(true);
-                            setFriendToRemove(contact);
-                          }}
-                        >
-                          <UserX className="w-4 h-4 mr-2 text-red-600" />
-                          <span className="text-red-600">Xóa bạn</span>
-                        </DropdownMenuItem>
+                        {contact.isBlocked ? (
+                          <DropdownMenuItem
+                            onClick={() => handleUnblockUser(contact.id)}
+                          >
+                            <Shield className="w-4 h-4 mr-2" />
+                            <span>Bỏ chặn</span>
+                          </DropdownMenuItem>
+                        ) : (
+                          <>
+                            <DropdownMenuItem
+                              onClick={() => handleBlockUser(contact.id)}
+                            >
+                              <Shield className="w-4 h-4 mr-2" />
+                              <span>Chặn người này</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setConfirmDialogOpen(true);
+                                setFriendToRemove(contact);
+                              }}
+                            >
+                              <UserX className="w-4 h-4 mr-2 text-red-600" />
+                              <span className="text-red-600">Xóa bạn</span>
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

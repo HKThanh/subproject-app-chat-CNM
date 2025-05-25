@@ -72,7 +72,7 @@ export default function BlockedList() {
       setBlockedUsers((prev) => prev.filter((user) => user.id !== userId));
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/user/unblock-user`,
+        `${process.env.NEXT_PUBLIC_API_URL}/user/blocked/unblock`,
         {
           method: "POST",
           headers: {
