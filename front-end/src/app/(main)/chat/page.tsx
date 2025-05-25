@@ -104,6 +104,37 @@ export default function Home() {
     }
   }, [activeConversation, messages, markMessagesAsRead]);
 
+  // Thêm useEffect để kiểm tra và mở cuộc trò chuyện đã được chọn từ localStorage
+  useEffect(() => {
+    const checkSavedConversation = () => {
+      const savedConversationId = localStorage.getItem(
+        "selectedConversationId"
+      );
+      if (savedConversationId && conversations.length > 0) {
+        const conversation = conversations.find(
+          (conv) => conv.idConversation === savedConversationId
+        );
+
+        if (conversation) {
+          // Mở cuộc trò chuyện
+          setActiveConversation(savedConversationId);
+          loadMessages(savedConversationId);
+
+          // Xóa ID đã lưu để tránh mở lại cuộc trò chuyện này khi người dùng quay lại trang
+          localStorage.removeItem("selectedConversationId");
+        } else {
+          // Nếu không tìm thấy cuộc trò chuyện, xóa ID đã lưu
+          localStorage.removeItem("selectedConversationId");
+        }
+      }
+    };
+
+    // Kiểm tra khi conversations thay đổi
+    if (isConnected && conversations.length > 0) {
+      checkSavedConversation();
+    }
+  }, [isConnected, conversations, loadMessages, setActiveConversation]);
+
   // Xử lý khi chọn một cuộc trò chuyện
   const handleSelectConversation = (conversationId: string) => {
     setActiveConversation(conversationId);

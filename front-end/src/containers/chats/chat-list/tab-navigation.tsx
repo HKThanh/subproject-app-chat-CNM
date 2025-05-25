@@ -305,14 +305,32 @@ export default function TabNavigation({
       return;
     }
 
+    // Hiển thị trạng thái đang tải
+    toast.loading("Đang mở cuộc trò chuyện...");
+
     // Emit sự kiện tạo conversation
     socket.emit("create_conversation", {
       IDSender: currentUserId,
       IDReceiver: friend.id,
     });
 
-    // Chuyển hướng đến trang chat
-    router.push("/chat");
+    // Lắng nghe phản hồi từ server
+    socket.once("create_conversation_response", (response) => {
+      toast.dismiss(); // Đóng toast loading
+
+      if (response.success) {
+        // Lưu ID cuộc trò chuyện vào localStorage
+        localStorage.setItem(
+          "selectedConversationId",
+          response.conversation.idConversation
+        );
+
+        // Chuyển hướng đến trang chat
+        router.push("/chat");
+      } else {
+        toast.error(response.message || "Không thể tạo cuộc trò chuyện");
+      }
+    });
   };
 
   return (

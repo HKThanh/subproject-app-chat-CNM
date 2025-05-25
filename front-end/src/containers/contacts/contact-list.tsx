@@ -5,7 +5,8 @@ import { MoreHorizontal, Search, UserX, Shield } from "lucide-react";
 import { getAuthToken } from "@/utils/auth-utils";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
-import { useSocket } from "@/socket/useSocket";
+import { useRouter } from "next/navigation";
+import { useSocketContext } from "@/socket/SocketContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,6 +46,7 @@ export default function ContactList({
   searchQuery,
   onSearchChange,
 }: ContactListProps) {
+  const router = useRouter();
   const [contacts, setContacts] = useState<ContactGroup[]>([]);
   const [totalFriends, setTotalFriends] = useState(0);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
@@ -55,7 +57,7 @@ export default function ContactList({
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
-  const { socket } = useSocket(); // Sử dụng socket hook
+  const { socket } = useSocketContext(); // Sử dụng socket hook
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [friendToRemove, setFriendToRemove] = useState<Contact | null>(null);
   const [actionInProgress, setActionInProgress] = useState(false);
@@ -537,6 +539,63 @@ export default function ContactList({
     };
   }, [socket]);
 
+  // Thêm hàm xử lý khi người dùng nhấp vào một người bạn trong danh sách
+  const handleContactClick = (contact: Contact, e: React.MouseEvent) => {
+    // Ngăn chặn sự kiện lan truyền nếu đang nhấp vào dropdown hoặc các nút trong dropdown
+    if (
+      (e.target as HTMLElement).closest(".dropdown-trigger") ||
+      (e.target as HTMLElement).closest(".dropdown-menu-content") ||
+      activeDropdown !== null
+    ) {
+      return;
+    }
+
+    if (!socket) {
+      console.error("Socket is not initialized");
+      toast.error("Không thể kết nối đến máy chủ");
+      return;
+    }
+
+    // Lấy thông tin người dùng từ sessionStorage
+    const userSession = sessionStorage.getItem("user-session");
+    const currentUserId = userSession
+      ? JSON.parse(userSession).state.user.id
+      : null;
+
+    if (!currentUserId) {
+      console.error("User ID not found in session storage");
+      toast.error("Không tìm thấy thông tin người dùng");
+      return;
+    }
+
+    // Hiển thị trạng thái đang tải
+    toast.loading("Đang mở cuộc trò chuyện...");
+
+    // Emit sự kiện tạo conversation
+    socket.emit("create_conversation", {
+      IDSender: currentUserId,
+      IDReceiver: contact.id,
+    });
+
+    // Lắng nghe phản hồi từ server
+    socket.once("create_conversation_response", (response) => {
+      toast.dismiss(); // Đóng toast loading
+
+      if (response.success) {
+        // Lưu ID cuộc trò chuyện vào localStorage
+        localStorage.setItem(
+          "selectedConversationId",
+          response.conversation.idConversation
+        );
+
+        // Chuyển hướng đến trang chat
+        router.push("/chat");
+      } else {
+        toast.error(response.message || "Không thể tạo cuộc trò chuyện");
+      }
+    });
+  };
+
   return (
     <div className="flex flex-col h-full p-4">
       {/* Header with total friends count */}
@@ -617,38 +676,45 @@ export default function ContactList({
         ) : (
           filteredContacts.map((group) => (
             <div key={group.letter} className="mb-4">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">
+              <div className="sticky top-0 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-500">
                 {group.letter}
-              </h3>
-              <div className="space-y-2">
+              </div>
+              <div className="space-y-1">
                 {group.contacts.map((contact) => (
                   <div
                     key={contact.id}
-                    className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg"
+                    className="flex items-center justify-between px-4 py-2 hover:bg-gray-100"
                   >
-                    <div className="flex items-center">
+                    {/* Phần thông tin người dùng có thể click để mở cuộc trò chuyện */}
+                    <div
+                      className="flex items-center cursor-pointer"
+                      onClick={(e) => handleContactClick(contact, e)}
+                    >
                       <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
                         <img
-                          src={contact.urlavatar}
+                          src={contact.urlavatar || "/default-avatar.png"}
                           alt={contact.fullname}
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              "/default-avatar.png";
+                          }}
                         />
                       </div>
                       <div>
-                        <h4 className="font-medium">{contact.fullname}</h4>
-                        {contact.email && (
-                          <p className="text-sm text-gray-500">
-                            {contact.email}
-                          </p>
-                        )}
+                        <div className="font-medium">{contact.fullname}</div>
+                        <div className="text-sm text-gray-500">
+                          {contact.phone ||
+                            contact.email ||
+                            "Không có thông tin liên hệ"}
+                        </div>
                       </div>
                     </div>
+
+                    {/* Phần dropdown menu tách biệt */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <button
-                          className="p-2 hover:bg-gray-200 rounded-full dropdown-trigger"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <button className="p-2 hover:bg-gray-200 rounded-full dropdown-trigger">
                           <MoreHorizontal className="w-5 h-5 text-gray-500" />
                         </button>
                       </DropdownMenuTrigger>
@@ -686,10 +752,13 @@ export default function ContactList({
             setFriendToRemove(null);
             setIsProcessing(false);
 
+            // Reset pointer-events ngay lập tức
+            document.body.style.pointerEvents = "auto";
+
             // Đảm bảo không có overlay nào còn tồn tại
             setTimeout(() => {
               document.body.style.pointerEvents = "auto";
-            }, 100);
+            }, 300); // Tăng thời gian timeout
           }
         }}
       >
