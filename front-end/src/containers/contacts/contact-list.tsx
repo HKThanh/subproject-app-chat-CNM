@@ -371,28 +371,14 @@ export default function ContactList({
       if (result.success) {
         toast.success("Đã chặn người dùng này");
 
-        // Cập nhật danh sách bạn bè - xóa khỏi danh sách bạn bè
-        setContacts((prevGroups) => {
-          const newGroups = prevGroups
-            .map((group) => ({
-              ...group,
-              contacts: group.contacts.filter(
-                (contact) => contact.id !== userId
-              ),
-            }))
-            .filter((group) => group.contacts.length > 0);
-
-          return newGroups;
-        });
+        // KHÔNG xóa khỏi danh sách bạn bè - chỉ thêm vào danh sách bị chặn
+        // Logic merge sẽ tự động đánh dấu isBlocked = true
 
         // Thêm vào danh sách người dùng bị chặn
         setBlockedUsers((prev) => [
           ...prev,
           { ...userToBlock, isBlocked: true },
         ]);
-
-        // Cập nhật tổng số bạn bè
-        setTotalFriends((prev) => prev - 1);
       } else {
         toast.error(result.message || "Không thể chặn người dùng");
       }
@@ -452,60 +438,63 @@ export default function ContactList({
     }
   };
 
-  // Lọc danh sách theo searchQuery và bao gồm cả người dùng bị chặn
-  const filteredContacts = contacts
-    .map((group) => ({
-      ...group,
-      contacts: group.contacts.filter((contact) =>
-        contact.fullname.toLowerCase().includes(searchQuery.toLowerCase())
-      ),
-    }))
-    .filter((group) => group.contacts.length > 0);
+  // Tạo Set các ID người dùng bị chặn để tra cứu nhanh
+  const blockedUserIds = new Set(blockedUsers.map((user) => user.id));
 
-  // Thêm người dùng bị chặn vào danh sách hiển thị
-  const blockedContactGroups = blockedUsers
-    .filter((user) =>
-      user.fullname.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    .reduce((groups: ContactGroup[], user) => {
-      const firstLetter = user.fullname.charAt(0).toUpperCase();
+  // Tạo Map để merge thông tin từ cả hai danh sách
+  const allContactsMap = new Map();
+
+  // Thêm tất cả bạn bè vào map
+  contacts.forEach((group) => {
+    group.contacts.forEach((contact) => {
+      if (contact.fullname.toLowerCase().includes(searchQuery.toLowerCase())) {
+        allContactsMap.set(contact.id, {
+          ...contact,
+          isBlocked: blockedUserIds.has(contact.id), // Đánh dấu nếu bị chặn
+        });
+      }
+    });
+  });
+
+  // Thêm những người dùng bị chặn mà không có trong danh sách bạn bè
+  blockedUsers.forEach((user) => {
+    if (user.fullname.toLowerCase().includes(searchQuery.toLowerCase())) {
+      if (!allContactsMap.has(user.id)) {
+        // Chỉ thêm nếu chưa có trong map (không phải bạn bè)
+        allContactsMap.set(user.id, {
+          ...user,
+          isBlocked: true,
+        });
+      }
+    }
+  });
+
+  // Chuyển đổi map thành groups
+  const allContactGroups = Array.from(allContactsMap.values())
+    .reduce((groups: ContactGroup[], contact) => {
+      const firstLetter = contact.fullname.charAt(0).toUpperCase();
       const existingGroup = groups.find(
         (group) => group.letter === firstLetter
       );
 
       if (existingGroup) {
-        existingGroup.contacts.push({ ...user, isBlocked: true });
+        existingGroup.contacts.push(contact);
       } else {
         groups.push({
           letter: firstLetter,
-          contacts: [{ ...user, isBlocked: true }],
+          contacts: [contact],
         });
       }
 
       return groups;
-    }, []);
-
-  // Kết hợp danh sách bạn bè và người dùng bị chặn
-  const allContactGroups = [...filteredContacts];
-
-  blockedContactGroups.forEach((blockedGroup) => {
-    const existingGroup = allContactGroups.find(
-      (group) => group.letter === blockedGroup.letter
-    );
-
-    if (existingGroup) {
-      existingGroup.contacts.push(...blockedGroup.contacts);
-      // Sắp xếp lại theo tên
-      existingGroup.contacts.sort((a, b) =>
+    }, [])
+    .map((group) => ({
+      ...group,
+      contacts: group.contacts.sort((a, b) =>
         a.fullname.localeCompare(b.fullname)
-      );
-    } else {
-      allContactGroups.push(blockedGroup);
-    }
-  });
-
-  // Sắp xếp các nhóm theo alphabet
-  allContactGroups.sort((a, b) => a.letter.localeCompare(b.letter));
+      ),
+    }))
+    .sort((a, b) => a.letter.localeCompare(b.letter));
 
   // Thêm style vào component
   useEffect(() => {
@@ -738,15 +727,11 @@ export default function ContactList({
 
   return (
     <div className="flex flex-col h-full p-4">
-      {/* Header with total friends count */}
+      {/* Header with correct count */}
       <div className="mb-4">
         <h2 className="text-xl font-semibold">
-          Liên hệ ({totalFriends + blockedUsers.length})
+          Liên hệ ({allContactGroups.flatMap((g) => g.contacts).length})
         </h2>
-        <p className="text-sm text-gray-500">
-          {totalFriends} bạn bè
-          {blockedUsers.length > 0 && `, ${blockedUsers.length} đã chặn`}
-        </p>
       </div>
 
       {/* Search and Filter Controls */}
