@@ -4,6 +4,7 @@ const multer = require("multer");
 const upload = multer();
 const userController = require("../controllers/userController");
 const friendRequestController = require("../controllers/friendRequestController");
+const friendController = require("../controllers/friendController");
 const authMiddleware = require("../middlewares/authMiddleware");
 const fileService = require("../services/fileService");
 
@@ -56,6 +57,12 @@ const userRoutes = (io) => {
   router.get('/friend/get-friends', authMiddleware, (req, res) => friendRequestController.getAllFriendsById(req, res));
 
   router.post("/friend/unfriend", authMiddleware, (req, res) => userController.unFriend(req, res, io));
+
+  // API tìm kiếm bạn bè
+  router.get('/friend/search', authMiddleware, friendController.searchFriends);
+
+  // API lấy danh sách bạn bè với sort
+  router.get('/friend/list', authMiddleware, friendController.getAllFriendsWithSort);
 
   return router;
 }
