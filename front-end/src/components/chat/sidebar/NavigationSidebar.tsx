@@ -103,15 +103,33 @@ export default function NavigationSidebar() {
   };
 
   const handleNavigation = (id: string) => {
-    setActiveItem(id);
-    if (id === "contacts") {
-      console.log("Navigating to contacts");
-      router.push("/contacts");
-    } else if (id === "messages") {
-      console.log("Navigating to chat");
-      router.push("/chat");
+    // Nếu đang ở trang hiện tại, không cần điều hướng lại
+    if ((id === "contacts" && pathname.includes("/contacts")) || 
+        (id === "messages" && pathname.includes("/chat"))) {
+      setActiveItem(id);
+      return;
     }
-    // Add other navigation cases as needed
+    
+    // Cập nhật trạng thái active trước khi điều hướng
+    setActiveItem(id);
+    
+    // Hiển thị trạng thái loading
+    const toastId = toast.loading(`Đang chuyển đến ${id === "contacts" ? "danh bạ" : "tin nhắn"}...`);
+    
+    // Sử dụng window.location để chuyển trang thay vì router
+    try {
+      if (id === "contacts") {
+        console.log("Navigating to contacts");
+        window.location.href = "/contacts";
+      } else if (id === "messages") {
+        console.log("Navigating to chat");
+        window.location.href = "/chat";
+      }
+    } catch (error) {
+      console.error("Navigation error:", error);
+      toast.error("Không thể chuyển trang, vui lòng thử lại");
+      toast.dismiss(toastId);
+    }
   };
 
   const navigationItems = [
