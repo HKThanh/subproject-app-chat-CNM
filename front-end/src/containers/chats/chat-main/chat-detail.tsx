@@ -4,7 +4,7 @@ import { useInView } from 'react-intersection-observer';
 import ChatInput from "./chat-input";
 import ChatMessage from "./chat-message";
 import { Conversation, Message, useChat } from "@/socket/useChat";
-import { Info, Loader2, Phone } from "lucide-react";
+import { Info, Loader2, Phone, Video } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSocketContext } from "@/socket/SocketContext";
 import {
@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
 import useUserStore from '@/stores/useUserStoree';
+import { useCallContext } from '@/context/CallContext';
 
 interface ChatDetailProps {
   onToggleInfo: () => void;
@@ -64,7 +65,7 @@ export default function ChatDetail({
   loading,
 }: ChatDetailProps) {
   const { user } = useUserStore();
-  const { startCall } = useChat(user?.id || '');
+  const { startCall } = useCallContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { socket } = useSocketContext();
 
@@ -288,12 +289,17 @@ export default function ChatDetail({
   };
   const handleVoiceCall = () => {
     if (!activeConversation.isGroup && activeConversation.otherUser?.id) {
-      console.log("Gọi thoại với người dùng:", activeConversation.otherUser.id);
       startCall(activeConversation.otherUser.id, 'audio');
     } else {
-      // Hiển thị thông báo không hỗ trợ gọi nhóm nếu cần
       console.log("Cuộc gọi nhóm chưa được hỗ trợ");
-      // Có thể thêm toast notification ở đây
+    }
+  };
+
+  const handleVideoCall = () => {
+    if (!activeConversation.isGroup && activeConversation.otherUser?.id) {
+      startCall(activeConversation.otherUser.id, 'video');
+    } else {
+      console.log("Cuộc gọi nhóm chưa được hỗ trợ");
     }
   };
 
@@ -345,21 +351,38 @@ export default function ChatDetail({
           </div>
         </div>
         <div className="flex items-center">
-          <button
-            className="p-2 rounded-full hover:bg-gray-200"
-            onClick={handleVoiceCall}
-            disabled={activeConversation.isGroup || !activeConversation.otherUser?.isOnline}
-            title={activeConversation.isGroup
-              ? "Cuộc gọi nhóm chưa được hỗ trợ"
-              : !activeConversation.otherUser?.isOnline
-                ? "Người dùng không trực tuyến"
-                : "Gọi thoại"}
-          >
-            <Phone className={`w-5 h-5 ${(activeConversation.isGroup || !activeConversation.otherUser?.isOnline)
-                ? "text-gray-400"
-                : "text-gray-700"
-              }`} />
-          </button>
+        <button 
+          className="p-2 rounded-full hover:bg-gray-200"
+          onClick={handleVoiceCall}
+          disabled={activeConversation.isGroup || !activeConversation.otherUser?.isOnline}
+          title={activeConversation.isGroup 
+            ? "Cuộc gọi nhóm chưa được hỗ trợ" 
+            : !activeConversation.otherUser?.isOnline 
+              ? "Người dùng không trực tuyến" 
+              : "Gọi thoại"}
+        >
+          <Phone className={`w-5 h-5 ${
+            (activeConversation.isGroup || !activeConversation.otherUser?.isOnline) 
+              ? "text-gray-400" 
+              : "text-gray-700"
+          }`} />
+        </button>
+        <button 
+          className="p-2 rounded-full hover:bg-gray-200"
+          onClick={handleVideoCall}
+          disabled={activeConversation.isGroup || !activeConversation.otherUser?.isOnline}
+          title={activeConversation.isGroup 
+            ? "Cuộc gọi nhóm chưa được hỗ trợ" 
+            : !activeConversation.otherUser?.isOnline 
+              ? "Người dùng không trực tuyến" 
+              : "Gọi video"}
+        >
+          <Video className={`w-5 h-5 ${
+            (activeConversation.isGroup || !activeConversation.otherUser?.isOnline) 
+              ? "text-gray-400" 
+              : "text-gray-700"
+          }`} />
+        </button>
           <button
             className="p-2 rounded-full hover:bg-gray-100"
             onClick={onToggleInfo}

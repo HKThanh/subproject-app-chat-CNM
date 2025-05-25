@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Conversation, useChat } from "@/socket/useChat";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import useUserStore from "@/stores/useUserStoree";
+import { useCallContext } from "@/context/CallContext";
 
 interface ChatHeaderProps {
   onToggleInfo: () => void;
@@ -18,16 +19,21 @@ export default function ChatHeader({
   conversation
 }: ChatHeaderProps) {
   const { user } = useUserStore();
-  const { startCall } = useChat(user?.id || '');
+  const { startCall } = useCallContext();
 
   const handleVoiceCall = () => {
     if (!conversation.isGroup && conversation.otherUser?.id) {
-      console.log("Gọi thoại với người dùng:", conversation.otherUser.id);
       startCall(conversation.otherUser.id, 'audio');
     } else {
-      // Hiển thị thông báo không hỗ trợ gọi nhóm nếu cần
       console.log("Cuộc gọi nhóm chưa được hỗ trợ");
-      // Có thể thêm toast notification ở đây
+    }
+  };
+
+  const handleVideoCall = () => {
+    if (!conversation.isGroup && conversation.otherUser?.id) {
+      startCall(conversation.otherUser.id, 'video');
+    } else {
+      console.log("Cuộc gọi nhóm chưa được hỗ trợ");
     }
   };
   return (

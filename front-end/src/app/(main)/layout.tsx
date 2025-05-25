@@ -1,14 +1,18 @@
+'use client';
 import NavigationSidebar from "@/components/chat/sidebar/NavigationSidebar";
 import UserDataLoader from "@/components/auth/user-data-loader";
 import SocketProviders from "@/components/providers/socket-providers";
 import { Suspense } from "react";
 import { Loader2 } from "lucide-react";
+import { CallProvider } from "@/context/CallContext";
+import useUserStore from "@/stores/useUserStoree";
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const user = useUserStore((state) => state.user);
   return (
     <UserDataLoader>
       <SocketProviders>
@@ -21,7 +25,9 @@ export default function RootLayout({
               </div>
             }>
               <main className="flex-1 bg-gray-50">
-                {children}
+                <CallProvider userId={user?.id || ''}>
+                  {children}
+                </CallProvider>
               </main>
             </Suspense>
           </div>
