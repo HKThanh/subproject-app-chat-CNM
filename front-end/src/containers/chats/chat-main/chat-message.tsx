@@ -10,9 +10,13 @@ import {
   RotateCcw,
   MessageSquareShare,
   Smile,
+  X,
 } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import Image from "next/image"
 import ImageViewer from "@/components/chat/image-viewer"
 import useUserStore from "@/stores/useUserStoree"
@@ -57,6 +61,101 @@ interface ChatMessageProps {
   onAddReaction?: (messageId: string, reaction: string) => void
 }
 
+interface ReactionDetailDialogProps {
+  isOpen: boolean
+  onClose: () => void
+  reaction: string
+  reactionData: {
+    reaction: string
+    totalCount: number
+    userReactions: Array<{
+      user: {
+        userId: string
+        fullname: string
+        urlavatar?: string
+      }
+      count: number
+    }>
+  } | null
+}
+
+// Component Dialog hiển thị chi tiết reaction
+function ReactionDetailDialog({ isOpen, onClose, reaction, reactionData }: ReactionDetailDialogProps) {
+  if (!reactionData) return null
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3">
+            <span className="text-2xl">{reaction}</span>
+            <div>
+              <div className="text-lg font-semibold">Reactions</div>
+              <div className="text-sm text-gray-500">{reactionData.userReactions.length} người đã thả cảm xúc</div>
+            </div>
+          </DialogTitle>
+        </DialogHeader>
+
+        <ScrollArea className="max-h-80 pr-4">
+          <div className="space-y-3">
+            {reactionData.userReactions.map((userReaction) => (
+              <div
+                key={userReaction.user.userId}
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200">
+                      <Image
+                        src={
+                          userReaction.user.urlavatar ||
+                          `https://ui-avatars.com/api/?name=${userReaction.user.fullname}`
+                        }
+                        alt={userReaction.user.fullname}
+                        width={40}
+                        height={40}
+                        className="object-cover"
+                      />
+                    </div>
+                    {/* Badge hiển thị số lần react nếu > 1 */}
+                    {userReaction.count > 1 && (
+                      <div className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold">
+                        {userReaction.count}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="font-medium text-gray-900">{userReaction.user.fullname}</div>
+                    {/* {userReaction.count > 1 && (
+                      <div className="text-xs text-gray-500">Đã react {userReaction.count} lần</div>
+                    )} */}
+                  </div>
+                </div>
+
+                {/* Hiển thị emoji với số lượng */}
+                <div className="flex items-center gap-1">
+                  <span className="text-lg">{reaction}</span>
+                  {userReaction.count > 1 && (
+                    <span className="text-sm text-gray-600 font-medium">×{userReaction.count}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+
+        <div className="flex justify-end pt-4 border-t">
+          <Button variant="outline" onClick={onClose} className="flex items-center gap-2">
+            <X className="w-4 h-4" />
+            Đóng
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export default function ChatMessage({
   message,
   timestamp,
@@ -82,6 +181,23 @@ export default function ChatMessage({
   const [isHovered, setIsHovered] = useState(false)
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
+  const [showReactionDetail, setShowReactionDetail] = useState(false)
+  const [selectedReaction, setSelectedReaction] = useState<{
+    emoji: string
+    data: {
+      reaction: string
+      totalCount: number
+      userReactions: Array<{
+        user: {
+          userId: string
+          fullname: string
+          urlavatar?: string
+        }
+        count: number
+      }>
+    }
+  } | null>(null)
+
   const reactionPickerRef = useRef<HTMLDivElement>(null)
   const messageRef = useRef<HTMLDivElement>(null)
   const { user } = useUserStore()
@@ -112,7 +228,13 @@ export default function ChatMessage({
     }
   }
 
-  //hàm render reaction picker
+  // Hàm xử lý khi click vào reaction đã được thả
+  const handleReactionDetailClick = (emoji: string, reactionData: any) => {
+    setSelectedReaction({ emoji, data: reactionData })
+    setShowReactionDetail(true)
+  }
+
+  // Hàm render reaction picker với animations
   const renderReactionPicker = () => {
     if (!showReactionPicker) return null
 
@@ -265,8 +387,7 @@ export default function ChatMessage({
     )
   }
 
-
-  //hàm render reactions với animation và vị trí ngược lại
+  // Sửa đổi hàm render reactions với animation và click handler
   const renderReactions = () => {
     if (totalReactions === 0) return null
 
@@ -281,6 +402,11 @@ export default function ChatMessage({
         {Object.entries(reactions).map(([reaction, data], index) => {
           // Check if current user has reacted with this emoji
           const hasUserReacted = data.userReactions.some((ur) => ur.user.userId === user?.id)
+          
+          // Tìm số lượng reaction của user hiện tại
+          const currentUserReactionCount = hasUserReacted 
+            ? data.userReactions.find(ur => ur.user.userId === user?.id)?.count || 0
+            : 0
 
           return (
             data.totalCount > 0 && (
@@ -291,8 +417,8 @@ export default function ChatMessage({
                     ? "bg-blue-50 border-blue-200 hover:bg-blue-100"
                     : "bg-white border-gray-100 hover:bg-gray-50"
                 }`}
-                onClick={() => handleReactionClick(reaction)}
-                title={data.userReactions.map((ur) => ur.user.fullname).join(", ")}
+                onClick={() => handleReactionDetailClick(reaction, data)}
+                title={`${data.totalCount} lượt thả cảm xúc này. Click để xem chi tiết.`}
                 style={{
                   // Thêm animation stagger cho từng reaction
                   animation: `slideInScale 0.4s ease-out ${index * 0.1}s both`,
@@ -314,6 +440,13 @@ export default function ChatMessage({
                 >
                   {data.totalCount}
                 </span>
+                
+                {/* Hiển thị số lượng reaction của user hiện tại nếu > 1 */}
+                {currentUserReactionCount > 1 && (
+                  <span className="text-xs ml-0.5 bg-blue-100 text-blue-700 px-1 rounded-full font-medium">
+                    {currentUserReactionCount}
+                  </span>
+                )}
               </div>
             )
           )
@@ -664,6 +797,7 @@ export default function ChatMessage({
           {renderActionButtons()}
         </div>
       </div>
+
       {/* Image Viewer */}
       {type === "image" && fileUrl && (
         <ImageViewer
@@ -673,6 +807,17 @@ export default function ChatMessage({
           initialIndex={0}
         />
       )}
+
+      {/* Reaction Detail Dialog */}
+      <ReactionDetailDialog
+        isOpen={showReactionDetail}
+        onClose={() => {
+          setShowReactionDetail(false)
+          setSelectedReaction(null)
+        }}
+        reaction={selectedReaction?.emoji || ""}
+        reactionData={selectedReaction?.data || null}
+      />
     </>
   )
 }
