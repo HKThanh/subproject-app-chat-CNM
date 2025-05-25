@@ -40,7 +40,17 @@ export default function Home() {
     replyMessage,
     addReaction
   } = useChatContext();
+  useEffect(() => {
+    const pendingConversation = sessionStorage.getItem('pendingConversation');
 
+    if (pendingConversation && isConnected) {
+      // Đặt cuộc trò chuyện đang chờ làm cuộc trò chuyện hiện tại
+      setActiveConversation(pendingConversation);
+
+      // Xóa cuộc trò chuyện đang chờ khỏi sessionStorage
+      sessionStorage.removeItem('pendingConversation');
+    }
+  }, [isConnected]);
   // Tải danh sách cuộc trò chuyện khi component được mount
   useEffect(() => {
     let hasLoadedConversations = false;
@@ -50,7 +60,7 @@ export default function Home() {
       loadConversations();
       hasLoadedConversations = true;
     }
-  }, [isConnected, loadConversations, ]);
+  }, [isConnected, loadConversations,]);
 
   // Tải tin nhắn khi chọn cuộc trò chuyện
   useEffect(() => {
@@ -119,16 +129,18 @@ export default function Home() {
     text: string,
     type: string = "text",
     fileUrl?: string,
-    replyingTo?: {name: string;
+    replyingTo?: {
+      name: string;
       messageId: string;
       content: string;
-      type: string;}
+      type: string;
+    }
   ) => {
     if (activeConversation) {
       console.log("check send message:", type, fileUrl, text, replyingTo);
       if (replyingTo) {
         replyMessage(activeConversation, replyingTo.messageId, text, type, fileUrl);
-      } 
+      }
       else if (type === "text") {
         sendMessage(activeConversation, text);
       } else {

@@ -71,8 +71,8 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
       console.log("selectedUser khi chấp nhận yêu cầu: ", selectedUser)
       // Cập nhật trạng thái nếu đang xem profile của người này
       // if (selectedUser && data.senderId === selectedUser.id) {
-        setFriendStatus("friends")
-        setFriendRequestId(null)
+      setFriendStatus("friends")
+      setFriendRequestId(null)
       // }
     })
 
@@ -118,8 +118,8 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
       console.log("selectedUser khi bị xóa khỏi danh sách bạn bè: ", selectedUser)
       // Nếu đang xem profile của người đã xóa bạn
       // if (selectedUser && (data.senderId === selectedUser.id || data.receiverId === selectedUser.id)) {
-        setFriendStatus("none")
-        setFriendRequestId(null)
+      setFriendStatus("none")
+      setFriendRequestId(null)
       // }
     })
 
@@ -637,7 +637,8 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
       console.error("Không tìm thấy ID người dùng trong session storage")
       return
     }
-
+    // Hiển thị toast loading
+    const toastId = toast.loading("Đang tạo cuộc trò chuyện...");
     // Emit sự kiện tạo conversation
     socket.emit("create_conversation", {
       IDSender: currentUserId,
@@ -647,12 +648,31 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
     // Lắng nghe phản hồi từ server
     socket.once("create_conversation_response", (response) => {
       if (response.success) {
-        // Gọi hàm onSelectConversation với idConversation từ backend
-        onSelectConversation(response.conversation.idConversation)
-        setShowUserProfile(false)
-        setSearchText("")
+        // Đóng toast loading
+        toast.dismiss(toastId);
+
+        // Đóng profile modal
+        setShowUserProfile(false);
+        setSearchText("");
+
+        // Kiểm tra xem đang ở trang nào
+        const currentPath = window.location.pathname;
+
+        if (currentPath.includes('/contacts')) {
+          // Nếu đang ở tab contacts, chuyển hướng sang tab chat
+          toast.success("Đang chuyển đến cuộc trò chuyện...");
+
+          // Lưu ID cuộc trò chuyện vào sessionStorage để có thể truy cập sau khi chuyển trang
+          sessionStorage.setItem('pendingConversation', response.conversation.idConversation);
+
+          // Chuyển hướng sang trang chat
+          window.location.href = '/chat';
+        } else {
+          // Nếu đã ở tab chat, chỉ cần chọn cuộc trò chuyện
+          onSelectConversation(response.conversation.idConversation);
+        }
       } else {
-        toast.info("Bạn chưa kết bạn với người này!")
+        toast.error("Bạn chưa kết bạn với người này!");
       }
       setActionLoading(null);
     })
