@@ -1407,8 +1407,10 @@ const handleAddMemberToGroup = async (io, socket) => {
             : null,
           coOwners: coOwnersInfo,
           members: allMembersInfo,
-          message: "Bạn đã được thêm vào nhóm",
+          // allMembersInfo: allMembersInfo,
+          message: "Bạn đã được thêm vào nhómmm",
           systemMessage,
+          // members: dataNewMembers,
         })
       }
     })
@@ -1424,6 +1426,7 @@ const handleAddMemberToGroup = async (io, socket) => {
             conversation: updatedConversation,
             message: `${newMembersInfo.join(", ")} đã được thêm vào nhóm`,
             systemMessage,
+            members: dataNewMembers,
           })
         }
       }

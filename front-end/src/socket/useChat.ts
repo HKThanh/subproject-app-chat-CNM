@@ -1237,7 +1237,7 @@ export const useChat = (userId: string) => {
   }, [socket, userId]);
   //xử lý phản hồi thêm thành viên vào nhóm
   const handleAddMemberToGroupResponse = useCallback((data: any) => {
-    console.log("Add member to group response (new_group_conversation):", data);
+    // console.log("Add member to group response (new_group_conversation):", data);
 
     if (data.success && data.conversation) {
       // Get the updated conversation data
@@ -1250,8 +1250,9 @@ export const useChat = (userId: string) => {
 
       if (!currentConversation) {
         // This is a new conversation for this user (they were just added to it)
-        console.log("New conversation received - user was added to a new group");
-        console.log("data.owner ", data.owner)
+        // console.log("New conversation received - user was added to a new group");
+        // console.log("data.owner ", data.owner)
+        // console.log("data.members ", data.members)
         // Format the conversation data properly for our state
         const newConversation: Conversation = {
           ...updatedConversation,
@@ -1262,8 +1263,8 @@ export const useChat = (userId: string) => {
           regularMembers: data.members || [],
           // Ensure we have the owner information
           owner: data.owner || {
-            id: data.owner.id || updatedConversation.rules?.IDOwner,
-            fullname: data.owner.fullname || "Group Owner"
+            id: data.owner?.id || updatedConversation.rules?.IDOwner,
+            fullname: data.owner?.fullname || "Group Owner"
           },
           // Ensure we have coOwners information
           coOwners: data.coOwners ||
