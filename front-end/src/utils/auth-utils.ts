@@ -45,9 +45,9 @@ async function refreshAccessToken(refreshToken: string): Promise<{accessToken: s
 
     const decoded = JSON.parse(jsonPayload);
     console.log('Decoded refresh token:', decoded);
-
+    const api = process.env.NEXT_PUBLIC_API;
     // Gửi request refresh token với platform
-    const response = await fetch('http://localhost:3000/auth/refresh-token', {
+    const response = await fetch(`${api}/auth/refresh-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -96,47 +96,35 @@ async function refreshAccessToken(refreshToken: string): Promise<{accessToken: s
  */
 export async function getAuthToken(): Promise<string | null> {
   try {
-    // Thử lấy token từ session
     const session = await getSession();
     let accessToken = session?.accessToken;
     let refreshToken = session?.refreshToken;
 
-    console.log('Session tokens:', { accessToken, refreshToken });
-
-    // Nếu không có trong session, thử lấy từ zustand
     if (!accessToken) {
       const userStore = useUserStore.getState();
       accessToken = userStore.accessToken || null;
       refreshToken = userStore.refreshToken || null;
-      console.log('Zustand tokens:', { accessToken, refreshToken });
     }
 
-    // Nếu không có token, trả về null
     if (!accessToken) {
-      return null;
+      throw new Error('SESSION_EXPIRED');
     }
 
-    // Kiểm tra token có hết hạn không
+    // Check if token is expired
     if (typeof accessToken === 'string' && isTokenExpired(accessToken)) {
-      console.log('Access token expired, attempting to refresh...');
-
-      // Nếu có refresh token, thử refresh
       if (refreshToken) {
         const refreshResult = await refreshAccessToken(refreshToken);
         if (refreshResult?.accessToken) {
           return refreshResult.accessToken;
         }
       }
-
-      // Nếu không thể refresh, trả về null
-      return null;
+      throw new Error('SESSION_EXPIRED');
     }
 
-    // Trả về access token hiện tại
     return accessToken;
   } catch (error) {
-    console.error("Lỗi khi lấy token xác thực:", error);
-    return null;
+    console.error("Auth token error:", error);
+    throw new Error('SESSION_EXPIRED');
   }
 }
 

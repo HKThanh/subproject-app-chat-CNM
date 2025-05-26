@@ -45,12 +45,13 @@ export const {
                 let response: any;
                 try {
                     const { email, password } = credentials;
-                    response = await fetch('http://localhost:3000/auth/login', {
+                    const api = `${process.env.NEXT_PUBLIC_API_URL}`;
+                    response = await fetch(`${api}/auth/login`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({ email, password, platform:"web" }),
+                        body: JSON.stringify({ email, password, platform: "web" }),
                     }).then(res => res.json());
                     console.log("Authorize response:", response);
                 } catch (error) {
@@ -100,6 +101,7 @@ export const {
     },
     callbacks: {
         async jwt({ token, user, session, trigger }) {
+            // console.log('Token callback:', { token, user, session, trigger });
             if (token.accessToken) {
 
                 const expired = typeof token.accessToken === 'string' && isTokenExpired(token.accessToken);
@@ -109,15 +111,15 @@ export const {
                         const refreshToken = token.refreshToken as string;
                         const base64Url = refreshToken.split('.')[1];
                         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
                             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
                         }).join(''));
 
                         const decoded = JSON.parse(jsonPayload);
                         console.log('Decoded refresh token in auth.ts:', decoded);
                         console.log("Refresh token in auth.ts:", refreshToken);
-                        
-                        const response = await fetch('http://localhost:3000/auth/refresh-token', {
+                        const api = `${process.env.NEXT_PUBLIC_API_URL}`;
+                        const response = await fetch(`${api}/auth/refresh-token`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -132,14 +134,14 @@ export const {
                         if (!response.ok) {
                             const errorData = await response.json().catch(() => ({}));
                             console.error('Refresh token error in auth.ts:', errorData);
-                            
+
                             // Clear all token data to force logout
-                            token = { 
+                            token = {
                                 ...token,
                                 accessToken: undefined,
                                 refreshToken: undefined
                             };
-                            
+
                             // This will trigger a redirect to login page on next request
                             throw new Error(`SESSION_EXPIRED`);
                         }
@@ -168,11 +170,11 @@ export const {
                         }
                     } catch (error) {
                         console.error('Error refreshing token:', error);
-                        
+
                         // Clear tokens on refresh error
                         token.accessToken = undefined;
                         token.refreshToken = undefined;
-                        
+
                         // If we have a SESSION_EXPIRED error, we'll let the error propagate
                         // to trigger the signOut in the error handler
                         if (error instanceof Error && error.message === 'SESSION_EXPIRED') {
@@ -180,6 +182,10 @@ export const {
                         }
                     }
                 }
+            }
+            else if (trigger !== 'signIn' && (!token.accessToken || !token.refreshToken)) {
+                console.error('No access token in token callback');
+                throw new Error(`SESSION_EXPIRED`);
             }
             if (trigger === 'update' && session?.user) {
                 // When updating via session, use session.user instead of user
@@ -254,7 +260,7 @@ function isTokenExpired(token: string): boolean {
         // Decode JWT payload
         const base64Url = token.split('.')[1];
         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
         }).join(''));
 

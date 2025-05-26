@@ -22,6 +22,10 @@ export default function Home() {
     messages,
     loading,
     error,
+    loadingMoreMessages,
+    hasMoreMessages,
+    combinedMessages,
+    loadMoreMessages,
     loadConversations,
     loadMessages,
     sendMessage,
@@ -33,6 +37,8 @@ export default function Home() {
     removeMembersFromGroup,
     changeGroupOwner,
     demoteMember,
+    replyMessage,
+    addReaction
   } = useChatContext();
 
   // Tải danh sách cuộc trò chuyện khi component được mount
@@ -44,7 +50,7 @@ export default function Home() {
       loadConversations();
       hasLoadedConversations = true;
     }
-  }, [isConnected, loadConversations]);
+  }, [isConnected, loadConversations, ]);
 
   // Tải tin nhắn khi chọn cuộc trò chuyện
   useEffect(() => {
@@ -143,12 +149,18 @@ export default function Home() {
   const handleSendMessage = (
     text: string,
     type: string = "text",
-    fileUrl?: string
+    fileUrl?: string,
+    replyingTo?: {name: string;
+      messageId: string;
+      content: string;
+      type: string;}
   ) => {
     if (activeConversation) {
-      console.log("check send message:", type, fileUrl, text);
-
-      if (type === "text") {
+      console.log("check send message:", type, fileUrl, text, replyingTo);
+      if (replyingTo) {
+        replyMessage(activeConversation, replyingTo.messageId, text, type, fileUrl);
+      } 
+      else if (type === "text") {
         sendMessage(activeConversation, text);
       } else {
         sendMessage(
@@ -199,9 +211,8 @@ export default function Home() {
   return (
     <div className="flex h-screen bg-gray-50 text-gray-900">
       <div
-        className={`${
-          showChatInfo ? "w-1/5" : "w-1/4"
-        } flex flex-col border-r border-gray-200 transition-all duration-300`}
+        className={`${showChatInfo ? "w-1/5" : "w-1/4"
+          } flex flex-col border-r border-gray-200 transition-all duration-300`}
       >
         <div className="flex-1 overflow-hidden flex flex-col">
           <TabNavigation
@@ -211,9 +222,8 @@ export default function Home() {
         </div>
       </div>
       <div
-        className={`${
-          showChatInfo ? "w-3/5" : "w-3/4"
-        } flex flex-col border-r border-gray-200 transition-all duration-300`}
+        className={`${showChatInfo ? "w-3/5" : "w-3/4"
+          } flex flex-col border-r border-gray-200 transition-all duration-300`}
       >
         <ChatDetail
           onToggleInfo={() => setShowChatInfo(!showChatInfo)}
@@ -221,8 +231,8 @@ export default function Home() {
           activeConversation={
             activeConversation
               ? conversations.find(
-                  (c) => c.idConversation === activeConversation
-                ) || null
+                (c) => c.idConversation === activeConversation
+              ) || null
               : null
           }
           messages={
@@ -234,6 +244,11 @@ export default function Home() {
           onForwardMessage={handleForwardMessage}
           conversations={conversations}
           loading={loading}
+          loadingMoreMessages={loadingMoreMessages}
+          hasMoreMessages={hasMoreMessages}
+          loadMoreMessages={loadMoreMessages}
+          combinedMessages={combinedMessages}
+          addReaction={addReaction}
         />
       </div>
       {showChatInfo && (
@@ -242,8 +257,8 @@ export default function Home() {
             activeConversation={
               activeConversation
                 ? conversations.find(
-                    (c) => c.idConversation === activeConversation
-                  ) || null
+                  (c) => c.idConversation === activeConversation
+                ) || null
                 : null
             }
             // addMembersToGroup={addMembersToGroup}

@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,8 +29,8 @@ export default function ProfileEdit({
   onUpdate,
   onCancel,
 }: ProfileEditProps) {
-  // Use separate state for each field instead of a single object
-  // This prevents re-rendering all inputs when one changes
+  const fullnameRef = useRef<HTMLInputElement>(null);
+  const bioRef = useRef<HTMLInputElement>(null);
   const [fullname, setFullname] = useState(profile.fullname || '');
   const [bio, setBio] = useState(profile.bio || '');
   const [gender, setGender] = useState(profile.gender || '');
@@ -39,35 +39,60 @@ export default function ProfileEdit({
   const [birthYear, setBirthYear] = useState(profile.birthYear || '');
   // const [phone, setPhone] = useState(profile.phone || '');
 
+  // Thêm debounce để giảm số lần cập nhật state
+  const debounce = (func: Function, delay: number) => {
+    let timeoutId: NodeJS.Timeout;
+    return (...args: any[]) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => func(...args), delay);
+    };
+  };
+
   // Memoize these arrays to prevent unnecessary recalculations
-  const days = useMemo(() => 
+  const days = useMemo(() =>
     Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0")),
     []
   );
-  
-  const months = useMemo(() => 
+
+  const months = useMemo(() =>
     Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0")),
     []
   );
-  
+
   const years = useMemo(() => {
     const currentYear = new Date().getFullYear();
     return Array.from({ length: 100 }, (_, i) => String(currentYear - i));
   }, []);
+  // Sử dụng useCallback để tránh tạo lại hàm mỗi khi render
+  const debouncedSetFullname = useCallback(
+    debounce((value: string) => setFullname(value), 100),
+    []
+  );
 
+  const debouncedSetBio = useCallback(
+    debounce((value: string) => setBio(value), 100),
+    []
+  );
   // Optimize form submission
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Lấy giá trị trực tiếp từ input thay vì state để đảm bảo dữ liệu mới nhất
+    const currentFullname = fullnameRef.current?.value || fullname;
+    const currentBio = bioRef.current?.value || bio;
+    
     onUpdate({
-      fullname,
-      bio,
+      ...profile,
+      fullname: currentFullname,
+      bio: currentBio,
       gender: gender as "Nam" | "Nữ",
       birthDay,
       birthMonth,
       birthYear,
       // phone,
+      id: profile.id,
     });
-  }, [fullname, bio, gender, birthDay, birthMonth, birthYear, onUpdate]);
+  }, [fullname, bio, gender, birthDay, birthMonth, birthYear, onUpdate, profile]);
 
   return (
     <div className="relative">
@@ -98,8 +123,9 @@ export default function ProfileEdit({
           <Label htmlFor="name">Tên hiển thị</Label>
           <Input
             id="name"
-            value={fullname}
-            onChange={(e) => setFullname(e.target.value)}
+            defaultValue={fullname}
+            ref={fullnameRef}
+            onChange={(e) => debouncedSetFullname(e.target.value)}
             autoComplete="off"
           />
         </div>
@@ -108,8 +134,9 @@ export default function ProfileEdit({
           <Label htmlFor="bio">Bio</Label>
           <Input
             id="bio"
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
+            defaultValue={bio}
+            ref={bioRef}
+            onChange={(e) => debouncedSetBio(e.target.value)}
             autoComplete="off"
           />
         </div>
@@ -118,7 +145,7 @@ export default function ProfileEdit({
           <Label>Thông tin cá nhân</Label>
           <RadioGroup
             value={gender}
-            onValueChange={setGender}
+            onValueChange={(value) => setGender(value as "Nam" | "Nữ")}
             className="flex items-center gap-4"
           >
             <div className="flex items-center space-x-2">

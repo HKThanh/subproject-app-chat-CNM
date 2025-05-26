@@ -13,7 +13,7 @@ const MessageDetailSchema = new Schema({
     idConversation: String,
     type: {
         type: String,
-        enum: ['text', 'image', 'video', 'file', 'sticker', 'link', 'audio','document', 'system'],
+        enum: ['text', 'image', 'video', 'file', 'sticker', 'link', 'audio', 'document', 'system'],
         default: 'text'
     },
     content: String,
@@ -49,6 +49,29 @@ const MessageDetailSchema = new Schema({
         type: Boolean,
         default: false
     },
+    reactions: {
+        type: Map,
+        of: {
+            reaction: String,        // Loại reaction (emoji)
+            userReactions: [{        // Chi tiết reaction của từng người dùng
+                userId: String,      // ID của người dùng
+                count: Number        // Số lần người dùng này đã react
+            }],
+            totalCount: Number       // Tổng số lượng reaction của loại này
+        },
+        default: () => new Map([
+            ['👍', { reaction: '👍', userReactions: [], totalCount: 0 }],
+            ['❤️', { reaction: '❤️', userReactions: [], totalCount: 0 }],
+            ['😂', { reaction: '😂', userReactions: [], totalCount: 0 }],
+            ['😮', { reaction: '😮', userReactions: [], totalCount: 0 }],
+            ['😢', { reaction: '😢', userReactions: [], totalCount: 0 }],
+            ['😡', { reaction: '😡', userReactions: [], totalCount: 0 }]
+        ])
+    },
+    mentionedUsers: {
+        type: [String],
+        default: []
+    }
 }, {
     timestamps: true
 });

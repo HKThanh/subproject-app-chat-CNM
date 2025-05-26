@@ -15,8 +15,9 @@ router.post("/chat-file",
         res.json({
             success: true,
             fileUrl: req.fileUrl,
-            fileType: req.body.fileType,
-            fileName: req.file.originalname
+            fileType: req.body.fileType || req.query.fileType || 'document',
+            fileName: req.file.originalname,
+            mimeType: req.file.mimetype
         });
     }
 );

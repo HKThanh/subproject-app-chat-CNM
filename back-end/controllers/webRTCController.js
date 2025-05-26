@@ -10,7 +10,18 @@ const handleCall = (io, socket) => {
         const socketIDConnectedPeer = connectedPeer?.socketId;
 
         console.log(`Looking up callee ${IDCallee}:`, connectedPeer);
+        // Tạo bản ghi cuộc gọi mới
+        const newCallLog = new CallLog({
+            caller: IDCaller,
+            callee: IDCallee,
+            callType: callType,
+            startTime: new Date(),
+            status: "PENDING"
+        });
 
+        // Lưu bản ghi và lấy ID
+        const savedCallLog = await newCallLog.save();
+        const callLogId = savedCallLog._id.toString();
         if (connectedPeer) {
             console.log(`Forwarding call to ${IDCallee} (socket: ${socketIDConnectedPeer})`);
             const data = {
@@ -19,14 +30,22 @@ const handleCall = (io, socket) => {
                 IDCallee,
                 socketIDCallee: socketIDConnectedPeer,
                 callType,
+                callLogId
             };
             io.to(socketIDConnectedPeer).emit("pre-offer-single", data);
         } else {
             console.log(`Callee ${IDCallee} not found`);
-            const data = {
+            // Cập nhật trạng thái cuộc gọi
+            await CallLog.findByIdAndUpdate(callLogId, {
+                status: "CALLEE_NOT_FOUND",
+                endTime: new Date()
+            });
+
+            const responseData = {
                 preOfferAnswer: "CALLEE_NOT_FOUND",
+                callLogId // Thêm callLogId vào phản hồi
             };
-            io.to(socket.id).emit("pre-offer-single-answer", data);
+            io.to(socket.id).emit("pre-offer-single-answer", responseData);
         }
     });
 
@@ -34,6 +53,7 @@ const handleCall = (io, socket) => {
     //data = {IDCaller: SDT người gọi,  : "CALL_ACCEPTED" hoặc "CALL_REJECTED" hoặc "CALL_UNAVAILABLE"}
     socket.on("pre-offer-single-answer", async (data) => {
         const { IDCaller, socketIDCaller, IDCallee, socketIDCallee, preOfferAnswer, callLogId } = data;
+        console.log("Received pre-offer-single-answer:", data);
 
         // Cập nhật log dựa trên phản hồi
         if (preOfferAnswer === "CALL_ACCEPTED") {
@@ -55,7 +75,7 @@ const handleCall = (io, socket) => {
     socket.on("webRTC-signaling", (data) => {
         // data = {connectedUserSocketId: SDT người nhận signaling, signaling: signaling}
         const { connectedUserSocketId } = data;
-
+        console.log("Received webRTC-signaling:", data);
         const connectedPeer = socketController.getUserBySocketId(connectedUserSocketId);
 
         if (connectedPeer) {

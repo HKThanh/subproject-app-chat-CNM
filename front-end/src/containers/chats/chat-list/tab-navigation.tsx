@@ -1,4 +1,4 @@
-import { ChevronDown, MoreHorizontal, Search, X, Camera } from "lucide-react";
+import { ChevronDown, MoreHorizontal, Search, X, Camera, Upload } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import SearchBar from "./search-bar";
 import {
@@ -26,6 +26,7 @@ export default function TabNavigation({
   onSelectConversation: (id: string) => void;
   activeConversationId?: string | null;
 }) {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -144,8 +145,8 @@ export default function TabNavigation({
   // Filter friends based on search query
   const filteredFriends = searchQuery
     ? friends.filter((friend) =>
-        friend.fullname.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      friend.fullname.toLowerCase().includes(searchQuery.toLowerCase())
+    )
     : friends;
 
   const toggleUserSelection = (userId: string) => {
@@ -156,7 +157,90 @@ export default function TabNavigation({
     }
   };
 
-  const handleCreateGroup = () => {
+  // Thêm state cho avatar nhóm
+  const [groupAvatar1, setGroupAvatar] = useState<File | null>(null);
+  const [groupAvatarPreview, setGroupAvatarPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Xử lý khi chọn file avatar
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+
+      // Kiểm tra kích thước file (giới hạn 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Kích thước ảnh không được vượt quá 5MB");
+        return;
+      }
+
+      // Kiểm tra loại file
+      if (!file.type.startsWith('image/')) {
+        toast.error("Vui lòng chọn file hình ảnh");
+        return;
+      }
+
+      setGroupAvatar(file);
+
+      // Tạo URL xem trước
+      const previewUrl = URL.createObjectURL(file);
+      setGroupAvatarPreview(previewUrl);
+    }
+  };
+
+  // Upload avatar lên server
+  const uploadGroupAvatar = async (): Promise<string | null> => {
+    if (!groupAvatar1) return null;
+    try {
+      const formData = new FormData();
+      formData.append("avatar-group", groupAvatar1);
+
+      const token = await getAuthToken();
+
+      const response = await fetch(`${apiUrl}/upload/avatar-group`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+      const data = await response.json();
+
+      if (data.success && data.fileUrl) {
+        return data.fileUrl;
+      } else {
+        toast.error("Không thể tải lên ảnh nhóm");
+        return null;
+      }
+    } catch (error) {
+      console.error("Lỗi khi tải lên ảnh nhóm:", error);
+      toast.error("Lỗi khi tải lên ảnh nhóm");
+      return null;
+    }
+  };
+  // Cập nhật useEffect để xóa URL xem trước khi đóng modal
+  useEffect(() => {
+    if (!isModalOpen) {
+      setGroupName("");
+      setSearchQuery("");
+      setSelectedUsers([]);
+
+      // Xóa URL xem trước để tránh rò rỉ bộ nhớ
+      if (groupAvatarPreview) {
+        URL.revokeObjectURL(groupAvatarPreview);
+        setGroupAvatarPreview(null);
+      }
+      setGroupAvatar(null);
+    }
+  }, [isModalOpen]);
+
+  // Xóa URL xem trước khi component unmount
+  useEffect(() => {
+    return () => {
+      if (groupAvatarPreview) {
+        URL.revokeObjectURL(groupAvatarPreview);
+      }
+    };
+  }, []);
+  const handleCreateGroup = async () => {
     if (!createGroupConversation || !currentUser) {
       toast.error("Không thể kết nối đến máy chủ");
       return;
@@ -173,25 +257,35 @@ export default function TabNavigation({
     }
 
     setIsLoading(true);
-
     console.log("Creating group with members:", selectedUsers);
-
-    // Use the createGroupConversation function from useChat
-    createGroupConversation(
-      groupName.trim(),
-      selectedUsers,
-      undefined // groupAvatar
-    );
-
-    // Add a timeout to handle cases where the server doesn't respond
-    setTimeout(() => {
-      if (isLoading) {
-        setIsLoading(false);
-        toast.error("Tạo nhóm không nhận được phản hồi, vui lòng thử lại sau");
+    
+    try {
+      // Upload avatar nếu có
+      let groupAvatar = null;
+      if (groupAvatar1) {
+        groupAvatar = await uploadGroupAvatar();
+        console.log("groupAvatar>>>> ", groupAvatar);
       }
-    }, 10000);
-  };
-
+      // Use the createGroupConversation function from useChat
+      createGroupConversation(
+        groupName.trim(),
+        selectedUsers,
+        groupAvatar || undefined
+      );
+      
+      // Thêm timeout để xử lý trường hợp server không phản hồi
+      setTimeout(() => {
+        if (isLoading) {
+          setIsLoading(false);
+          toast.error("Tạo nhóm không nhận được phản hồi, vui lòng thử lại sau");
+        }
+      }, 10000);
+    } catch (error) {
+      console.error("Lỗi khi tạo nhóm:", error);
+      toast.error("Không thể tạo nhóm");
+      setIsLoading(false);
+    }
+  }
   const router = useRouter();
 
   const handleUserClick = (friend: any) => {
@@ -271,6 +365,7 @@ export default function TabNavigation({
         >
           DIRECT
         </button>
+        {/* Fixed duplicate button */}
         <button
           className={`px-3 py-1 text-sm font-medium rounded-full ${
             activeTab === "GROUPS"
@@ -303,10 +398,35 @@ export default function TabNavigation({
             Tạo nhóm
           </DialogTitle>
           <div className="space-y-4 py-2">
+            {/* Thêm phần upload avatar */}
+            <div className="flex flex-col items-center mb-2">
+              <div
+                className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center cursor-pointer relative overflow-hidden"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {groupAvatarPreview ? (
+                  <img
+                    src={groupAvatarPreview}
+                    alt="Ảnh nhóm"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Camera className="h-8 w-8 text-gray-500" />
+                )}
+              </div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleFileChange}
+              />
+              <span className="text-sm text-gray-500 mt-2">
+                {groupAvatarPreview ? "Thay đổi ảnh nhóm" : "Thêm ảnh nhóm"}
+              </span>
+            </div>
+
             <div className="flex items-center">
-              {/* <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mr-3">
-                <Camera className="h-6 w-6 text-gray-500" />
-              </div> */}
               <Input
                 id="group-name"
                 value={groupName}
@@ -320,7 +440,7 @@ export default function TabNavigation({
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 id="search-friends"
-                placeholder="Nhập tên, số điện thoại, hoặc danh sách số điện thoại"
+                placeholder="Nhập tên bạn bè..."
                 className="pl-10 py-5 rounded-full"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -328,9 +448,7 @@ export default function TabNavigation({
             </div>
 
             <div className="max-h-[400px] overflow-y-auto">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">
-                Trò chuyện gần đây
-              </h3>
+              <h3 className="text-sm font-medium text-gray-500 mb-2">Bạn bè</h3>
 
               {filteredFriends.length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-4">
@@ -341,9 +459,17 @@ export default function TabNavigation({
                   {filteredFriends.map((friend) => (
                     <div
                       key={friend.id}
-                      className="flex items-center py-2 cursor-pointer hover:bg-gray-100 px-3 rounded-lg"
-                      onClick={() => handleUserClick(friend)}
+                      className="flex items-center py-2 cursor-pointer"
+                      onClick={() => toggleUserSelection(friend.id)}
                     >
+                      <div className="mr-3 flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={selectedUsers.includes(friend.id)}
+                          onChange={() => {}}
+                          className="h-5 w-5 rounded-full border-gray-300"
+                        />
+                      </div>
                       <Avatar className="h-10 w-10 mr-3 rounded-full">
                         {friend.urlavatar ? (
                           <img
@@ -380,9 +506,7 @@ export default function TabNavigation({
             </Button>
             <Button
               onClick={handleCreateGroup}
-              disabled={
-                isLoading || !groupName.trim() || selectedUsers.length === 0
-              }
+              disabled={isLoading || !groupName.trim() || selectedUsers.length === 0}
               className="rounded-md bg-blue-400 hover:bg-blue-500 px-6"
             >
               {isLoading ? (

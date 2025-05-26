@@ -15,9 +15,16 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
+import type { EmojiClickData } from 'emoji-picker-react';
+import EmojiPicker from "emoji-picker-react";
 
 interface ChatInputProps {
-  onSendMessage: (text: string, type?: string, fileUrl?: string) => void;
+  onSendMessage: (text: string, type?: string, fileUrl?: string, replyingTo?: {
+    name: string;
+    messageId: string;
+    content: string;
+    type: string;
+  }) => void;
   replyingTo?: {
     name: string;
     messageId: string;
@@ -38,7 +45,7 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
     };
     fetchToken();
   }, []);
-  
+
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [filePreviews, setFilePreviews] = useState<string[]>([]);
   const [fileType, setFileType] = useState<string | null>(null);
@@ -48,22 +55,46 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
   const messageInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
   // Focus on input when replying
   useEffect(() => {
     if (replyingTo && messageInputRef.current) {
       messageInputRef.current.focus();
     }
   }, [replyingTo]);
+  // Handle clicking outside emoji picker to close it
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    }
 
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+  const onEmojiClick = (emojiData: EmojiClickData) => {
+    setMessage(prev => prev + emojiData.emoji);
+    // setShowEmojiPicker(false);
+
+    // Focus back on the input after selecting emoji
+    if (messageInputRef.current) {
+      messageInputRef.current.focus();
+    }
+  };
   const handleSendMessage = () => {
     if (selectedFiles.length > 0) {
       // If files are selected, handle file upload
       handleFileUpload();
     } else if (message.trim()) {
       // If only text, send text message
-      onSendMessage(message.trim(), "text");
+      onSendMessage(message.trim(), "text", undefined, replyingTo || undefined);
       setMessage("");
-      
+
       // Clear reply state if exists
       if (replyingTo && onCancelReply) {
         onCancelReply();
@@ -75,7 +106,7 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
   const handleThumbsUpClick = () => {
     // Send thumbs up emoji as a message
     onSendMessage("👍", "text");
-    
+
     // Clear reply state if exists
     if (replyingTo && onCancelReply) {
       onCancelReply();
@@ -91,49 +122,49 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
 
     setIsUploading(true);
     setUploadProgress(0);
-    
+
     try {
       // Calculate total files for progress tracking
       const totalFiles = selectedFiles.length;
       let completedFiles = 0;
-      
+
       // Upload each file and collect URLs
       const uploadPromises = selectedFiles.map(async (file, index) => {
         const formData = new FormData();
         formData.append("file", file);
-
-        const response = await fetch(`http://localhost:3000/upload/chat-file`, {
+        const api = `${process.env.NEXT_PUBLIC_API_URL}`;
+        const response = await fetch(`${api}/upload/chat-file`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
           body: formData,
         });
-        
+
         if (!response.ok) {
           throw new Error("Upload file thất bại");
         }
 
         const data = await response.json();
-        
+
         // Update progress after each file completes
         completedFiles++;
         setUploadProgress(Math.round((completedFiles / totalFiles) * 100));
-        
+
         return data;
       });
 
       const results = await Promise.all(uploadPromises);
-      
+
       // Send each file as a separate message
       for (const result of results) {
         const fileUrl = result.fileUrl;
         const success = result.success;
-        
+
         if (!success) {
           throw new Error("Upload file thất bại");
         }
-        
+
         // Send message with uploaded file
         onSendMessage(
           message.trim() || "Đã gửi một tệp đính kèm",
@@ -173,27 +204,27 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
 
     // Convert FileList to array
     const fileArray = Array.from(files);
-    
+
     // Check file size limits
     const oversizedFiles = fileArray.filter(file => {
       // 100MB limit for videos, 10MB for images, 50MB for other files
-      const maxSize = type === 'video' ? 100 * 1024 * 1024 : 
-                     type === 'image' ? 10 * 1024 * 1024 : 
-                     50 * 1024 * 1024;
+      const maxSize = type === 'video' ? 100 * 1024 * 1024 :
+        type === 'image' ? 10 * 1024 * 1024 :
+          50 * 1024 * 1024;
       return file.size > maxSize;
     });
-    
+
     if (oversizedFiles.length > 0) {
-      const typeLabel = type === 'video' ? 'Video' : 
-                       type === 'image' ? 'Hình ảnh' : 
-                       'Tệp';
-      const sizeLimit = type === 'video' ? '100MB' : 
-                       type === 'image' ? '10MB' : 
-                       '50MB';
+      const typeLabel = type === 'video' ? 'Video' :
+        type === 'image' ? 'Hình ảnh' :
+          'Tệp';
+      const sizeLimit = type === 'video' ? '100MB' :
+        type === 'image' ? '10MB' :
+          '50MB';
       toast.error(`${typeLabel} không được vượt quá ${sizeLimit}`);
       return;
     }
-    
+
     setSelectedFiles(prev => [...prev, ...fileArray]);
     setFileType(type);
 
@@ -215,7 +246,7 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
   const clearSelectedFile = (index: number) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
     setFilePreviews(prev => prev.filter((_, i) => i !== index));
-    
+
     if (selectedFiles.length === 1) {
       setFileType(null);
     }
@@ -259,8 +290,8 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2.5">
-            <div 
-              className="bg-purple-500 h-2.5 rounded-full transition-all duration-300 ease-in-out" 
+            <div
+              className="bg-purple-500 h-2.5 rounded-full transition-all duration-300 ease-in-out"
               style={{ width: `${uploadProgress}%` }}
             ></div>
           </div>
@@ -372,12 +403,25 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
         >
           <Video className="w-5 h-5 text-gray-500" />
         </button>
-        <button className="p-2 rounded-full hover:bg-gray-200">
-          <Smile className="w-5 h-5 text-gray-500" />
-        </button>
-        <button className="p-2 rounded-full hover:bg-gray-200">
+        <div className="relative">
+          <button 
+            className="p-2 rounded-full hover:bg-gray-200"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+          >
+            <Smile className="w-5 h-5 text-gray-500" />
+          </button>
+          {showEmojiPicker && (
+            <div 
+              className="absolute bottom-12 right-0 z-10" 
+              ref={emojiPickerRef}
+            >
+              <EmojiPicker onEmojiClick={onEmojiClick} />
+            </div>
+          )}
+        </div>
+        {/* <button className="p-2 rounded-full hover:bg-gray-200">
           <MoreHorizontal className="w-5 h-5 text-gray-500" />
-        </button>
+        </button> */}
       </div>
       <div className="flex items-center">
         <input
@@ -403,12 +447,12 @@ export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: 
             )}
           </button>
         ) : (
-          <button 
-            className="p-2 ml-2 rounded-full hover:bg-gray-200" 
+          <button
+            className="p-2 ml-2 rounded-full hover:bg-gray-200"
             disabled={isUploading}
             onClick={handleThumbsUpClick}
           >
-            <ThumbsUp className="w-5 h-5 text-gray-500" width={30} color="#f6ca51"/>
+            <ThumbsUp className="w-5 h-5 text-gray-500" width={30} color="#f6ca51" />
           </button>
         )}
       </div>

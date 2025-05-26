@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import useUserStore from "@/stores/useUserStoree";
+import { useChat } from "@/socket/useChat";
 
 export default function NavigationSidebar() {
   const router = useRouter();
@@ -45,6 +46,14 @@ export default function NavigationSidebar() {
   // Lấy thông tin người dùng từ Zustand store
   const user = useUserStore((state) => state.user);
   const clearUser = useUserStore((state) => state.clearUser);
+  const userId = user?.id || session?.user?.id || "";
+
+  const { conversations } = useChat(userId);
+  
+  // Calculate total unread messages
+  const totalUnreadMessages = conversations.reduce((total, conversation) => {
+    return total + (conversation.unreadCount || 0);
+  }, 0);
 
   // Fallback values nếu chưa có thông tin người dùng
   const userName = user?.fullname || session?.user?.fullname || "User";
@@ -104,11 +113,11 @@ export default function NavigationSidebar() {
   };
 
   const navigationItems = [
-    { id: "messages", icon: MessageSquare, label: "Tin nhắn", badge: 5 },
+    { id: "messages", icon: MessageSquare, label: "Tin nhắn", badge: totalUnreadMessages > 0 ? totalUnreadMessages : null },
     { id: "contacts", icon: Users, label: "Danh bạ" },
-    { id: "tasks", icon: CheckSquare, label: "Công việc" },
-    { id: "cloud", icon: Cloud, label: "Cloud" },
-    { id: "documents", icon: FolderOpen, label: "Tài liệu" },
+    // { id: "tasks", icon: CheckSquare, label: "Công việc" },
+    // { id: "cloud", icon: Cloud, label: "Cloud" },
+    // { id: "documents", icon: FolderOpen, label: "Tài liệu" },
   ];
 
   // Xử lý đóng modal profile

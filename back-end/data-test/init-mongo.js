@@ -66,7 +66,7 @@ db.users.insertMany([
         "id": "user004",
         "username": "test4@example.com",
         "password": "$2a$10$UxRwIISgdFaytqp50HUEFOKShlFU93yyqqJX4jFDiCB4iF4.wJU0m",
-        "fullname": "Alice Johnson",
+        "fullname": "Elsa",
         "ismale": false,
         "isLoggedin": false,
         "isVerified": true,
