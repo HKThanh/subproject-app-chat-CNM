@@ -1,4 +1,4 @@
-const { createDailyRoom, deleteRoom } = require('../services/dailyService');
+const { createDailyRoom, deleteRoom, getRoomParticipants } = require('../services/dailyService');
 const Call = require('../models/CallModel');
 const User = require('../models/UserModel');
 const MessageDetail = require('../models/MessageDetailModel');
@@ -8,8 +8,9 @@ const moment = require("moment-timezone");
 
 class CallController {
     constructor() {
-        this.activeCalls = new Map(); // callId -> callData
-        this.userCalls = new Map();   // userId -> callId
+        this.activeCalls = new Map();
+        this.userCalls = new Map();
+        this.roomCheckIntervals = new Map(); // callId -> intervalId
     }
 
     async initiateCall(callerId, receiverId, callType = 'video') {
@@ -70,11 +71,14 @@ class CallController {
 
             // Cập nhật status và startTime
             callData.status = 'active';
-            callData.startTime = new Date(); // Thêm dòng này
+            callData.startTime = new Date();
             await callData.save();
 
             // Cập nhật cache
             this.activeCalls.set(callId, callData);
+
+            // Bắt đầu monitor room participants
+            this.startRoomMonitoring(callId);
 
             // Tạo message detail cho việc chấp nhận cuộc gọi
             await this.createCallMessage(
@@ -122,6 +126,9 @@ class CallController {
                 throw new Error('Unauthorized to end this call');
             }
 
+            // Dừng room monitoring
+            this.stopRoomMonitoring(callId);
+
             // Tính thời gian cuộc gọi
             const endTime = new Date();
             const duration = callData.startTime ? Math.floor((endTime - callData.startTime) / 1000) : 0;
@@ -142,10 +149,7 @@ class CallController {
             this.userCalls.delete(callData.callerId);
             this.userCalls.delete(callData.receiverId);
 
-            // Xóa room Daily.co trong các trường hợp:
-            // - Không còn ai trong cuộc gọi
-            // - Cuộc gọi bị từ chối hoặc nhỡ
-            // - Một trong hai người disconnect
+            // Xóa room Daily.co
             const shouldDeleteRoom = !isOtherUserStillInCall ||
                 reason === 'rejected' ||
                 reason === 'missed' ||
@@ -157,7 +161,6 @@ class CallController {
                     console.log(`Room ${callData.roomName} deleted successfully`);
                 } catch (deleteError) {
                     console.error('Error deleting Daily.co room:', deleteError.message);
-                    // Không throw error để không ảnh hưởng đến flow chính
                 }
             }
 
@@ -178,59 +181,178 @@ class CallController {
         }
     }
 
-    // Thêm method mới để kiểm tra và cleanup room
-    async checkAndCleanupRoom(callId) {
+    // Thêm method mới để monitor room participants
+    startRoomMonitoring(callId) {
+        // Dừng monitoring cũ nếu có
+        this.stopRoomMonitoring(callId);
+
+        const intervalId = setInterval(async () => {
+            try {
+                await this.checkRoomParticipants(callId);
+            } catch (error) {
+                console.error(`Error monitoring room for call ${callId}:`, error);
+                // Nếu có lỗi, dừng monitoring
+                this.stopRoomMonitoring(callId);
+            }
+        }, 10000); // Kiểm tra mỗi 10 giây
+
+        this.roomCheckIntervals.set(callId, intervalId);
+        console.log(`Started room monitoring for call: ${callId}`);
+    }
+
+    stopRoomMonitoring(callId) {
+        const intervalId = this.roomCheckIntervals.get(callId);
+        if (intervalId) {
+            clearInterval(intervalId);
+            this.roomCheckIntervals.delete(callId);
+            console.log(`Stopped room monitoring for call: ${callId}`);
+        }
+    }
+
+    async checkRoomParticipants(callId) {
+        try {
+            const callData = this.activeCalls.get(callId);
+            if (!callData || callData.status !== 'active') {
+                this.stopRoomMonitoring(callId);
+                return;
+            }
+
+            // Lấy thông tin participants từ Daily.co
+            const participantsData = await getRoomParticipants(callData.roomName);
+            const participantCount = participantsData.data ? participantsData.data.length : 0;
+
+            console.log(`Room ${callData.roomName} has ${participantCount} participants`);
+
+            // Nếu chỉ còn 1 người hoặc không còn ai trong room
+            if (participantCount <= 1) {
+                console.log(`Auto-ending call ${callId} due to insufficient participants (${participantCount})`);
+                
+                // Tìm user nào còn lại để end call
+                const remainingUserId = this.findRemainingUser(callId);
+                if (remainingUserId) {
+                    await this.autoEndCall(callId, remainingUserId);
+                } else {
+                    // Nếu không tìm được user nào, cleanup trực tiếp
+                    await this.forceCleanupCall(callId);
+                }
+            }
+        } catch (error) {
+            console.error(`Error checking participants for call ${callId}:`, error);
+        }
+    }
+
+    findRemainingUser(callId) {
+        const callData = this.activeCalls.get(callId);
+        if (!callData) return null;
+
+        // Kiểm tra xem user nào còn trong cache
+        if (this.userCalls.has(callData.callerId)) {
+            return callData.callerId;
+        }
+        if (this.userCalls.has(callData.receiverId)) {
+            return callData.receiverId;
+        }
+        
+        // Nếu cả hai đều không còn trong cache, trả về callerId
+        return callData.callerId;
+    }
+
+    async autoEndCall(callId, userId) {
+        try {
+            const call = await this.endCall(callId, userId, 'auto_disconnect');
+            
+            // Thông báo cho cả hai user về việc auto-end call
+            const socketController = require('./socketController');
+            const io = require('../app').io; // Giả sử bạn export io từ app.js
+            
+            // Thông báo cho caller
+            const callerSocket = socketController.getUser(call.callerId);
+            if (callerSocket) {
+                io.to(callerSocket.socketId).emit("call_auto_ended", {
+                    callId: callId,
+                    reason: 'auto_disconnect',
+                    message: 'Cuộc gọi đã tự động kết thúc do chỉ còn một người trong phòng',
+                    duration: call.duration
+                });
+            }
+
+            // Thông báo cho receiver
+            const receiverSocket = socketController.getUser(call.receiverId);
+            if (receiverSocket) {
+                io.to(receiverSocket.socketId).emit("call_auto_ended", {
+                    callId: callId,
+                    reason: 'auto_disconnect',
+                    message: 'Cuộc gọi đã tự động kết thúc do chỉ còn một người trong phòng',
+                    duration: call.duration
+                });
+            }
+
+        } catch (error) {
+            console.error('Error auto-ending call:', error);
+            // Fallback: force cleanup
+            await this.forceCleanupCall(callId);
+        }
+    }
+
+    async forceCleanupCall(callId) {
         try {
             const callData = await Call.findOne({ idCall: callId });
             if (!callData || callData.status === 'ended') {
                 return;
             }
 
-            // Kiểm tra xem còn user nào trong cuộc gọi không
-            const activeCall = this.activeCalls.get(callId);
-            if (!activeCall) {
-                return;
+            // Dừng monitoring
+            this.stopRoomMonitoring(callId);
+
+            // Cleanup database
+            callData.status = 'ended';
+            callData.endTime = new Date();
+            callData.endReason = 'force_cleanup';
+            const duration = callData.startTime ? Math.floor((new Date() - callData.startTime) / 1000) : 0;
+            callData.duration = duration;
+            await callData.save();
+
+            // Cleanup cache
+            this.activeCalls.delete(callId);
+            this.userCalls.delete(callData.callerId);
+            this.userCalls.delete(callData.receiverId);
+
+            // Delete room
+            try {
+                await deleteRoom(callData.roomName);
+                console.log(`Force cleanup: Room ${callData.roomName} deleted`);
+            } catch (error) {
+                console.error('Error force deleting room:', error);
             }
 
-            const callerInCall = this.userCalls.has(callData.callerId);
-            const receiverInCall = this.userCalls.has(callData.receiverId);
+            // Create message
+            await this.createCallMessage(
+                callData.callerId,
+                callData.receiverId,
+                callData.callType,
+                'ended',
+                callId,
+                { duration, reason: 'force_cleanup' }
+            );
 
-            // Nếu chỉ còn một người hoặc không còn ai, cleanup trực tiếp
-            if (!callerInCall || !receiverInCall) {
-                // Cleanup trực tiếp mà không gọi endCall để tránh đệ quy
-                callData.status = 'ended';
-                callData.endTime = new Date();
-                callData.endReason = 'disconnected';
-                const duration = callData.startTime ? Math.floor((new Date() - callData.startTime) / 1000) : 0;
-                callData.duration = duration;
-                await callData.save();
-
-                // Xóa khỏi cache
-                this.activeCalls.delete(callId);
-                this.userCalls.delete(callData.callerId);
-                this.userCalls.delete(callData.receiverId);
-
-                // Xóa room Daily.co
-                try {
-                    await deleteRoom(callData.roomName);
-                    console.log(`Room ${callData.roomName} deleted due to user disconnect`);
-                } catch (deleteError) {
-                    console.error('Error deleting Daily.co room:', deleteError.message);
-                }
-
-                // Tạo call message cho cleanup
-                await this.createCallMessage(
-                    callData.callerId,
-                    callData.receiverId,
-                    callData.callType,
-                    'ended',
-                    callId,
-                    { duration, reason: 'disconnected' }
-                );
-            }
+            console.log(`Force cleanup completed for call: ${callId}`);
         } catch (error) {
-            console.error('Error checking and cleaning up room:', error);
+            console.error('Error in force cleanup:', error);
         }
+    }
+
+    // Cập nhật getEndReasonText để bao gồm lý do mới
+    getEndReasonText(reason) {
+        const reasonTexts = {
+            'normal': 'Kết thúc bình thường',
+            'rejected': 'Đã từ chối',
+            'missed': 'Cuộc gọi nhỡ',
+            'disconnected': 'Mất kết nối',
+            'auto_disconnect': 'Tự động kết thúc do chỉ còn một người',
+            'force_cleanup': 'Dọn dẹp tự động',
+            'error': 'Lỗi hệ thống'
+        };
+        return reasonTexts[reason] || 'Đã kết thúc';
     }
 
     async createCallMessage(callerId, receiverId, callType, action, callId, additionalData = {}) {
@@ -305,17 +427,6 @@ class CallController {
             console.error('Error creating call message:', error);
             throw error;
         }
-    }
-
-    getEndReasonText(reason) {
-        const reasonTexts = {
-            'normal': 'Kết thúc bình thường',
-            'rejected': 'Đã từ chối',
-            'missed': 'Cuộc gọi nhỡ',
-            'disconnected': 'Mất kết nối',
-            'error': 'Lỗi hệ thống'
-        };
-        return reasonTexts[reason] || 'Đã kết thúc';
     }
 
     getActiveCall(userId) {
@@ -652,6 +763,16 @@ class CallController {
         } catch (error) {
             console.error('Error handling user disconnect for calls:', error);
         }
+    }
+
+    // Cleanup tất cả monitoring khi shutdown
+    cleanup() {
+        console.log('Cleaning up all room monitoring intervals...');
+        for (const [callId, intervalId] of this.roomCheckIntervals) {
+            clearInterval(intervalId);
+            console.log(`Cleaned up monitoring for call: ${callId}`);
+        }
+        this.roomCheckIntervals.clear();
     }
 }
 

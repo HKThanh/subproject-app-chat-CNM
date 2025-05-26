@@ -7,7 +7,7 @@ const createDailyRoom = async (roomName, callType) => {
             properties: {
                 enable_chat: false,
                 enable_screenshare: false,
-                enable_recording: false, // Tắt recording theo yêu cầu
+                enable_recording: false,
                 start_video_off: callType === "audio" ? true : false,
                 start_audio_off: false,
                 enable_prejoin_ui: false,
@@ -47,6 +47,11 @@ const deleteRoom = async (roomName) => {
         );
         return response.data;
     } catch (error) {
+        // Nếu room không tồn tại (404), coi như đã xóa thành công
+        if (error.response && error.response.status === 404) {
+            console.log(`Room ${roomName} already deleted or not found`);
+            return { message: 'Room already deleted' };
+        }
         console.error("Error deleting Daily.co room:", error.message);
         throw error;
     }
@@ -69,4 +74,22 @@ const getRoomInfo = async (roomName) => {
     }
 };
 
-module.exports = { createDailyRoom, deleteRoom, getRoomInfo };
+// Thêm function mới để lấy thông tin participants trong room
+const getRoomParticipants = async (roomName) => {
+    try {
+        const response = await axios.get(
+            `${config.dailyApiUrl}/${roomName}/participants`,
+            {
+                headers: {
+                    Authorization: `Bearer ${config.dailyApiKey}`,
+                },
+            }
+        );
+        return response.data;
+    } catch (error) {
+        console.error("Error getting room participants:", error.message);
+        throw error;
+    }
+};
+
+module.exports = { createDailyRoom, deleteRoom, getRoomInfo, getRoomParticipants };
