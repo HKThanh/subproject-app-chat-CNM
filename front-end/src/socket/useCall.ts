@@ -166,7 +166,12 @@ export const useCall = (userId: string) => {
         dispatch({ type: 'CALL_ENDED', payload: data });
         toast.info('Cuộc gọi đã kết thúc');
     }, []);
-
+    // handler cho sự kiện call_auto_ended
+    const handleCallAutoEnded = useCallback((data: any) => {
+        console.log('Call auto ended:', data);
+        dispatch({ type: 'CALL_ENDED', payload: data });
+        toast.info(data.message || 'Cuộc gọi đã tự động kết thúc do chỉ còn một người trong phòng');
+    }, []);
     // Xử lý lỗi cuộc gọi
     const handleCallError = useCallback((data: any) => {
         toast.error(data.message || 'Đã xảy ra lỗi trong cuộc gọi');
@@ -253,9 +258,9 @@ export const useCall = (userId: string) => {
         if (data.roomUrl) {
             // Sử dụng roomUrl từ data thay vì state
             window.open(data.roomUrl, '_blank', 'width=800,height=600');
-          } else {
+        } else {
             toast.error('Không tìm thấy URL phòng gọi');
-          }
+        }
     }, []);
     // Đăng ký các event listeners
     useEffect(() => {
@@ -267,6 +272,7 @@ export const useCall = (userId: string) => {
         socket.on('call_accepted', handleCallAccepted);
         socket.on('call_rejected', handleCallRejected);
         socket.on('call_ended', handleCallEnded);
+        socket.on('call_auto_ended', handleCallAutoEnded);
         socket.on('call_error', handleCallError);
 
         return () => {
@@ -275,6 +281,7 @@ export const useCall = (userId: string) => {
             socket.off('call_accepted', handleCallAccepted);
             socket.off('call_rejected', handleCallRejected);
             socket.off('call_ended', handleCallEnded);
+            socket.off('call_auto_ended', handleCallAutoEnded);
             socket.off('call_error', handleCallError);
 
             // Xóa timeout khi unmount
