@@ -10,7 +10,8 @@ import BlockedList from "./components/blocked-list";
 import useUserStore from "@/stores/useUserStoree";
 
 export default function ContactsView() {
-  const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  const NEXT_PUBLIC_API_URL =
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
   const [searchQuery, setSearchQuery] = useState("");
   type SectionKey = keyof typeof sectionConfig;
   const [activeSection, setActiveSection] = useState<SectionKey>("friends");
@@ -39,10 +40,10 @@ export default function ContactsView() {
     };
 
     fetchFriendRequests();
-    
+
     // Set up interval to refresh friend requests every minute
     const interval = setInterval(fetchFriendRequests, 60000);
-    
+
     return () => clearInterval(interval);
   }, []);
   // Định nghĩa cấu hình cho từng section
@@ -73,7 +74,7 @@ export default function ContactsView() {
   const ActiveIcon = sectionConfig[activeSection]?.icon || Users;
 
   return (
-    <div className="flex h-full">
+    <div className="flex max-h-screen">
       <ContactSidebar
         activeSection={activeSection}
         setActiveSection={(section: string) =>

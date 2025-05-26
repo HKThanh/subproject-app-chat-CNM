@@ -40,6 +40,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   const [actionLoading, setActionLoading] = useState<
     "add" | "cancel" | "remove" | "accept" | "chat" | "decline" | null
   >(null);
+  const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
   // Lắng nghe sự kiện click bên ngoài để đóng kết quả tìm kiếm
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -311,11 +312,11 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
     e: React.MouseEvent
   ) => {
     e.stopPropagation(); // Ngăn chặn sự kiện click lan tỏa
-    // Nếu đang loading, không cho thực hiện thêm
-    if (actionLoading) return;
+    // Nếu đang loading cho user này, không cho thực hiện thêm
+    if (loadingUserId === userId) return;
 
-    // Set trạng thái loading
-    setActionLoading("add");
+    // Set trạng thái loading cho user này
+    setLoadingUserId(userId);
     try {
       const token = await getAuthToken();
 
@@ -422,7 +423,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
       toast.error("Không thể gửi lời mời kết bạn");
     } finally {
       // Reset trạng thái loading
-      setActionLoading(null);
+      setLoadingUserId(null);
     }
   };
 
@@ -823,14 +824,14 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
                         <button
                           onClick={(e) => handleAddFriend(result.id, result, e)}
                           className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                            actionLoading === "add"
+                            loadingUserId === result.id
                               ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                               : "bg-blue-50 text-blue-600 hover:bg-blue-100"
                           }`}
                           title="Thêm bạn"
-                          disabled={actionLoading === "add"}
+                          disabled={loadingUserId === result.id}
                         >
-                          {actionLoading === "add" ? (
+                          {loadingUserId === result.id ? (
                             <div className="w-3 h-3 border border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
                           ) : (
                             <UserAddIcon width={12} height={12} />
