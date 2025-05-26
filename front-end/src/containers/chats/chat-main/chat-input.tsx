@@ -37,7 +37,7 @@ interface ChatInputProps {
 export default function ChatInput({ onSendMessage, replyingTo, onCancelReply }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
   useEffect(() => {
     const fetchToken = async () => {
       const token = await getAuthToken();

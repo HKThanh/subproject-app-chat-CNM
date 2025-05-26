@@ -350,7 +350,7 @@ export const useCall = (userId: string) => {
                 endCall(state.callId);
             }
         };
-    }, [state.callId, state.isOutgoingCall, state.isCallInProgress, endCall]);
+    }, []);
     return {
         ...state,
         startCall,

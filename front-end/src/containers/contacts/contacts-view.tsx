@@ -9,7 +9,7 @@ import ContactList from "./contact-list";
 import useUserStore from "@/stores/useUserStoree";
 
 export default function ContactsView() {
-  const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL;
   const [searchQuery, setSearchQuery] = useState("");
   type SectionKey = keyof typeof sectionConfig;
   const [activeSection, setActiveSection] = useState<SectionKey>("friends");
