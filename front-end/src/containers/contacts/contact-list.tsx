@@ -843,13 +843,25 @@ export default function ContactList({
                               handleContactClick(contact, e);
                             }}
                           >
-                            <BlockedAvatar
-                              src={contact.urlavatar}
-                              alt={contact.fullname}
-                              isBlocked={contact.isBlocked}
-                              size="md"
-                              className="mr-3"
-                            />
+                            <div className="relative mr-3">
+                              <img
+                                src={contact.urlavatar || "/default-avatar.png"}
+                                alt={contact.fullname}
+                                className="w-10 h-10 rounded-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src =
+                                    "/default-avatar.png";
+                                }}
+                              />
+                              {/* Status indicator: blocked icon */}
+                              {contact.isBlocked && (
+                                <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white bg-red-500 flex items-center justify-center">
+                                  <span className="text-white text-[8px]">
+                                    🚫
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                             <div>
                               <div className="font-medium">
                                 {contact.fullname}

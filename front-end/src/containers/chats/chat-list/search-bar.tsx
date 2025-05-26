@@ -329,13 +329,21 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
                       result.isFriend ? handleSelectUser(result.id) : null
                     }
                   >
-                    <BlockedAvatar
-                      src={result.urlavatar || "https://via.placeholder.com/40"}
-                      alt={result.fullname}
-                      isBlocked={result.isBlocked}
-                      size="md"
-                      className="mr-3"
-                    />
+                    <div className="relative mr-3">
+                      <img
+                        src={
+                          result.urlavatar || "https://via.placeholder.com/40"
+                        }
+                        alt={result.fullname}
+                        className="w-10 h-10 rounded-full"
+                      />
+                      {/* Status indicator: blocked icon */}
+                      {result.isBlocked && (
+                        <div className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white bg-red-500 flex items-center justify-center">
+                          <span className="text-white text-[8px]">🚫</span>
+                        </div>
+                      )}
+                    </div>
                     <div>
                       <div className="font-medium">{result.fullname}</div>
                       <div className="text-sm text-gray-500">
