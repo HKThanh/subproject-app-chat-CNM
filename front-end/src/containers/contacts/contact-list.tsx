@@ -64,6 +64,7 @@ export default function ContactList({
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [friendToRemove, setFriendToRemove] = useState<Contact | null>(null);
   const [actionInProgress, setActionInProgress] = useState(false);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc"); // Thêm state cho sort order
 
   // Kiểm tra socket khi component mount
   useEffect(() => {
@@ -169,19 +170,20 @@ export default function ContactList({
   const fetchFriendList = async () => {
     try {
       const token = await getAuthToken();
+      // Sử dụng API mới có hỗ trợ sort
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/user/friend/get-friends`,
+        `${process.env.NEXT_PUBLIC_API_URL}/user/friend/list?sortOrder=${sortOrder}&limit=50&offset=0`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
       const result = await response.json();
 
-      // Kiểm tra response format theo API docs
-      if (result.code === 0 && Array.isArray(result.data)) {
+      // Kiểm tra response format theo API docs mới
+      if (result.success && result.data && Array.isArray(result.data.friends)) {
         console.log("Friend list response:", result); // Debug log
 
-        const friendList = result.data;
+        const friendList = result.data.friends;
         // Nhóm bạn bè theo chữ cái đầu tiên
         const groupedContacts: { [key: string]: Contact[] } = {};
 
@@ -194,17 +196,22 @@ export default function ContactList({
         });
 
         // Chuyển đổi object thành mảng và sắp xếp theo alphabet
+        // Backend đã sort rồi nên chỉ cần group theo letter
         const sortedGroups = Object.entries(groupedContacts)
           .map(([letter, contacts]) => ({
             letter,
-            contacts: contacts.sort((a, b) =>
-              a.fullname.localeCompare(b.fullname)
-            ),
+            contacts: contacts, // Không cần sort lại vì backend đã sort
           }))
-          .sort((a, b) => a.letter.localeCompare(b.letter));
+          .sort((a, b) => {
+            // Sort groups theo sortOrder
+            if (sortOrder === "desc") {
+              return b.letter.localeCompare(a.letter);
+            }
+            return a.letter.localeCompare(b.letter);
+          });
 
         setContacts(sortedGroups);
-        setTotalFriends(friendList.length);
+        setTotalFriends(result.data.total);
       } else {
         console.error("Invalid response format:", result);
         toast.error("Không thể tải danh sách bạn bè");
@@ -236,7 +243,13 @@ export default function ContactList({
         handleFriendRequestAccepted
       );
     };
-  }, []);
+  }, [sortOrder]); // Thêm sortOrder vào dependency để reload khi sort thay đổi
+
+  // Xử lý thay đổi sort order
+  const handleSortChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const newSortOrder = event.target.value as "asc" | "desc";
+    setSortOrder(newSortOrder);
+  };
 
   // Fetch danh sách người dùng bị chặn
   const fetchBlockedUsers = async () => {
@@ -505,11 +518,21 @@ export default function ContactList({
     }, [])
     .map((group) => ({
       ...group,
-      contacts: group.contacts.sort((a, b) =>
-        a.fullname.localeCompare(b.fullname)
-      ),
+      contacts: group.contacts.sort((a, b) => {
+        // Sort contacts trong group theo sortOrder
+        if (sortOrder === "desc") {
+          return b.fullname.localeCompare(a.fullname);
+        }
+        return a.fullname.localeCompare(b.fullname);
+      }),
     }))
-    .sort((a, b) => a.letter.localeCompare(b.letter));
+    .sort((a, b) => {
+      // Sort groups theo sortOrder
+      if (sortOrder === "desc") {
+        return b.letter.localeCompare(a.letter);
+      }
+      return a.letter.localeCompare(b.letter);
+    });
 
   // Thêm style vào component
   useEffect(() => {
@@ -783,9 +806,13 @@ export default function ContactList({
                   d="M7 16V4m0 0L3 8m4-4l4 4m-4 4v8m0 0l4-4m-4 4l-4-4"
                 />
               </svg>
-              <select className="border-none bg-transparent pr-8 py-2 text-sm focus:ring-0">
-                <option>Tên (A-Z)</option>
-                <option>Tên (Z-A)</option>
+              <select
+                className="border-none bg-transparent pr-8 py-2 text-sm focus:ring-0"
+                value={sortOrder}
+                onChange={handleSortChange}
+              >
+                <option value="asc">Tên (A-Z)</option>
+                <option value="desc">Tên (Z-A)</option>
               </select>
             </div>
 
