@@ -739,7 +739,7 @@ export default function ContactList({
     }
 
     // Hiển thị trạng thái đang tải
-    toast.loading("Đang mở cuộc trò chuyện...");
+    const toastId = toast.loading("Đang mở cuộc trò chuyện...");
 
     // Emit sự kiện tạo conversation
     socket.emit("create_conversation", {
@@ -747,9 +747,16 @@ export default function ContactList({
       IDReceiver: contact.id,
     });
 
+    // Thêm timeout để tránh đợi quá lâu
+    const timeout = setTimeout(() => {
+      toast.dismiss(toastId);
+      toast.error("Timeout - Không thể tạo cuộc trò chuyện");
+    }, 8000); // 8 giây timeout
+
     // Lắng nghe phản hồi từ server
     socket.once("create_conversation_response", (response) => {
-      toast.dismiss(); // Đóng toast loading
+      clearTimeout(timeout);
+      toast.dismiss(toastId);
 
       if (response.success) {
         // Lưu ID cuộc trò chuyện vào localStorage
@@ -758,8 +765,8 @@ export default function ContactList({
           response.conversation.idConversation
         );
 
-        // Chuyển hướng đến trang chat
-        router.push("/chat");
+        // Chuyển hướng đến trang chat nhanh hơn
+        window.location.href = "/chat";
       } else {
         toast.error(response.message || "Không thể tạo cuộc trò chuyện");
       }

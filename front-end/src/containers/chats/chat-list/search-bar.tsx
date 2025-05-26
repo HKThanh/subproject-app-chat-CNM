@@ -429,14 +429,13 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
 
   const handleSelectUser = async (user: SearchResult) => {
     console.log("Thông tin người được chọn: ", user.id);
-    // Lưu thông tin người dùng được chọn
-    setSelectedUser(user);
-    // Kiểm tra trạng thái bạn bè
-    await checkFriendStatus(user.id);
-    // Hiển thị profile modal
-    setShowUserProfile(true);
-    // Ẩn kết quả tìm kiếm
+
+    // Ẩn kết quả tìm kiếm ngay lập tức
     setShowResults(false);
+    setSearchText("");
+
+    // Mở cuộc trò chuyện trực tiếp thay vì mở profile modal
+    startConversation(user.id);
   };
   // Hàm thu hồi lời mời kết bạn
   const handleCancelRequest = async (requestId: string) => {
@@ -652,12 +651,15 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   // Thêm hàm để bắt đầu cuộc trò chuyện từ profile
   const startConversation = (userId: string) => {
     // Nếu đang loading, không cho thực hiện thêm
-    if (actionLoading) return;
+    if (loadingUserId) return;
 
-    // Set trạng thái loading
-    setActionLoading("chat");
+    // Set trạng thái loading cho user này
+    setLoadingUserId(userId);
+
     if (!socket) {
       console.error("Socket chưa được khởi tạo");
+      toast.error("Không thể kết nối đến máy chủ");
+      setLoadingUserId(null);
       return;
     }
 
@@ -669,36 +671,40 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
 
     if (!currentUserId) {
       console.error("Không tìm thấy ID người dùng trong session storage");
+      toast.error("Không tìm thấy thông tin người dùng");
+      setLoadingUserId(null);
       return;
     }
+
     // Hiển thị toast loading
-    const toastId = toast.loading("Đang tạo cuộc trò chuyện...");
+    const toastId = toast.loading("Đang mở cuộc trò chuyện...");
+
     // Emit sự kiện tạo conversation
     socket.emit("create_conversation", {
       IDSender: currentUserId,
       IDReceiver: userId,
     });
 
-    // Lắng nghe phản hồi từ server
+    // Lắng nghe phản hồi từ server với timeout
+    const timeout = setTimeout(() => {
+      toast.dismiss(toastId);
+      toast.error("Timeout - Không thể tạo cuộc trò chuyện");
+      setLoadingUserId(null);
+    }, 10000); // 10 giây timeout
+
     socket.once("create_conversation_response", (response) => {
+      clearTimeout(timeout);
+      toast.dismiss(toastId);
+
       if (response.success) {
-        // Đóng toast loading
-        toast.dismiss(toastId);
-
-        // Đóng profile modal
-        setShowUserProfile(false);
-        setSearchText("");
-
         // Kiểm tra xem đang ở trang nào
         const currentPath = window.location.pathname;
 
         if (currentPath.includes("/contacts")) {
           // Nếu đang ở tab contacts, chuyển hướng sang tab chat
-          toast.success("Đang chuyển đến cuộc trò chuyện...");
-
-          // Lưu ID cuộc trò chuyện vào sessionStorage để có thể truy cập sau khi chuyển trang
-          sessionStorage.setItem(
-            "pendingConversation",
+          // Lưu ID cuộc trò chuyện vào localStorage để có thể truy cập sau khi chuyển trang
+          localStorage.setItem(
+            "selectedConversationId",
             response.conversation.idConversation
           );
 
@@ -709,9 +715,9 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
           onSelectConversation(response.conversation.idConversation);
         }
       } else {
-        toast.error("Bạn chưa kết bạn với người này!");
+        toast.error(response.message || "Không thể tạo cuộc trò chuyện");
       }
-      setActionLoading(null);
+      setLoadingUserId(null);
     });
   };
 
