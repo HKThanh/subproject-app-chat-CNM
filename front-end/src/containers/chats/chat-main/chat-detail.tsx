@@ -216,6 +216,7 @@ export default function ChatDetail({
   };
 
   const handleDelete = (messageId: string) => {
+    console.log("check delete message:", messageId);
     setDeletingMessage(messageId);
     setShowDeleteDialog(true);
   };
@@ -344,22 +345,21 @@ export default function ChatDetail({
           </div>
         </div>
         <div className="flex items-center">
-        <button 
-          className="p-2 rounded-full hover:bg-gray-200"
-          onClick={handleVoiceCall}
-          disabled={activeConversation.isGroup || !activeConversation.otherUser?.isOnline}
-          title={activeConversation.isGroup 
-            ? "Cuộc gọi nhóm chưa được hỗ trợ" 
-            : !activeConversation.otherUser?.isOnline 
-              ? "Người dùng không trực tuyến" 
-              : "Gọi thoại"}
-        >
-          <Phone className={`w-5 h-5 ${
-            (activeConversation.isGroup || !activeConversation.otherUser?.isOnline) 
-              ? "text-gray-400" 
-              : "text-gray-700"
-          }`} />
-        </button>
+          <button
+            className="p-2 rounded-full hover:bg-gray-200"
+            onClick={handleVoiceCall}
+            disabled={activeConversation.isGroup || !activeConversation.otherUser?.isOnline}
+            title={activeConversation.isGroup
+              ? "Cuộc gọi nhóm chưa được hỗ trợ"
+              : !activeConversation.otherUser?.isOnline
+                ? "Người dùng không trực tuyến"
+                : "Gọi thoại"}
+          >
+            <Phone className={`w-5 h-5 ${(activeConversation.isGroup || !activeConversation.otherUser?.isOnline)
+                ? "text-gray-400"
+                : "text-gray-700"
+              }`} />
+          </button>
           <button
             className="p-2 rounded-full hover:bg-gray-100"
             onClick={onToggleInfo}
@@ -657,92 +657,26 @@ export default function ChatDetail({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showForwardDialog} onOpenChange={setShowForwardDialog}>
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Chuyển tiếp tin nhắn</DialogTitle>
+            <DialogTitle>Xóa tin nhắn</DialogTitle>
             <DialogDescription>
-              Chọn cuộc trò chuyện để chuyển tiếp tin nhắn này
+              Bạn có chắc chắn muốn xóa tin nhắn này? Hành động này không thể hoàn tác.
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-4">
-            <ScrollArea className="h-[300px] pr-4">
-              {availableConversations.length > 0 ? (
-                availableConversations.map((conv) => (
-                  <div
-                    key={conv.idConversation}
-                    className="flex items-center space-x-2 py-2 border-b border-gray-100"
-                  >
-                    <Checkbox
-                      id={conv.idConversation}
-                      checked={selectedConversations.includes(
-                        conv.idConversation
-                      )}
-                      onCheckedChange={() =>
-                        toggleConversationSelection(conv.idConversation)
-                      }
-                    />
-                    <div className="w-8 h-8 rounded-full overflow-hidden">
-                      <Image
-                        src={
-                          conv.isGroup
-                            ? conv.groupAvatar ||
-                            "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp"
-                            : conv.otherUser?.urlavatar ||
-                            `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                              conv.otherUser?.fullname || "User"
-                            )}`
-                        }
-                        alt={
-                          conv.isGroup
-                            ? conv.groupName || "Group"
-                            : conv.otherUser?.fullname || "User"
-                        }
-                        width={32}
-                        height={32}
-                        className="object-cover"
-                      />
-                    </div>
-                    <Label
-                      htmlFor={conv.idConversation}
-                      className="flex-1 cursor-pointer"
-                    >
-                      <div className="font-medium">
-                        {conv.isGroup
-                          ? conv.groupName
-                          : conv.otherUser?.fullname || "Người dùng"}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {conv.isGroup
-                          ? `${conv.groupMembers?.length || 0} thành viên`
-                          : "Chat trực tiếp"}
-                      </div>
-                    </Label>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-4 text-gray-500">
-                  Không có cuộc trò chuyện nào khác
-                </div>
-              )}
-            </ScrollArea>
-          </div>
           <DialogFooter>
             <Button
               variant="outline"
               onClick={() => {
-                setShowForwardDialog(false);
-                setForwardingMessage(null);
-                setSelectedConversations([]);
+                setShowDeleteDialog(false);
+                setDeletingMessage(null);
               }}
             >
               Hủy
             </Button>
-            <Button
-              onClick={confirmForward}
-              disabled={selectedConversations.length === 0}
-            >
-              Chuyển tiếp
+            <Button variant="destructive" onClick={confirmDelete}>
+              Xóa
             </Button>
           </DialogFooter>
         </DialogContent>

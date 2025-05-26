@@ -39,7 +39,7 @@ export interface Message {
       totalCount: number;
       userReactions: Array<{
         user: {
-          id: string;
+          userId: string;
           fullname: string;
           urlavatar?: string;
         };
@@ -1154,11 +1154,40 @@ export const useChat = (userId: string) => {
   }) => {
     console.log("Nhận danh sách cuộc trò chuyện nhóm:", data);
 
-    // Kết hợp cuộc trò chuyện nhóm với cuộc trò chuyện hiện có
+    // Xử lý tin nhắn mới nhất đã bị xóa
     if (data.Items && Array.isArray(data.Items)) {
+      const processedItems = data.Items.map(conversation => {
+        // Kiểm tra nếu tin nhắn mới nhất đã bị xóa hoặc thu hồi
+        if (conversation.latestMessage) {
+          if (conversation.latestMessage.isRemove) {
+            // Nếu tin nhắn đã bị xóa, thay đổi nội dung hiển thị
+            return {
+              ...conversation,
+              latestMessage: {
+                ...conversation.latestMessage,
+                content: "Tin nhắn đã bị xóa",
+                preview: "Tin nhắn đã bị xóa"
+              }
+            };
+          } else if (conversation.latestMessage.isRecall) {
+            // Nếu tin nhắn đã bị thu hồi, thay đổi nội dung hiển thị
+            return {
+              ...conversation,
+              latestMessage: {
+                ...conversation.latestMessage,
+                content: "Tin nhắn đã được thu hồi",
+                preview: "Tin nhắn đã được thu hồi"
+              }
+            };
+          }
+        }
+        return conversation;
+      });
+
+      // Kết hợp cuộc trò chuyện nhóm với cuộc trò chuyện hiện có
       dispatch({
         type: 'SET_CONVERSATIONS',
-        payload: [...state.conversations, ...data.Items].filter((conv, index, self) =>
+        payload: [...state.conversations, ...processedItems].filter((conv, index, self) =>
           // Loại bỏ các cuộc trò chuyện trùng lặp
           index === self.findIndex(c => c.idConversation === conv.idConversation)
         )
@@ -1166,7 +1195,7 @@ export const useChat = (userId: string) => {
     }
 
     dispatch({ type: 'SET_LOADING', payload: false });
-  }, [state.conversations]); // Phụ thuộc vào state.conversations để luôn có danh sách mới nhất
+  }, [state.conversations]); // Phụ thuộc vào state.conversations để luôn có danh sách mới nhất // Phụ thuộc vào state.conversations để luôn có danh sách mới nhất
   const createGroupConversation = useCallback((
     groupName: string,
     groupMembers: string[],
@@ -1208,7 +1237,7 @@ export const useChat = (userId: string) => {
   }, [socket, userId]);
   //xử lý phản hồi thêm thành viên vào nhóm
   const handleAddMemberToGroupResponse = useCallback((data: any) => {
-    console.log("Add member to group response (new_group_conversation):", data);
+    // console.log("Add member to group response (new_group_conversation):", data);
 
     if (data.success && data.conversation) {
       // Get the updated conversation data
@@ -1221,8 +1250,9 @@ export const useChat = (userId: string) => {
 
       if (!currentConversation) {
         // This is a new conversation for this user (they were just added to it)
-        console.log("New conversation received - user was added to a new group");
-        console.log("data.owner ", data.owner)
+        // console.log("New conversation received - user was added to a new group");
+        // console.log("data.owner ", data.owner)
+        // console.log("data.members ", data.members)
         // Format the conversation data properly for our state
         const newConversation: Conversation = {
           ...updatedConversation,
@@ -1233,8 +1263,8 @@ export const useChat = (userId: string) => {
           regularMembers: data.members || [],
           // Ensure we have the owner information
           owner: data.owner || {
-            id: data.owner.id || updatedConversation.rules?.IDOwner,
-            fullname: data.owner.fullname || "Group Owner"
+            id: data.owner?.id || updatedConversation.rules?.IDOwner,
+            fullname: data.owner?.fullname || "Group Owner"
           },
           // Ensure we have coOwners information
           coOwners: data.coOwners ||
@@ -3543,16 +3573,57 @@ export const useChat = (userId: string) => {
     // Xử lý sự kiện xóa tin nhắn thành công
     const handleDeleteMessageSuccess = (data: { messageId: string, updatedMessage: Message }) => {
       console.log("Tin nhắn đã được xóa:", data);
-
+  
       if (data.updatedMessage && data.updatedMessage.idConversation) {
+        const conversationId = data.updatedMessage.idConversation;
+        
+        // Cập nhật tin nhắn trong state
         dispatch({
           type: 'UPDATE_MESSAGE',
           payload: {
-            conversationId: data.updatedMessage.idConversation,
+            conversationId: conversationId,
             messageId: data.messageId,
-            updates: { ...data.updatedMessage, isRemove: true }
+            updates: { isRemove: true }
           }
         });
+        
+        // Kiểm tra xem tin nhắn bị xóa có phải là tin nhắn mới nhất không
+        const conversation = state.conversations.find(conv => conv.idConversation === conversationId);
+        if (conversation && conversation.latestMessage && conversation.latestMessage.idMessage === data.messageId) {
+          // Tìm tin nhắn mới nhất tiếp theo (không bị xóa)
+          const conversationMessages = state.messages[conversationId] || [];
+          const nextLatestMessage = conversationMessages
+            .filter(msg => msg.idMessage !== data.messageId && !msg.isRemove)
+            .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())[0];
+          
+          // Cập nhật tin nhắn mới nhất của cuộc trò chuyện
+          if (nextLatestMessage) {
+            dispatch({
+              type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+              payload: {
+                conversationId: conversationId,
+                latestMessage: nextLatestMessage
+              }
+            });
+          } else {
+            // Nếu không còn tin nhắn nào, đặt latestMessage thành null hoặc tin nhắn trống
+            dispatch({
+              type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+              payload: {
+                conversationId: conversationId,
+                latestMessage: {
+                  idMessage: `system-${Date.now()}`,
+                  idSender: 'system',
+                  idConversation: conversationId,
+                  type: 'text',
+                  content: "Không có tin nhắn",
+                  dateTime: new Date().toISOString(),
+                  isRead: true
+                }
+              }
+            });
+          }
+        }
       }
     };
 
@@ -4097,11 +4168,46 @@ export const useChat = (userId: string) => {
       if (data.success) {
         // Cập nhật tin nhắn trong state đã được thực hiện trong optimistic update
         console.log(`Tin nhắn ${data.messageId} đã được thu hồi thành công`);
+        if (data.conversationId && data.isLatestMessage) {
+          dispatch({
+            type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+            payload: {
+              conversationId: data.conversationId,
+              latestMessage: {
+                idMessage: `recall-${Date.now()}`,
+                idConversation: data.conversationId,
+                content: "Tin nhắn đã được thu hồi",
+                dateTime: new Date().toISOString(),
+                isRead: true,
+                idSender: userId,
+                isRecall: true,
+                type: "text"
+              }
+            }
+          });
+        }
       } else {
         console.error("Lỗi khi thu hồi tin nhắn:", data.error);
         // Khôi phục trạng thái tin nhắn nếu thu hồi thất bại
-        // Cần biết conversationId để khôi phục
-        // Có thể lưu trữ một bản đồ messageId -> conversationId để sử dụng ở đây
+        if (data.messageId && data.conversationId) {
+          // Khôi phục tin nhắn về trạng thái ban đầu
+          const conversationMessages = messages[data.conversationId] || [];
+          const originalMessage = conversationMessages.find(msg => msg.idMessage === data.messageId);
+          
+          if (originalMessage) {
+            dispatch({
+              type: 'UPDATE_MESSAGE',
+              payload: {
+                conversationId: data.conversationId,
+                messageId: data.messageId,
+                updates: {
+                  isRecall: false,
+                  content: originalMessage.content
+                }
+              }
+            });
+          }
+        }
       }
     };
 
@@ -4123,6 +4229,25 @@ export const useChat = (userId: string) => {
             updates: {
               isRecall: true,
               content: "Tin nhắn đã được thu hồi"
+            }
+          }
+        });
+      }
+      // Cập nhật tin nhắn mới nhất nếu tin nhắn bị thu hồi là tin nhắn mới nhất
+      if (data.isLatestMessage) {
+        dispatch({
+          type: 'UPDATE_CONVERSATION_LATEST_MESSAGE',
+          payload: {
+            conversationId: data.conversationId,
+            latestMessage: {
+              idMessage: `recall-${Date.now()}`,
+              idConversation: data.conversationId,
+              content: "Tin nhắn đã được thu hồi",
+              dateTime: new Date().toISOString(),
+              isRead: true,
+              idSender: data.senderId || "",
+              isRecall: true,
+              type: "text"
             }
           }
         });

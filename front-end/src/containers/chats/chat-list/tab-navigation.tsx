@@ -336,7 +336,7 @@ export default function TabNavigation({
   return (
     <div className="flex flex-col h-full bg-gray-200">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-        <h2 className="text-xl font-bold text-gray-900">Chats</h2>
+        <h2 className="text-xl font-bold text-gray-900">Tin nhắn</h2>
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -363,7 +363,7 @@ export default function TabNavigation({
           }`}
           onClick={() => setActiveTab("DIRECT")}
         >
-          DIRECT
+          Chat đơn
         </button>
         {/* Fixed duplicate button */}
         <button
@@ -374,7 +374,7 @@ export default function TabNavigation({
           }`}
           onClick={() => setActiveTab("GROUPS")}
         >
-          GROUPS
+          Chat nhóm
         </button>
       </div>
 

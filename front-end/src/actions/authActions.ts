@@ -70,7 +70,8 @@ export async function signUpUser(
   email: string,
   password: string,
   fullname: string,
-  otp: string
+  otp: string,
+  urlAvatar: 'https://test-9-4.s3.ap-southeast-1.amazonaws.com/hw8q-1748087377359-avatar-default.jpg'
 ) {
   try {
     const result = await fetch(`${API_URL}/auth/register-web`, {

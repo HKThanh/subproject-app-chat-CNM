@@ -7,7 +7,7 @@ import { useSession } from "next-auth/react";
 import useUserStore from "@/stores/useUserStoree";
 
 // Mặc định kết nối đến server hiện tại nếu không có cấu hình
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
+const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || "http://13.213.18.135:3000";
 
 export const useSocket = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
