@@ -41,8 +41,8 @@ const MessageDetailSchema = new Schema({
         type: Boolean,
         default: false
     },
-    idMessageReply: {
-        type: String,
+    messageReply: {
+        type: Schema.Types.Mixed, // Có thể là một đối tượng hoặc null
         default: null
     },
     isPinned: {

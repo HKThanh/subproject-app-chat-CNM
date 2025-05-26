@@ -19,6 +19,18 @@ export interface Message {
   isReply?: boolean; // Trường mới cho tin nhắn reply
   idMessageReply?: string; // ID của tin nhắn gốc khi chuyển tiếp
   isOwn?: boolean; // Đánh dấu tin nhắn của người dùng hiện tại
+  messageReply?: {
+    idMessage: string;
+    content: string;
+    idSender: string;
+    dateTime: string;
+    type: string;
+    senderInfo?: {
+      id: string;
+      fullname: string;
+      urlavatar: string;
+    }
+  };
   senderInfo?: {
     id?: string;
     fullname?: string;
@@ -1125,6 +1137,7 @@ export const useChat = (userId: string) => {
   useEffect(() => {
     if (!socket) return;
     const handleLoadMessagesResponse = (data: any) => {
+      console.log("Nhận danh sách tin nhắn:", data); 
       if (data.messages && data.conversationId) {
         dispatch({
           type: 'LOAD_MORE_MESSAGES',

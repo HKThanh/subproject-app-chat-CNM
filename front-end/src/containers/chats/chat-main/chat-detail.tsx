@@ -351,38 +351,36 @@ export default function ChatDetail({
           </div>
         </div>
         <div className="flex items-center">
-        <button 
-          className="p-2 rounded-full hover:bg-gray-200"
-          onClick={handleVoiceCall}
-          disabled={activeConversation.isGroup || !activeConversation.otherUser?.isOnline}
-          title={activeConversation.isGroup 
-            ? "Cuộc gọi nhóm chưa được hỗ trợ" 
-            : !activeConversation.otherUser?.isOnline 
-              ? "Người dùng không trực tuyến" 
-              : "Gọi thoại"}
-        >
-          <Phone className={`w-5 h-5 ${
-            (activeConversation.isGroup || !activeConversation.otherUser?.isOnline) 
-              ? "text-gray-400" 
+          <button
+            className="p-2 rounded-full hover:bg-gray-200"
+            onClick={handleVoiceCall}
+            disabled={activeConversation.isGroup || !activeConversation.otherUser?.isOnline}
+            title={activeConversation.isGroup
+              ? "Cuộc gọi nhóm chưa được hỗ trợ"
+              : !activeConversation.otherUser?.isOnline
+                ? "Người dùng không trực tuyến"
+                : "Gọi thoại"}
+          >
+            <Phone className={`w-5 h-5 ${(activeConversation.isGroup || !activeConversation.otherUser?.isOnline)
+              ? "text-gray-400"
               : "text-gray-700"
-          }`} />
-        </button>
-        <button 
-          className="p-2 rounded-full hover:bg-gray-200"
-          onClick={handleVideoCall}
-          disabled={activeConversation.isGroup || !activeConversation.otherUser?.isOnline}
-          title={activeConversation.isGroup 
-            ? "Cuộc gọi nhóm chưa được hỗ trợ" 
-            : !activeConversation.otherUser?.isOnline 
-              ? "Người dùng không trực tuyến" 
-              : "Gọi video"}
-        >
-          <Video className={`w-5 h-5 ${
-            (activeConversation.isGroup || !activeConversation.otherUser?.isOnline) 
-              ? "text-gray-400" 
+              }`} />
+          </button>
+          <button
+            className="p-2 rounded-full hover:bg-gray-200"
+            onClick={handleVideoCall}
+            disabled={activeConversation.isGroup || !activeConversation.otherUser?.isOnline}
+            title={activeConversation.isGroup
+              ? "Cuộc gọi nhóm chưa được hỗ trợ"
+              : !activeConversation.otherUser?.isOnline
+                ? "Người dùng không trực tuyến"
+                : "Gọi video"}
+          >
+            <Video className={`w-5 h-5 ${(activeConversation.isGroup || !activeConversation.otherUser?.isOnline)
+              ? "text-gray-400"
               : "text-gray-700"
-          }`} />
-        </button>
+              }`} />
+          </button>
           <button
             className="p-2 rounded-full hover:bg-gray-100"
             onClick={onToggleInfo}
@@ -494,39 +492,15 @@ export default function ChatDetail({
                   }
                   // Xử lý thông tin tin nhắn reply
                   let replyInfo = null;
-                  if (msg.isReply && msg.idMessageReply) {
-                    // Tìm tin nhắn gốc từ danh sách tin nhắn hiện có
-                    const originalMessage = displayMessages.find(
-                      (m) => m.idMessage === msg.idMessageReply
-                    );
-
-                    if (originalMessage) {
-                      // Tìm thông tin người gửi tin nhắn gốc
-                      let originalSenderName = "";
-
-                      if (originalMessage.senderInfo?.fullname) {
-                        originalSenderName = originalMessage.senderInfo.fullname;
-                      } else if (activeConversation?.isGroup && originalMessage.idSender) {
-                        const originalMember = activeConversation.regularMembers?.find(
-                          (member) => member.id === originalMessage.idSender
-                        );
-
-                        if (originalMember) {
-                          originalSenderName = originalMember.fullname || originalMessage.idSender;
-                        } else if (activeConversation.owner?.id === originalMessage.idSender) {
-                          originalSenderName = activeConversation.owner.fullname || originalMessage.idSender;
-                        } else {
-                          originalSenderName = originalMessage.idSender;
-                        }
-                      } else if (!activeConversation?.isGroup) {
-                        originalSenderName = originalMessage.idSender === msg.idSender
-                          ? activeConversation?.otherUser?.fullname || "Người dùng"
-                          : "Bạn";
-                      }
+                  if (msg.isReply) {
+                    // Sử dụng thông tin từ messageReply nếu có
+                    if (msg.messageReply) {
+                      // Lấy thông tin người gửi tin nhắn gốc từ messageReply
+                      let originalSenderName = msg.messageReply.senderInfo?.fullname || "Người dùng";
 
                       // Chuẩn bị nội dung tin nhắn gốc để hiển thị
-                      let originalContent = originalMessage.content || "";
-                      let originalType = originalMessage.type || "text";
+                      let originalContent = msg.messageReply.content || "";
+                      let originalType = msg.messageReply.type || "text";
 
                       if (originalType !== "text" && originalContent.includes("http")) {
                         const urlMatch = originalContent.match(/(https?:\/\/[^\s]+)/g);
@@ -552,13 +526,73 @@ export default function ChatDetail({
                         content: originalContent,
                         type: originalType
                       };
-                    } else {
-                      // Nếu không tìm thấy tin nhắn gốc, hiển thị thông tin mặc định
-                      replyInfo = {
-                        name: "Người dùng",
-                        content: "Tin nhắn gốc không còn tồn tại",
-                        type: "text"
-                      };
+                    }
+                    else if (msg.idMessageReply) {
+                      // Fallback: Tìm tin nhắn gốc từ danh sách tin nhắn hiện có nếu không có messageReply
+                      const originalMessage = displayMessages.find(
+                        (m) => m.idMessage === msg.idMessageReply
+                      );
+
+                      if (originalMessage) {
+                        // Tìm thông tin người gửi tin nhắn gốc
+                        let originalSenderName = "";
+
+                        if (originalMessage.senderInfo?.fullname) {
+                          originalSenderName = originalMessage.senderInfo.fullname;
+                        } else if (activeConversation?.isGroup && originalMessage.idSender) {
+                          const originalMember = activeConversation.regularMembers?.find(
+                            (member) => member.id === originalMessage.idSender
+                          );
+
+                          if (originalMember) {
+                            originalSenderName = originalMember.fullname || originalMessage.idSender;
+                          } else if (activeConversation.owner?.id === originalMessage.idSender) {
+                            originalSenderName = activeConversation.owner.fullname || originalMessage.idSender;
+                          } else {
+                            originalSenderName = originalMessage.idSender;
+                          }
+                        } else if (!activeConversation?.isGroup) {
+                          originalSenderName = originalMessage.idSender === msg.idSender
+                            ? activeConversation?.otherUser?.fullname || "Người dùng"
+                            : "Bạn";
+                        }
+
+                        // Chuẩn bị nội dung tin nhắn gốc để hiển thị
+                        let originalContent = originalMessage.content || "";
+                        let originalType = originalMessage.type || "text";
+
+                        if (originalType !== "text" && originalContent.includes("http")) {
+                          const urlMatch = originalContent.match(/(https?:\/\/[^\s]+)/g);
+                          const fileUrl = urlMatch ? urlMatch[0] : undefined;
+
+                          if (fileUrl) {
+                            originalContent = originalContent.replace(fileUrl, "").trim();
+
+                            if (!originalContent) {
+                              if (originalType === "image") {
+                                originalContent = "Hình ảnh";
+                              } else if (originalType === "video") {
+                                originalContent = "Video";
+                              } else {
+                                originalContent = "Tệp đính kèm";
+                              }
+                            }
+                          }
+                        }
+
+                        replyInfo = {
+                          name: originalSenderName,
+                          content: originalContent,
+                          type: originalType
+                        };
+                      } else {
+                        // Nếu không tìm thấy tin nhắn gốc, hiển thị thông tin mặc định
+                        replyInfo = {
+                          name: "Người dùng",
+                          content: "Tin nhắn gốc không còn tồn tại",
+                          type: "text"
+                        };
+                      }
                     }
                   }
                   return (

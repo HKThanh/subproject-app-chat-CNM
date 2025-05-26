@@ -2529,25 +2529,33 @@ const handleSearchMessagesInGroup = (io, socket) => {
 const handleReplyMessage = async (io, socket) => {
   socket.on("reply_message", async (payload) => {
     try {
-      const { IDSender, IDReceiver, IDConversation, IDMessageReply, textMessage, type = "text", fileUrl } = payload
-
-      console.log("Received reply message:", payload)
-
+      const { 
+        IDSender, 
+        IDReceiver, 
+        IDConversation, 
+        IDMessageReply, 
+        textMessage, 
+        type = "text", 
+        fileUrl 
+      } = payload;
+      
+      console.log("Received reply message:", payload);
+      
       // Tìm tin nhắn gốc để reply
-      const originalMessage = await MessageDetail.findOne({ idMessage: IDMessageReply })
+      const originalMessage = await MessageDetail.findOne({ idMessage: IDMessageReply });
       if (!originalMessage) {
-        throw new Error("Không tìm thấy tin nhắn gốc")
+        throw new Error("Không tìm thấy tin nhắn gốc");
       }
-
+      
       // Tìm conversation
-      const conversation = await Conversation.findOne({ idConversation: IDConversation })
-
+      let conversation = await Conversation.findOne({ idConversation: IDConversation });
+      
       // Tạo message detail dựa vào type
-      let messageContent = textMessage
+      let messageContent = textMessage;
       if (type !== "text") {
-        messageContent = fileUrl
+        messageContent = fileUrl;
       }
-
+      
       // Tạo tin nhắn reply
       const messageDetail = await MessageDetail.create({
         idMessage: uuidv4(),
@@ -2559,82 +2567,93 @@ const handleReplyMessage = async (io, socket) => {
         dateTime: new Date().toISOString(),
         isRead: false,
         isReply: true,
-        idMessageReply: IDMessageReply,
-      })
-
+        messageReply: {
+          idMessage: IDMessageReply,
+          content: originalMessage.content,
+          idSender: originalMessage.idSender,
+          dateTime: originalMessage.dateTime,
+          type: originalMessage.type,
+          senderInfo: {
+            id: originalMessage.idSender,
+            fullname: (await User.findOne({ id: originalMessage.idSender }).select("fullname")).fullname || "Unknown",
+            urlavatar: (await User.findOne({ id: originalMessage.idSender }).select("urlavatar")).urlavatar || ""
+          }
+        }
+      });
+      
       // Cập nhật conversation
       const updateFields = {
         lastChange: new Date().toISOString(),
         idNewestMessage: messageDetail.idMessage,
-      }
-
+      };
+      
       // Tự động lưu vào danh sách tương ứng dựa vào type
       if (type === "image") {
-        updateFields.$push = { listImage: messageContent }
+        updateFields.$push = { listImage: messageContent };
       } else if (type === "video" || type === "audio") {
         // Lưu vào listVideo (bao gồm cả audio)
-        updateFields.$push = { listVideo: messageContent }
+        updateFields.$push = { listVideo: messageContent };
       } else if (type === "file" || type === "document") {
-        updateFields.$push = { listFile: messageContent }
+        updateFields.$push = { listFile: messageContent };
       }
-
+      
       const updatedConversation = await Conversation.findOneAndUpdate(
         { idConversation: IDConversation },
         updateFields,
-        { new: true },
-      )
-
-      await updateLastChangeConversation(IDConversation, messageDetail.idMessage)
-
+        { new: true }
+      );
+      
+      await updateLastChangeConversation(IDConversation, messageDetail.idMessage);
+      
       // Lấy thông tin người gửi
-      const sender = await User.findOne({ id: IDSender }).select("id fullname urlavatar")
-
+      const sender = await User.findOne({ id: IDSender }).select("id fullname urlavatar");
+      
       // Thêm thông tin người gửi và tin nhắn gốc vào tin nhắn
       const messageWithUsers = {
-        ...messageDetail.toObject(),
+...messageDetail.toObject(),
         senderInfo: sender,
-        originalMessage: originalMessage,
-      }
-
+        originalMessage: originalMessage
+      };
+      
       // Xử lý gửi tin nhắn dựa vào loại conversation (nhóm hoặc đơn)
       if (conversation.isGroup) {
         // Nếu là nhóm, gửi tới tất cả thành viên trong nhóm
-        const groupMembers = conversation.groupMembers || []
-
+        const groupMembers = conversation.groupMembers || [];
+        
         groupMembers.forEach((member) => {
           if (member !== IDSender) {
-            const receiverOnline = getUser(member)
+            const receiverOnline = getUser(member);
             if (receiverOnline) {
-              io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers)
+              io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers);
               io.to(receiverOnline.socketId).emit("conversation_updated", {
                 conversationId: IDConversation,
                 updates: {
                   listImage: updatedConversation.listImage || [],
                   listFile: updatedConversation.listFile || [],
                   listVideo: updatedConversation.listVideo || [],
-                  lastChange: updatedConversation.lastChange,
-                },
-              })
+                  lastChange: updatedConversation.lastChange
+                }
+              });
             }
           }
-        })
+        });
       } else {
         // Nếu là chat đơn, gửi tới người nhận
-        const receiverOnline = getUser(IDReceiver)
+        const receiverOnline = getUser(IDReceiver);
         if (receiverOnline) {
-          io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers)
+          io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers);
           io.to(receiverOnline.socketId).emit("conversation_updated", {
             conversationId: IDConversation,
             updates: {
               listImage: updatedConversation.listImage || [],
               listFile: updatedConversation.listFile || [],
               listVideo: updatedConversation.listVideo || [],
-              lastChange: updatedConversation.lastChange,
-            },
-          })
+              lastChange: updatedConversation.lastChange
+            }
+          });
         }
       }
-
+      
       // Emit success cho sender
       socket.emit("send_message_success", {
         conversationId: IDConversation,
@@ -2643,18 +2662,19 @@ const handleReplyMessage = async (io, socket) => {
           listImage: updatedConversation.listImage || [],
           listFile: updatedConversation.listFile || [],
           listVideo: updatedConversation.listVideo || [],
-          lastChange: updatedConversation.lastChange,
-        },
-      })
+          lastChange: updatedConversation.lastChange
+        }
+      });
+      
     } catch (error) {
-      console.error("Error replying to message:", error)
+      console.error("Error replying to message:", error);
       socket.emit("error", {
         message: "Lỗi khi trả lời tin nhắn",
         error: error.message,
-      })
+      });
     }
-  })
-}
+  });
+};
 
 // Thêm vào socketController.js
 const handlePinGroupMessage = (io, socket) => {
