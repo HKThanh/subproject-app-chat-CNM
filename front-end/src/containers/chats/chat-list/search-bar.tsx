@@ -283,6 +283,10 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
     });
   };
 
+  const handleSelectNonFriend = () => {
+    toast.info("Bạn cần kết bạn trước khi có thể nhắn tin");
+  };
+
   return (
     <div className="relative flex-1">
       <div className="flex items-center gap-2">
@@ -326,7 +330,9 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
                     key={result.id}
                     className="flex items-center p-3 hover:bg-gray-100 cursor-pointer"
                     onClick={() =>
-                      result.isFriend ? handleSelectUser(result.id) : null
+                      result.isFriend
+                        ? handleSelectUser(result.id)
+                        : handleSelectNonFriend()
                     }
                   >
                     <div className="relative mr-3">
