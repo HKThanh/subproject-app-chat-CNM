@@ -55,7 +55,7 @@ export default function LoginForm() {
 
   useEffect(() => {
     // Khởi tạo kết nối socket khi component được mount
-    const socketInstance = io(process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000");
+    const socketInstance = io(process.env.NEXT_PUBLIC_API_URL);
     setSocket(socketInstance);
 
     // Lắng nghe sự kiện nhận mã QR

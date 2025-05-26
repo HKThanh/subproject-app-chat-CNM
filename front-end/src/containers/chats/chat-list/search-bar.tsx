@@ -41,7 +41,7 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
   const [showUserProfile, setShowUserProfile] = useState(false)
   const [friendStatus, setFriendStatus] = useState<"none" | "pending" | "requested" | "friends">("none")
   const [friendRequestId, setFriendRequestId] = useState<string | null>(null)
-  const END_POINT_URL = process.env.NEXT_PUBLIC_API_URL || "localhost:3000"
+  const END_POINT_URL = process.env.NEXT_PUBLIC_API_URL
   const token = useUserStore((state) => state.accessToken);
   const [actionLoading, setActionLoading] = useState<"add" | "cancel" | "remove" | "accept" | "chat" | "decline" | null>(null);
   // Lắng nghe sự kiện click bên ngoài để đóng kết quả tìm kiếm

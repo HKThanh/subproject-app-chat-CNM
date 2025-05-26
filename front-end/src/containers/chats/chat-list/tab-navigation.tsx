@@ -43,7 +43,7 @@ export default function TabNavigation({
 
   // Use a ref for API_URL to keep it stable between renders
   const API_URL = useRef(
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+    process.env.NEXT_PUBLIC_API_URL
   ).current;
 
   // State for friends list

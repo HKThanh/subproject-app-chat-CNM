@@ -213,31 +213,33 @@ class CallController {
         try {
             const callData = this.activeCalls.get(callId);
             if (!callData || callData.status !== 'active') {
+                console.log(`Call ${callId} is not active or does not exist. Stopping monitoring.`);
                 this.stopRoomMonitoring(callId);
                 return;
             }
-
+    
             // Lấy thông tin participants từ Daily.co
             const participantsData = await getRoomParticipants(callData.roomName);
-            const participantCount = participantsData.data ? participantsData.data.length : 0;
-
+            const participantCount = participantsData?.data?.length || 0;
+    
             console.log(`Room ${callData.roomName} has ${participantCount} participants`);
-
-            // Nếu chỉ còn 1 người hoặc không còn ai trong room
+    
+            // Nếu không còn ai hoặc chỉ còn 1 người trong phòng
             if (participantCount <= 1) {
                 console.log(`Auto-ending call ${callId} due to insufficient participants (${participantCount})`);
                 
-                // Tìm user nào còn lại để end call
                 const remainingUserId = this.findRemainingUser(callId);
-                if (remainingUserId) {
+                if (participantCount === 1 && remainingUserId) {
                     await this.autoEndCall(callId, remainingUserId);
                 } else {
-                    // Nếu không tìm được user nào, cleanup trực tiếp
                     await this.forceCleanupCall(callId);
                 }
             }
         } catch (error) {
-            console.error(`Error checking participants for call ${callId}:`, error);
+            console.error(`Error checking participants for call ${callId}:`, error.message);
+            // Force cleanup nếu có lỗi nghiêm trọng
+            await this.forceCleanupCall(callId);
+            this.stopRoomMonitoring(callId);
         }
     }
 
@@ -263,7 +265,7 @@ class CallController {
             
             // Thông báo cho cả hai user về việc auto-end call
             const socketController = require('./socketController');
-            const io = require('../app').io; // Giả sử bạn export io từ app.js
+            const io = require('../config/socket').getIO(); // Giả sử bạn export io từ app.js
             
             // Thông báo cho caller
             const callerSocket = socketController.getUser(call.callerId);
