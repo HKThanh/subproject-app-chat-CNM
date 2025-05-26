@@ -99,7 +99,8 @@ export default function ContactList({
     // Xử lý khi người khác xóa mình khỏi danh sách bạn bè
     const handleUnfriend = (data: { friendId: string; message: string }) => {
       console.log("Unfriend event received:", data);
-      toast.info(data.message);
+      // Bỏ thông báo khi bị xóa bạn theo yêu cầu nghiệp vụ
+      // toast.info(data.message);
 
       // Cập nhật danh sách bạn bè ngay lập tức
       setContacts((prevGroups) => {
@@ -131,7 +132,8 @@ export default function ContactList({
       message: string;
     }) => {
       console.log("Blocked by user event received:", data);
-      toast.info(data.message);
+      // Bỏ thông báo khi bị chặn theo yêu cầu nghiệp vụ
+      // toast.info(data.message);
     };
 
     const handleUnblockedByUser = (data: {
@@ -139,7 +141,8 @@ export default function ContactList({
       message: string;
     }) => {
       console.log("Unblocked by user event received:", data);
-      toast.info(data.message);
+      // Bỏ thông báo khi được bỏ chặn theo yêu cầu nghiệp vụ
+      // toast.info(data.message);
     };
 
     socket.on("blockedByUser", handleBlockedByUser);
