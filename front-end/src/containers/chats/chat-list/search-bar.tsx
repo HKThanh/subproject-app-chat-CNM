@@ -769,34 +769,35 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
 
       {/* Kết quả tìm kiếm */}
       {showResults && (
-        <div className="absolute top-full left-0 w-full bg-white border border-gray-200 shadow-lg mt-2 rounded-md z-50">
-          <div className="max-h-96 overflow-y-auto">
+        <div className="absolute top-full left-0 w-full bg-white border border-gray-200 shadow-lg mt-2 rounded-lg z-50 max-w-sm">
+          <div className="max-h-80 overflow-y-auto">
             {loading ? (
               <div className="p-4 text-center text-gray-500">
                 <div className="flex justify-center items-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500 mr-2"></div>
-                  Đang tìm kiếm...
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                  <span className="text-sm">Đang tìm kiếm...</span>
                 </div>
               </div>
             ) : searchResults.length > 0 ? (
-              <ul>
+              <div className="py-1">
                 {searchResults.map((result) => (
-                  <li
+                  <div
                     key={result.id}
-                    className="flex items-center p-3 hover:bg-gray-100 cursor-pointer"
+                    className="flex items-center p-3 hover:bg-gray-50 cursor-pointer transition-colors"
                     onClick={() =>
                       result.isFriend
                         ? handleSelectUser(result)
                         : handleSelectNonFriend()
                     }
                   >
-                    <div className="relative mr-3">
+                    {/* Avatar */}
+                    <div className="relative flex-shrink-0 mr-3">
                       <img
                         src={
                           result.urlavatar || "https://via.placeholder.com/40"
                         }
                         alt={result.fullname}
-                        className="w-10 h-10 rounded-full"
+                        className="w-10 h-10 rounded-full object-cover"
                       />
                       {/* Status indicator: blocked icon */}
                       {result.isBlocked && (
@@ -805,46 +806,65 @@ export default function SearchBar({ onSelectConversation }: SearchBarProps) {
                         </div>
                       )}
                     </div>
-                    <div>
-                      <div className="font-medium">{result.fullname}</div>
-                      <div className="text-sm text-gray-500">
+
+                    {/* User info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-900 truncate text-sm">
+                        {result.fullname}
+                      </div>
+                      <div className="text-xs text-gray-500 truncate">
                         {result.email}
                       </div>
                     </div>
-                    {/* Kiểm tra trạng thái bạn bè trước khi hiển thị nút */}
-                    {!result.isFriend && (
-                      <button
-                        onClick={(e) => handleAddFriend(result.id, result, e)}
-                        className={`ml-2 flex items-center gap-1 px-3 py-1.5 rounded-md transition-all ${
-                          actionLoading === "add"
-                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                            : "bg-blue-50 text-blue-600 hover:bg-blue-100"
-                        }`}
-                        title="Thêm bạn"
-                        disabled={actionLoading === "add"}
-                      >
-                        {actionLoading === "add" ? (
-                          <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin mr-1"></div>
-                        ) : (
-                          <UserAddIcon width={16} height={16} />
-                        )}
-                        <span className="text-xs font-medium">Thêm bạn</span>
-                      </button>
-                    )}
-                  </li>
+
+                    {/* Action button hoặc status */}
+                    <div className="flex-shrink-0 ml-2">
+                      {!result.isFriend && !result.isBlocked && (
+                        <button
+                          onClick={(e) => handleAddFriend(result.id, result, e)}
+                          className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                            actionLoading === "add"
+                              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                              : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                          }`}
+                          title="Thêm bạn"
+                          disabled={actionLoading === "add"}
+                        >
+                          {actionLoading === "add" ? (
+                            <div className="w-3 h-3 border border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+                          ) : (
+                            <UserAddIcon width={12} height={12} />
+                          )}
+                          <span>Thêm</span>
+                        </button>
+                      )}
+
+                      {result.isFriend && (
+                        <span className="text-xs text-green-600 font-medium">
+                          Bạn bè
+                        </span>
+                      )}
+
+                      {result.isBlocked && (
+                        <span className="text-xs text-red-600 font-medium">
+                          Đã chặn
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 ))}
-              </ul>
+              </div>
             ) : searchText ? (
               <div className="p-4 text-center text-gray-500">
-                Không tìm thấy kết quả
+                <p className="text-sm">Không tìm thấy kết quả</p>
               </div>
             ) : null}
           </div>
 
-          {/* Nút đóng ở dưới */}
-          <div className="p-2 border-t">
+          {/* Nút đóng */}
+          <div className="border-t p-2">
             <button
-              className="w-full py-2 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors"
+              className="w-full py-2 text-sm text-gray-600 hover:bg-gray-50 rounded transition-colors"
               onClick={() => {
                 setShowResults(false);
                 setSearchText("");
