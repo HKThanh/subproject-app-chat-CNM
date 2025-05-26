@@ -142,16 +142,16 @@ export const useCall = (userId: string) => {
         }
     }, []);
 
-    // Xử lý khi cuộc gọi được chấp nhận
+    // Xử lý khi cuộc gọi được chấp nhận (cho người gọi )
     const handleCallAccepted = useCallback((data: any) => {
         console.log('Call accepted:', data);
         dispatch({ type: 'CALL_ACCEPTED', payload: data });
 
         // Mở cửa sổ Daily.co
-        if (state.roomUrl) {
-            window.open(state.roomUrl, '_blank', 'width=800,height=600');
+        if (data.roomUrl) {
+            window.open(data.roomUrl, '_blank', 'width=800,height=600');
         }
-    }, [state.roomUrl]);
+    }, []);
 
     // Xử lý khi cuộc gọi bị từ chối
     const handleCallRejected = useCallback((data: any) => {
@@ -237,13 +237,13 @@ export const useCall = (userId: string) => {
             return;
         }
         console.log('End call in handle:', callId, reason);
-        // socket.emit('end_call', {
-        //     callId,
-        //     userId,
-        //     reason
-        // });
+        socket.emit('end_call', {
+            callId,
+            userId,
+            reason
+        });
 
-        // dispatch({ type: 'CALL_ENDED' });
+        dispatch({ type: 'CALL_ENDED' });
     }, [socket, userId]);
     // Xử lý khi người nhận chấp nhận cuộc gọi (cho người nhận)
     const handleCallAcceptedConfirmed = useCallback((data: any) => {
@@ -252,10 +252,11 @@ export const useCall = (userId: string) => {
 
         // Mở cửa sổ Daily.co cho người nhận
         if (data.roomUrl) {
+            // Sử dụng roomUrl từ data thay vì state
             window.open(data.roomUrl, '_blank', 'width=800,height=600');
-        } else {
+          } else {
             toast.error('Không tìm thấy URL phòng gọi');
-        }
+          }
     }, []);
     // Đăng ký các event listeners
     useEffect(() => {
@@ -296,11 +297,12 @@ export const useCall = (userId: string) => {
     // Cleanup khi component unmount
     useEffect(() => {
         return () => {
+            console.log('Cleaning up call state');
             if (state.callId && (state.isOutgoingCall || state.isCallInProgress)) {
                 endCall(state.callId);
             }
         };
-    }, [state.callId, state.isOutgoingCall, state.isCallInProgress, endCall]);
+    }, []);
 
     return {
         ...state,
