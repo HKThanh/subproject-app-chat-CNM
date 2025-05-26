@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middlewares/authMiddleware');
 const { createDailyRoom } = require('../services/dailyService');
-const callController = require('../controllers/callController');
+const callController = require('../controllers/CallController');
 
 router.post('/create-room', authMiddleware, async (req, res) => {
     try {
