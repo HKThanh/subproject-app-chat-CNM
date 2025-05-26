@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useSocketContext } from './SocketContext';
 import { toast } from 'sonner';
 
@@ -114,11 +114,29 @@ export const useCall = (userId: string) => {
     const { socket } = useSocketContext();
     const [state, dispatch] = useReducer(callReducer, initialCallState);
     const [callTimeout, setCallTimeout] = useState<NodeJS.Timeout | null>(null);
+    const ringtoneRef = useRef<HTMLAudioElement | null>(null);
+    // Khởi tạo đối tượng Audio cho chuông
+    useEffect(() => {
+        ringtoneRef.current = new Audio('/sounds/ringtone.wav');
+        ringtoneRef.current.loop = true;
 
+        return () => {
+            if (ringtoneRef.current) {
+                ringtoneRef.current.pause();
+                ringtoneRef.current = null;
+            }
+        };
+    }, []);
     // Xử lý cuộc gọi đến
     const handleIncomingCall = useCallback((data: any) => {
         console.log('Incoming call:', data);
         dispatch({ type: 'INCOMING_CALL', payload: data });
+        // Phát âm thanh chuông
+        if (ringtoneRef.current) {
+            ringtoneRef.current.play().catch(err => {
+                console.error('Không thể phát âm thanh chuông:', err);
+            });
+        }
 
         // Tự động từ chối cuộc gọi sau 30 giây nếu không phản hồi
         const timeout = setTimeout(() => {
@@ -126,6 +144,12 @@ export const useCall = (userId: string) => {
                 rejectCall(state.callId);
                 dispatch({ type: 'CALL_TIMEOUT' });
                 toast.info('Người nhận không trả lời');
+
+                // Dừng âm thanh chuông
+                if (ringtoneRef.current) {
+                    ringtoneRef.current.pause();
+                    ringtoneRef.current.currentTime = 0;
+                }
             }
         }, 30000);
 
@@ -208,6 +232,11 @@ export const useCall = (userId: string) => {
             clearTimeout(callTimeout);
             setCallTimeout(null);
         }
+        // Dừng âm thanh chuông
+        if (ringtoneRef.current) {
+            ringtoneRef.current.pause();
+            ringtoneRef.current.currentTime = 0;
+        }
 
         socket.emit('accept_call', {
             callId,
@@ -226,7 +255,11 @@ export const useCall = (userId: string) => {
             clearTimeout(callTimeout);
             setCallTimeout(null);
         }
-
+        // Dừng âm thanh chuông
+        if (ringtoneRef.current) {
+            ringtoneRef.current.pause();
+            ringtoneRef.current.currentTime = 0;
+        }
         socket.emit('reject_call', {
             callId,
             userId
@@ -239,6 +272,11 @@ export const useCall = (userId: string) => {
     const endCall = useCallback((callId: string, reason: string = 'normal') => {
         if (!socket || !userId || !callId) {
             return;
+        }
+        // Dừng âm thanh chuông nếu đang phát
+        if (ringtoneRef.current) {
+            ringtoneRef.current.pause();
+            ringtoneRef.current.currentTime = 0;
         }
         console.log('End call in handle:', callId, reason);
         socket.emit('end_call', {
@@ -253,7 +291,11 @@ export const useCall = (userId: string) => {
     const handleCallAcceptedConfirmed = useCallback((data: any) => {
         console.log('Call accepted confirmed (receiver):', data);
         dispatch({ type: 'CALL_ACCEPTED', payload: data });
-
+        // Dừng âm thanh chuông nếu đang phát
+        if (ringtoneRef.current) {
+            ringtoneRef.current.pause();
+            ringtoneRef.current.currentTime = 0;
+        }
         // Mở cửa sổ Daily.co cho người nhận
         if (data.roomUrl) {
             // Sử dụng roomUrl từ data thay vì state
@@ -308,8 +350,7 @@ export const useCall = (userId: string) => {
                 endCall(state.callId);
             }
         };
-    }, []);
-
+    }, [state.callId, state.isOutgoingCall, state.isCallInProgress, endCall]);
     return {
         ...state,
         startCall,

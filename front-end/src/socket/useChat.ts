@@ -2935,9 +2935,7 @@ export const useChat = (userId: string) => {
 
   // function to demote a member
   const demoteMember = useCallback((
-    conversationId: string,
-    memberToDemote: string
-  ) => {
+conversationId: string,memberToDemote: string) => {
     if (!socket || !userId) {
       console.error("Cannot demote member: Socket not connected or user not authenticated");
       return;

@@ -11,6 +11,7 @@ import {
   MessageSquareShare,
   Smile,
   X,
+  Phone,
 } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
@@ -25,7 +26,7 @@ interface ChatMessageProps {
   message: string
   timestamp: string
   isOwn?: boolean
-  type?: "text" | "image" | "video" | "document" | "file"
+  type?: "text" | "image" | "video" | "document" | "file" | "call"
   isReply?: boolean
   replyInfo?: {
     name: string
@@ -600,7 +601,27 @@ export default function ChatMessage({
               </div>
             </div>
           )
-
+          case "call":
+        // Determine call type icon and color
+        const isVideoCall = message.includes("video");
+        const isAccepted = message.includes("chấp nhận") || message.includes("Thời gian:");
+        const isMissed = message.includes("không trả lời") || message.includes("bị từ chối");
+        
+        return (
+          <div className="flex items-center gap-2">
+            <div className={`p-2 rounded-full ${isAccepted ? 'bg-green-100' : isMissed ? 'bg-red-100' : 'bg-blue-100'}`}>
+              {isVideoCall ? (
+                <Video className={`w-5 h-5 ${isAccepted ? 'text-green-600' : isMissed ? 'text-red-600' : 'text-blue-600'}`} />
+              ) : (
+                <Phone className={`w-5 h-5 ${isAccepted ? 'text-green-600' : isMissed ? 'text-red-600' : 'text-blue-600'}`} />
+              )}
+            </div>
+            <div>
+              <div className="font-medium">{isVideoCall ? 'Cuộc gọi video' : 'Cuộc gọi thoại'}</div>
+              <div className={`text-sm ${isMissed ? 'text-red-500' : 'text-gray-500'}`}>{message}</div>
+            </div>
+          </div>
+        );
         default:
           return <div className="whitespace-pre-wrap break-words">{message}</div>
       }
@@ -720,12 +741,18 @@ export default function ChatMessage({
           {replyInfo.type !== "text" ? (
             <span className="flex items-center">
               {replyInfo.type === "image" ? (
-                <ImageIcon className="h-3 w-3 mr-1" />
-              ) : replyInfo.type === "video" ? (
+              <ImageIcon className="h-3 w-3 mr-1" />
+            ) : replyInfo.type === "video" ? (
+              <Video className="h-3 w-3 mr-1" />
+            ) : replyInfo.type === "call" ? (
+              replyInfo.content.includes("video") ? (
                 <Video className="h-3 w-3 mr-1" />
               ) : (
-                <FileText className="h-3 w-3 mr-1" />
-              )}
+                <Phone className="h-3 w-3 mr-1" />
+              )
+            ) : (
+              <FileText className="h-3 w-3 mr-1" />
+            )}
               {replyInfo.type === "image" ? "Hình ảnh" : replyInfo.type === "video" ? "Video" : "Tệp đính kèm"}
             </span>
           ) : (
