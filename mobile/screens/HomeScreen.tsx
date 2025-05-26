@@ -19,9 +19,11 @@ import FooterComponent from '../components/FooterComponent';
 import io from 'socket.io-client';
 import SocketService from '../services/SocketService';
 import SearchUserScreen from './SearchUserScreen';
+import IncomingCallHandler from '../components/IncomingCallHandler';
 
 // Socket.IO server URL
-const SOCKET_URL = 'http://192.168.0.104:3000';
+const SOCKET_URL = 'ws://192.168.0.104:3000';
+const API_URL = 'http://192.168.0.104:3000';
 
 // Global state for persisting conversations between screen navigations
 if (!global.socketInstance) {
@@ -211,7 +213,7 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
       // Fetch blocked users list first
       let blockedUsersList: SearchUserResult[] = [];
       try {
-        const blockedResponse = await fetch(`${SOCKET_URL}/user/blocked/get-blocked`, {
+        const blockedResponse = await fetch(`${API_URL}/user/blocked/get-blocked`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -236,7 +238,7 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
       }
 
       // Call the API to get friends list
-      const response = await fetch(`${SOCKET_URL}/user/friend/get-friends`, {
+      const response = await fetch(`${API_URL}/user/friend/get-friends`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -357,7 +359,7 @@ const HomeScreen = ({ navigation, route }: HomeScreenProps) => {
       }
 
       // Call the search API
-      const response = await fetch(`${SOCKET_URL}/user/search`, {
+      const response = await fetch(`${API_URL}/user/search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

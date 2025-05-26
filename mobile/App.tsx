@@ -18,6 +18,8 @@ import SocketService from './services/SocketService';
 import ForwardMessageScreen from './screens/ForwardMessageScreen';
 import GroupChatScreen from './screens/GroupChatScreen';
 import DetailGroupChatScreen from './screens/DetailGroupChatScreen';
+import CallScreen from './screens/CallScreen';
+import IncomingCallHandler from './components/IncomingCallHandler';
 const Stack = createNativeStackNavigator();
 
 export default function App() {
@@ -44,10 +46,10 @@ export default function App() {
   if (isLoading) {
     // You could add a splash screen or loading indicator here
     return null;
-  }
-
-  return (
+  }  return (
+    
     <NavigationContainer>
+      <>
       <Stack.Navigator 
         initialRouteName={initialRoute}
         screenOptions={{
@@ -66,15 +68,18 @@ export default function App() {
         <Stack.Screen name="ChatScreen" component={ChatScreen} />
         <Stack.Screen name="ForwardMessageScreen" component={ForwardMessageScreen} />
         <Stack.Screen name="ChangePasswordScreen" component={ChangePasswordScreen} />
-        <Stack.Screen name="GroupChatScreen" component={GroupChatScreen} />
-        <Stack.Screen name="DetailGroupChatScreen" component={DetailGroupChatScreen} />
+        <Stack.Screen name="GroupChatScreen" component={GroupChatScreen} />  
+              <Stack.Screen name="DetailGroupChatScreen" component={DetailGroupChatScreen} />
         <Stack.Screen name="DetailInfoScreen" component={DetailInfoScreen} />
+        <Stack.Screen name="CallScreen" component={CallScreen} />
         <Stack.Screen
           name="SearchUserScreen"
           component={SearchUserScreen}
-          options={{ headerShown: false }}
-        />
+          options={{ headerShown: false }}        />
       </Stack.Navigator>
-    </NavigationContainer>
+      <IncomingCallHandler />
+      </> 
+      </NavigationContainer>
+      
   );
 }

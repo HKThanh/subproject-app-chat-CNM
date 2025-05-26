@@ -79,11 +79,6 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
             // Add user ID to form data
             formData.append('id', userData.id);
 
-            console.log('Uploading cover photo:', {
-                uri: imageUri,
-                name: fileName,
-                formData: formData
-            });
 
             // Make the API call to upload the cover photo
             const response = await fetch('http://192.168.0.104:3000/user/cover/upload', {
@@ -96,7 +91,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
             });
 
             const result = await response.json();
-            console.log('Cover photo upload response:', result);
+           
 
             if (!response.ok) {
                 throw new Error(`HTTP error! Status: ${response.status}`);
@@ -147,11 +142,6 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
             // Add user ID to form data
             formData.append('id', userData.id);
 
-            console.log('Uploading avatar photo:', {
-                uri: imageUri,
-                name: fileName,
-                formData: formData
-            });
 
             // Make the API call to upload the avatar photo
             const response = await fetch('http://192.168.0.104:3000/user/avatar/upload', {
@@ -164,7 +154,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
             });
 
             const result = await response.json();
-            console.log('Avatar photo upload response:', result);
+      
 
             if (!response.ok) {
                 throw new Error(`HTTP error! Status: ${response.status}`);
@@ -247,13 +237,13 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
         const fetchUserData = async () => {
             const accessToken = route?.params?.accessToken;
             if (!accessToken) {
-                console.log('No access token provided');
+                
                 setLoading(false);
                 return;
             }
 
             try {
-                console.log('Fetching user data with token:', accessToken);
+              
                 const response = await fetch('http://192.168.0.104:3000/user', {
                     method: 'GET',
                     headers: {
@@ -263,7 +253,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                 });
 
                 const responseText = await response.text();
-                console.log('Raw API Response:', responseText);
+               
 
                 if (!response.ok) {
                     throw new Error(`HTTP error! Status: ${response.status}, Response: ${responseText}`);
@@ -273,7 +263,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                 let data;
                 try {
                     data = JSON.parse(responseText);
-                    console.log('API Response Data:', data);
+                    
                 } catch (e) {
                     console.error('Failed to parse JSON:', e);
                     setLoading(false);
@@ -289,11 +279,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                     bio: data.bio && data.bio !== "" ? data.bio : textBioDefault
                 });
 
-                console.log('Updated user state:', {
-                    name: data.fullname || 'User',
-                    avatar: data.urlavatar && data.urlavatar !== "" ? data.urlavatar : avatarDefaulturi,
-                    bio: data.bio && data.bio !== "" ? data.bio : textBioDefault
-                });
+              
 
                 setLoading(false);
             } catch (error) {
@@ -476,7 +462,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                                             });
 
                                             const result = await response.json();
-                                            console.log('Bio update response:', result);
+                                           
 
                                             if (!response.ok) {
                                                 throw new Error(`HTTP error! Status: ${response.status}`);
@@ -564,7 +550,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                                                 onPress: async () => {
                                                     // Sử dụng Promise với timeout để tránh treo ứng dụng
                                                     try {
-                                                        console.log('Requesting camera permission with timeout...');
+                                                        
 
                                                         // Tạo promise với timeout
                                                         const permissionPromise = Promise.race([
@@ -576,7 +562,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
 
                                                         // Chờ kết quả từ promise
                                                         const { status } = await permissionPromise as { status: string };
-                                                        console.log('Camera permission status:', status);
+                                                        //console.log('Camera permission status:', status);
 
                                                         if (status !== 'granted') {
                                                             console.log('Camera permission denied');
@@ -590,7 +576,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                                                             return;
                                                         }
 
-                                                        console.log('Opening camera with timeout...');
+                                                        //console.log('Opening camera with timeout...');
                                                         // Tạo promise với timeout cho camera
                                                         const cameraPromise = Promise.race([
                                                             ImagePicker.launchCameraAsync({
@@ -604,9 +590,9 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                                                         // Chờ kết quả từ promise camera
                                                         const result = await cameraPromise as any;
 
-                                                        console.log('Camera result:', result);
+                                                        //console.log('Camera result:', result);
                                                         if (!result.canceled && result.assets && result.assets.length > 0) {
-                                                            console.log('Selected image:', result.assets[0].uri);
+                                                            //console.log('Selected image:', result.assets[0].uri);
                                                             uploadCoverPhoto(result.assets[0].uri);
                                                         }
                                                     } catch (error) {
@@ -640,7 +626,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                                                 onPress: async () => {
                                                     // Sử dụng Promise với timeout để tránh treo ứng dụng
                                                     try {
-                                                        console.log('Requesting media library permission with timeout...');
+                                                        //console.log('Requesting media library permission with timeout...');
 
                                                         // Tạo promise với timeout
                                                         const permissionPromise = Promise.race([
@@ -652,10 +638,10 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
 
                                                         // Chờ kết quả từ promise
                                                         const { status } = await permissionPromise as { status: string };
-                                                        console.log('Media library permission status:', status);
+                                                        //console.log('Media library permission status:', status);
 
                                                         if (status !== 'granted') {
-                                                            console.log('Media library permission denied');
+                                                            //console.log('Media library permission denied');
                                                             Alert.alert(
                                                                 'Quyền truy cập',
                                                                 'Cần cấp quyền truy cập thư viện ảnh để chọn ảnh. Vui lòng cấp quyền trong cài đặt thiết bị.',
@@ -666,7 +652,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                                                             return;
                                                         }
 
-                                                        console.log('Opening image library with timeout...');
+                                                        //console.log('Opening image library with timeout...');
                                                         // Tạo promise với timeout cho thư viện ảnh
                                                         const imageLibraryPromise = Promise.race([
                                                             ImagePicker.launchImageLibraryAsync({
@@ -680,9 +666,9 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                                                         // Chờ kết quả từ promise thư viện ảnh
                                                         const result = await imageLibraryPromise as any;
 
-                                                        console.log('Image library result:', result);
+                                                        //console.log('Image library result:', result);
                                                         if (!result.canceled && result.assets && result.assets.length > 0) {
-                                                            console.log('Selected image:', result.assets[0].uri);
+                                                            //console.log('Selected image:', result.assets[0].uri);
                                                             uploadCoverPhoto(result.assets[0].uri);
                                                         }
                                                     } catch (error) {
@@ -805,7 +791,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                                                 onPress: async () => {
                                                     // Sử dụng Promise với timeout để tránh treo ứng dụng
                                                     try {
-                                                        console.log('Requesting camera permission for avatar with timeout...');
+                                                        //console.log('Requesting camera permission for avatar with timeout...');
 
                                                         // Tạo promise với timeout
                                                         const permissionPromise = Promise.race([
@@ -817,10 +803,10 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
 
                                                         // Chờ kết quả từ promise
                                                         const { status } = await permissionPromise as { status: string };
-                                                        console.log('Camera permission status:', status);
+                                                        //console.log('Camera permission status:', status);
 
                                                         if (status !== 'granted') {
-                                                            console.log('Camera permission denied');
+                                                            //console.log('Camera permission denied');
                                                             Alert.alert(
                                                                 'Quyền truy cập',
                                                                 'Cần cấp quyền truy cập camera để chụp ảnh. Vui lòng cấp quyền trong cài đặt thiết bị.',
@@ -831,7 +817,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                                                             return;
                                                         }
 
-                                                        console.log('Opening camera with timeout...');
+                                                        //console.log('Opening camera with timeout...');
                                                         // Tạo promise với timeout cho camera
                                                         const cameraPromise = Promise.race([
                                                             ImagePicker.launchCameraAsync({
@@ -847,9 +833,9 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                                                         // Chờ kết quả từ promise camera
                                                         const result = await cameraPromise as any;
 
-                                                        console.log('Camera result for avatar:', result);
+                                                        //console.log('Camera result for avatar:', result);
                                                         if (!result.canceled && result.assets && result.assets.length > 0) {
-                                                            console.log('Selected avatar image:', result.assets[0].uri);
+                                                            //console.log('Selected avatar image:', result.assets[0].uri);
                                                             uploadAvatarPhoto(result.assets[0].uri);
                                                         }
                                                     } catch (error) {
@@ -883,7 +869,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                                                 onPress: async () => {
                                                     // Sử dụng Promise với timeout để tránh treo ứng dụng
                                                     try {
-                                                        console.log('Requesting media library permission for avatar with timeout...');
+                                                        //console.log('Requesting media library permission for avatar with timeout...');
 
                                                         // Tạo promise với timeout
                                                         const permissionPromise = Promise.race([
@@ -895,10 +881,10 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
 
                                                         // Chờ kết quả từ promise
                                                         const { status } = await permissionPromise as { status: string };
-                                                        console.log('Media library permission status:', status);
+                                                        //console.log('Media library permission status:', status);
 
                                                         if (status !== 'granted') {
-                                                            console.log('Media library permission denied');
+                                                            //console.log('Media library permission denied');
                                                             Alert.alert(
                                                                 'Quyền truy cập',
                                                                 'Cần cấp quyền truy cập thư viện ảnh để chọn ảnh. Vui lòng cấp quyền trong cài đặt thiết bị.',
@@ -909,7 +895,7 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                                                             return;
                                                         }
 
-                                                        console.log('Opening image library for avatar with timeout...');
+                                                        //console.log('Opening image library for avatar with timeout...');
                                                         // Tạo promise với timeout cho thư viện ảnh
                                                         const imageLibraryPromise = Promise.race([
                                                             ImagePicker.launchImageLibraryAsync({
@@ -925,9 +911,9 @@ const BioScreen = ({ navigation, route }: BioScreenProps) => {
                                                         // Chờ kết quả từ promise thư viện ảnh
                                                         const result = await imageLibraryPromise as any;
 
-                                                        console.log('Image library result for avatar:', result);
+                                                        //console.log('Image library result for avatar:', result);
                                                         if (!result.canceled && result.assets && result.assets.length > 0) {
-                                                            console.log('Selected avatar image:', result.assets[0].uri);
+                                                            //console.log('Selected avatar image:', result.assets[0].uri);
                                                             uploadAvatarPhoto(result.assets[0].uri);
                                                         }
                                                     } catch (error) {

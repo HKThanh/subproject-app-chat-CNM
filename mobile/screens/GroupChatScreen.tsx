@@ -17,7 +17,9 @@ import {
   ScrollView,
   Alert,
   Linking,
-  RefreshControl
+  RefreshControl,
+  Modal,
+  Pressable
 } from 'react-native';
 import { Socket } from 'socket.io-client';
 import { Ionicons } from '@expo/vector-icons';
@@ -62,11 +64,53 @@ type ChatScreenProps = {
   route?: any;
 };
 
+// Reaction interfaces
+interface UserReaction {
+  user?: {
+    id?: string;
+    fullname?: string;
+    urlavatar?: string;
+  } | null;
+  count?: number;
+}
+
+interface ReactionData {
+  reaction: string;
+  totalCount: number;
+  userReactions: UserReaction[];
+}
+
+interface MessageReactions {
+  [reactionType: string]: ReactionData;
+}
+
+// Mention interfaces
+interface MentionedUser {
+  id: string;
+  fullname: string;
+  urlavatar?: string;
+}
+
+interface MentionData {
+  messageId: string;
+  conversationId: string;
+  sender: {
+    id: string;
+    fullname: string;
+    urlavatar?: string;
+  };
+  mentionedUsers: MentionedUser[];
+  isGroup: boolean;
+  groupName?: string | null;
+  timestamp: string;
+}
+
 // Message type definition
 interface Message {
   _id: string;
   idMessage: string;
   idSender: string;
+  idReceiver?: string;
   idConversation: string;
   type: string;
   content: string;
@@ -81,6 +125,7 @@ interface Message {
   updatedAt: string;
   __v: number;
   sentByMe?: boolean;
+  tempId?: string;
   // Add sender information fields
   senderInfo?: {
     _id?: string;
@@ -88,7 +133,24 @@ interface Message {
     fullname?: string;
     urlavatar?: string;
     phone?: string;
+  };  // Reply message fields
+  originalMessage?: Message;
+  messageReply?: {
+    idMessage: string;
+    content: string;
+    idSender: string;
+    dateTime: string;
+    type: string;
+    senderInfo?: {
+      id: string;
+      fullname: string;
+      urlavatar?: string;
+    };
   };
+  // Reaction fields
+  reactions?: MessageReactions;
+  // Mention fields
+  mentionedUsers?: string[];
 }
 
 // Group user information
@@ -118,6 +180,8 @@ interface MessageActionMenuProps {
   onForward: (message: Message) => void;
   onRecall: (message: Message) => void;
   onDelete: (message: Message) => void;
+  onReply: (message: Message) => void;
+  onReact: (message: Message) => void;
 }
 
 const MessageActionMenu: React.FC<MessageActionMenuProps> = ({
@@ -125,7 +189,9 @@ const MessageActionMenu: React.FC<MessageActionMenuProps> = ({
   onClose,
   onForward,
   onRecall,
-  onDelete
+  onDelete,
+  onReply,
+  onReact
 }) => {
   const isSentByMe = message.sentByMe;
 
@@ -141,6 +207,22 @@ const MessageActionMenu: React.FC<MessageActionMenuProps> = ({
           message.sentByMe ? styles.myMessageMenu : styles.theirMessageMenu
         ]}
       >
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => onReply(message)}
+        >
+          <Ionicons name="arrow-undo" size={22} color="#1FAEEB" />
+          <Text style={styles.menuItemText}>Trả lời</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => onReact(message)}
+        >
+          <Ionicons name="happy" size={22} color="#1FAEEB" />
+          <Text style={styles.menuItemText}>Thả cảm xúc</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.menuItem}
           onPress={() => onForward(message)}
@@ -224,6 +306,20 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
   // Message action menu state
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showMessageActionMenu, setShowMessageActionMenu] = useState(false);
+  // Reply message state
+  const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
+  const [showReplyBar, setShowReplyBar] = useState(false);
+  // Reaction state
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [selectedMessageForReaction, setSelectedMessageForReaction] = useState<Message | null>(null);
+  const [availableReactions] = useState(['👍', '❤️', '😂', '😮', '😢', '😡']);
+
+  // Mention state
+  const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionStartIndex, setMentionStartIndex] = useState(-1);
+  const [selectedMentions, setSelectedMentions] = useState<GroupUserInfo[]>([]);
+  const [filteredMembers, setFilteredMembers] = useState<GroupUserInfo[]>([]);
 
   // Function to fetch member info for group chat
   const fetchMemberInfo = async (memberId: string) => {
@@ -311,10 +407,93 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
     setShowMessageActionMenu(false);
     setSelectedMessage(null);
   };
-
   const handleForwardMessage = (message: Message) => {
     handleCloseMessageMenu();
     navigation.navigate('ForwardMessageScreen', { message });
+  };
+
+  const handleReplyMessage = (message: Message) => {
+    handleCloseMessageMenu();
+    setReplyingToMessage(message);
+    setShowReplyBar(true);
+    // Focus on text input
+    if (textInputRef.current) {
+      textInputRef.current.focus();
+    }
+  };
+  const handleCancelReply = () => {
+    setReplyingToMessage(null);
+    setShowReplyBar(false);
+  };
+
+  // Reaction handlers
+  const handleShowReactionPicker = (message: Message) => {
+    handleCloseMessageMenu();
+    setSelectedMessageForReaction(message);
+    setShowReactionPicker(true);
+  };
+
+  const handleReactionSelect = (reaction: string) => {
+    if (!selectedMessageForReaction) return;
+
+    const socket = socketService.getSocket();
+    const userData = socketService.getUserData();
+
+    if (!socket || !userData) {
+      Alert.alert('Lỗi', 'Không thể thêm reaction. Vui lòng thử lại.');
+      return;
+    }    // Check if user already has this reaction
+    const currentReactions = selectedMessageForReaction.reactions || {};
+    const existingReaction = currentReactions[reaction];
+    const userAlreadyReacted = existingReaction?.userReactions?.some(
+      ur => ur && 
+            typeof ur === 'object' && 
+            ur.user && 
+            typeof ur.user === 'object' && 
+            ur.user.id && 
+            typeof ur.user.id === 'string' && 
+            ur.user.id === userData.id
+    );
+
+    // Send reaction to server
+    socket.emit('add_reaction', {
+      IDUser: userData.id,
+      IDMessage: selectedMessageForReaction.idMessage,
+      reaction: reaction,
+      count: userAlreadyReacted ? 0 : 1 // 0 to remove, 1 to add
+    });
+
+    setShowReactionPicker(false);
+    setSelectedMessageForReaction(null);
+  };
+
+  const handleQuickReaction = (message: Message, reaction: string) => {
+    const socket = socketService.getSocket();
+    const userData = socketService.getUserData();
+
+    if (!socket || !userData) {
+      Alert.alert('Lỗi', 'Không thể thêm reaction. Vui lòng thử lại.');
+      return;
+    }    // Check if user already has this reaction
+    const currentReactions = message.reactions || {};
+    const existingReaction = currentReactions[reaction];
+    const userAlreadyReacted = existingReaction?.userReactions?.some(
+      ur => ur && 
+            typeof ur === 'object' && 
+            ur.user && 
+            typeof ur.user === 'object' && 
+            ur.user.id && 
+            typeof ur.user.id === 'string' && 
+            ur.user.id === userData.id
+    );
+
+    // Send reaction to server
+    socket.emit('add_reaction', {
+      IDUser: userData.id,
+      IDMessage: message.idMessage,
+      reaction: reaction,
+      count: userAlreadyReacted ? 0 : 1 // 0 to remove, 1 to add
+    });
   };
   const handleRecallMessage = (message: Message) => {
     handleCloseMessageMenu();
@@ -415,12 +594,44 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       flatListRef.current.scrollToEnd({ animated: true });
     }
   };
+
+  // Function to scroll to a specific message by ID
+  const scrollToMessage = (messageId: string) => {
+    if (!flatListRef.current || !dataView.length) return;
+    
+    const messageIndex = dataView.findIndex(msg => 
+      msg.idMessage === messageId || msg._id === messageId
+    );
+    
+    if (messageIndex !== -1) {
+      // Scroll to the found message with animation
+      flatListRef.current.scrollToIndex({
+        index: messageIndex,
+        animated: true,
+        viewPosition: 0.5 // Center the message in the view
+      });
+      
+      // Optional: Add a brief highlight effect to the target message
+      console.log(`Scrolled to message at index ${messageIndex}`);
+    } else {
+      console.log('Original message not found in current view');
+      // Could show a toast notification here if desired
+    }
+  };
+
+  // Handle tapping on quoted message to scroll to original
+  const handleQuotedMessagePress = (originalMessage: any) => {
+    if (originalMessage && (originalMessage.idMessage || originalMessage._id)) {
+      scrollToMessage(originalMessage.idMessage || originalMessage._id);
+    }
+  };
   // Auto scroll to bottom when view is ready or messages change
   useEffect(() => {
     if (dataView.length > 0) {
       setTimeout(scrollToBottom, 100);
     }
   }, [dataView.length]);
+  
   // Thêm useEffect để cập nhật khi người dùng quay lại màn hình
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -660,18 +871,19 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       console.log("Loading messages for conversation:", conversationIdToUse);
       loadMessages(conversationIdToUse);
     }      // Cleanup on unmount
-    return () => {
-      // Remove only the listeners we added in this screen, don't disconnect the socket
+    return () => {      // Remove only the listeners we added in this screen, don't disconnect the socket
       const cleanupSocket = socketService.getSocket();
       if (cleanupSocket) {
         cleanupSocket.off('load_messages_response');
         cleanupSocket.off('receive_message');
         cleanupSocket.off('send_message_success');
         cleanupSocket.off('users_status');
-        cleanupSocket.off('recall_message_success');
-        cleanupSocket.off('message_recalled');
+        cleanupSocket.off('recall_message_success');        cleanupSocket.off('message_recalled');
         cleanupSocket.off('delete_message_success');
-        cleanupSocket.off('forward_message_success');
+        cleanupSocket.off('forward_message_success');        cleanupSocket.off('reply_message_success');
+        cleanupSocket.off('message_reaction_updated');
+        cleanupSocket.off('user_mentioned');
+        cleanupSocket.off('mention_user_response');
         // Remove additional listeners for group updates
         cleanupSocket.off('group_info_updated');
         cleanupSocket.off('member_added_to_group');
@@ -683,8 +895,7 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       }
     };
   }, []);  // Setup socket listeners specific to this screen
-  const setupSocketListeners = (socket: Socket) => {
-    // First remove any existing listeners to avoid duplicates
+  const setupSocketListeners = (socket: Socket) => {    // First remove any existing listeners to avoid duplicates
     socket.off('load_messages_response');
     socket.off('receive_message');
     socket.off('send_message_success');
@@ -693,14 +904,15 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
     socket.off('message_recalled');
     socket.off('delete_message_success');
     socket.off('forward_message_success');
+    socket.off('reply_message_success');
     socket.off('group_info_updated');
     socket.off('member_added_to_group');
     socket.off('member_removed_from_group');
-    socket.off('group_owner_changed');
-    socket.off('member_promoted_to_admin');
+    socket.off('group_owner_changed');    socket.off('member_promoted_to_admin');
     socket.off('member_demoted_from_admin');
-    socket.off('group_deleted');    // Load messages response handler
-    socket.on('load_messages_response', (data) => {
+    socket.off('group_deleted');
+    socket.off('user_mentioned');    socket.off('mention_user_response');// Load messages response handler
+    socket.on('load_messages_response', async (data) => {
       console.log('Messages received:', data);
       setIsLoading(false);
       setIsLoadingOlder(false);
@@ -715,8 +927,7 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
         const userId = userData?.id || ''; // Fallback if not available
 
         console.log('Processing messages, current user ID:', userId);
-        console.log('First message in response:', data.messages[0]);     
-             // First map to add sentByMe flag and handle senderInfo
+        console.log('First message in response:', data.messages[0]);            // First map to add sentByMe flag and handle senderInfo
         const processedMessages = data.messages.map((msg: Message) => {
           // Xác định lại idSender của tin nhắn có trùng với userId hiện tại không
           // Đảm bảo rằng khi đăng nhập tài khoản khác, tin nhắn sẽ được phân loại đúng
@@ -748,16 +959,63 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
                 sentByMe
               };
             }
-          }
-
-          return {
+          }          return {
             ...msg,
             sentByMe
           };
-        });
-
-        // Filter out messages that should be hidden for the sender (deleted messages)
-        const filteredMessages = processedMessages.filter(msg => {
+        });        // Process reply messages to fetch original messages if needed
+        const messagesWithReplies = await Promise.all(processedMessages.map(async (msg) => {
+          // If this is a reply message, handle the messageReply field from backend
+          if (msg.isReply && (msg.messageReply || msg.idMessageReply)) {
+            try {
+              // Check if we already have originalMessage from the backend messageReply field
+              if (msg.messageReply && msg.messageReply.idMessage) {
+                console.log('Processing reply message with messageReply from backend:', msg.idMessage);
+                // Backend provides messageReply object - use it as originalMessage
+                return {
+                  ...msg,
+                  originalMessage: {
+                    idMessage: msg.messageReply.idMessage,
+                    content: msg.messageReply.content,
+                    idSender: msg.messageReply.idSender,
+                    dateTime: msg.messageReply.dateTime,
+                    type: msg.messageReply.type,
+                    senderInfo: msg.messageReply.senderInfo
+                  }
+                };
+              }
+              
+              // If messageReply exists but incomplete, or if we only have idMessageReply
+              if (msg.idMessageReply) {
+                console.log('Looking for original message locally for reply:', msg.idMessage, 'idMessageReply:', msg.idMessageReply);
+                
+                // Try to find the original message in current messages first
+                let originalMessage = processedMessages.find(m => m.idMessage === msg.idMessageReply);
+                
+                // If not found in current batch, try in existing dataView
+                if (!originalMessage) {
+                  originalMessage = dataView.find(m => m.idMessage === msg.idMessageReply);
+                }
+                
+                if (originalMessage) {
+                  console.log('Found original message locally for reply:', msg.idMessage);
+                  return {
+                    ...msg,
+                    originalMessage: originalMessage
+                  };
+                } else {
+                  console.log('Could not find original message for reply:', msg.idMessage, 'idMessageReply:', msg.idMessageReply);
+                  // Return message as is - the reply will show without original message quote
+                  return msg;
+                }
+              }
+            } catch (error) {
+              console.log('Error processing reply message:', error);
+            }
+          }
+          return msg;
+        }));// Filter out messages that should be hidden for the sender (deleted messages)
+        const filteredMessages = messagesWithReplies.filter(msg => {
           // If message is marked as removed AND was sent by current user, hide it
           if (msg.isRemove && msg.idSender === userId) {
             return false; // Filter out this message
@@ -765,7 +1023,21 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
           return true; // Keep all other messages
         });
 
-        console.log(`After filtering, have ${filteredMessages.length} messages to display`);        // Update hasMoreOldMessages based on server response
+        console.log(`After filtering, have ${filteredMessages.length} messages to display`);
+        
+        // Debug: Log reply messages to see what we have
+        const replyMessages = filteredMessages.filter(msg => msg.isReply);
+        console.log(`Found ${replyMessages.length} reply messages after processing`);
+        replyMessages.forEach(msg => {
+          console.log(`Reply message ${msg.idMessage}:`, {
+            hasOriginalMessage: !!msg.originalMessage,
+            hasMessageReply: !!msg.messageReply,
+            idMessageReply: msg.idMessageReply,
+            originalMessageId: msg.originalMessage?.idMessage
+          });
+        });
+
+        // Update hasMoreOldMessages based on server response
         if (data.hasMore !== undefined) {
           setHasMoreOldMessages(data.hasMore);
           console.log('Server indicated hasMore:', data.hasMore);
@@ -953,20 +1225,35 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
               if (msg._id?.startsWith('temp-') && 
                   msg.content === newMessage.content && 
                   msg.idSender === newMessage.idSender) {
-                console.log('Replacing temporary message with official one');
-                return {
+                console.log('Replacing temporary message with official one');                return {
                   ...newMessage,
-                  sentByMe
+                  sentByMe,
+                  // Preserve original message from temp message or use backend data
+                  originalMessage: msg.originalMessage || newMessage.originalMessage || (newMessage.messageReply ? {
+                    idMessage: newMessage.messageReply.idMessage,
+                    content: newMessage.messageReply.content,
+                    idSender: newMessage.messageReply.idSender,
+                    dateTime: newMessage.messageReply.dateTime,
+                    type: newMessage.messageReply.type,
+                    senderInfo: newMessage.messageReply.senderInfo
+                  } : undefined)
                 };
               }
               return msg;
             });
-          }
-
-          // Nếu không phải tin nhắn trùng lặp, thêm vào cuối danh sách
+          }          // Nếu không phải tin nhắn trùng lặp, thêm vào cuối danh sách
           const updatedMessages = [...prevMessages, {
             ...newMessage,
-            sentByMe
+            sentByMe,
+            // Handle originalMessage from backend - check both fields
+            originalMessage: newMessage.originalMessage || (newMessage.messageReply ? {
+              idMessage: newMessage.messageReply.idMessage,
+              content: newMessage.messageReply.content,
+              idSender: newMessage.messageReply.idSender,
+              dateTime: newMessage.messageReply.dateTime,
+              type: newMessage.messageReply.type,
+              senderInfo: newMessage.messageReply.senderInfo
+            } : undefined)
           }];
 
           // Đảm bảo cuộn xuống sau khi thêm tin nhắn
@@ -1005,15 +1292,21 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
             );
 
             // Log for debugging
-            console.log(`Processing sent message success. Found temp message: ${tempIndex !== -1}, temp ID: ${response.tempId}, message ID: ${message.idMessage}`);
-
-            // If found temporary message, replace with official message
+            console.log(`Processing sent message success. Found temp message: ${tempIndex !== -1}, temp ID: ${response.tempId}, message ID: ${message.idMessage}`);            // If found temporary message, replace with official message
             if (tempIndex !== -1) {
-              console.log('Replacing temporary message with official message');
-              const updatedMessages = [...prevMessages];
+              console.log('Replacing temporary message with official message');              const updatedMessages = [...prevMessages];
               updatedMessages[tempIndex] = {
                 ...message,
-                sentByMe
+                sentByMe,
+                // Handle originalMessage from backend response
+                originalMessage: message.originalMessage || (message.messageReply ? {
+                  idMessage: message.messageReply.idMessage,
+                  content: message.messageReply.content,
+                  idSender: message.messageReply.idSender,
+                  dateTime: message.messageReply.dateTime,
+                  type: message.messageReply.type,
+                  senderInfo: message.messageReply.senderInfo
+                } : undefined)
               };
               return updatedMessages;
             }
@@ -1075,7 +1368,9 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
           )
         );
       }
-    });    // Listen for message delete events
+    });
+
+    // Listen for message delete events
     socket.on('delete_message_success', (data) => {
       console.log('Message deleted:', data);
       if (data && data.messageId && data.updatedMessage) {
@@ -1111,6 +1406,78 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
             return msg;
           })
         );
+      }
+    });    // Listen for reply message success
+    socket.on('reply_message_success', (data) => {
+      console.log('Reply message sent successfully:', data);
+      
+      // Debug: Log the message structure
+      if (data && data.message) {
+        console.log('Reply message structure:', {
+          hasOriginalMessage: !!data.message.originalMessage,
+          hasMessageReply: !!data.message.messageReply,
+          isReply: data.message.isReply,
+          idMessageReply: data.message.idMessageReply
+        });
+      }
+      
+      if (data && data.message) {
+        const message = data.message;
+
+        // Check if the message belongs to current conversation
+        const idConversationParam = route.params?.idConversation || conversationId;
+        if (message.idConversation !== idConversationParam) {
+          console.log('Reply message success is for another conversation, ignoring');
+          return;
+        }
+
+        // Get user ID from the socket service
+        const userData = socketService.getUserData();
+        const userId = userData?.id || '';
+        const sentByMe = message.idSender === userId;
+        
+        // Handle message from current user
+        if (sentByMe) {
+          setDataView(prevMessages => {
+            // Find temporary message with matching ID or content
+            const tempIndex = prevMessages.findIndex(msg =>
+              (msg._id && msg._id.startsWith('temp-') && msg.content === message.content) ||
+              (msg.tempId && msg.tempId === data.tempId)
+            );            if (tempIndex !== -1) {
+              console.log('Replacing temporary reply message with official message');              const updatedMessages = [...prevMessages];
+              updatedMessages[tempIndex] = {
+                ...message,
+                sentByMe,
+                // Handle originalMessage from backend response
+                originalMessage: message.originalMessage || (message.messageReply ? {
+                  idMessage: message.messageReply.idMessage,
+                  content: message.messageReply.content,
+                  idSender: message.messageReply.idSender,
+                  dateTime: message.messageReply.dateTime,
+                  type: message.messageReply.type,
+                  senderInfo: message.messageReply.senderInfo
+                } : undefined)
+              };
+              return updatedMessages;
+            }
+            
+            // Check if message already exists
+            const messageExists = prevMessages.some(msg => 
+              msg.idMessage === message.idMessage || 
+              msg._id === message._id
+            );
+            
+            if (messageExists) {
+              console.log('Reply message already exists in chat, not adding duplicate');
+              return prevMessages;
+            }
+            
+            return prevMessages;
+          });
+        }
+
+        // Scroll down immediately
+        scrollToBottom();
       }
     });
     // Listener for group info updates (name, avatar, etc.) - consolidated with better messaging
@@ -1749,35 +2116,6 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
     socket.on('group_deleted', (data) => {
       console.log('Group deleted:', data);
       if (data && data.success && data.conversationId === conversationId) {
-        // Hiển thị thông báo và chuyển về màn hình Home
-        Alert.alert('Thông báo', 'Nhóm đã bị xóa bởi trưởng nhóm', [
-          { text: 'OK', onPress: () => navigation.navigate('HomeScreen') }
-        ]);
-      }
-    });
-
-    // Handle when user is removed from group
-    socket.on('removed_from_group', (data) => {
-      console.log('User removed from group event received:', data);
-      if (data && data.success) {
-        // Navigate immediately to HomeScreen when user is removed
-        navigation.navigate('HomeScreen');
-        
-        // Show alert after navigation is triggered
-        setTimeout(() => {
-          Alert.alert('Thông báo', data.message || 'Bạn đã bị xóa khỏi nhóm');
-        }, 100);
-      }
-    });
-
-    // New listener: Handle group deletion notification from server
-    socket.on('new_group_conversation', (data) => {
-      console.log('New group conversation event:', data);
-      
-      // Check if this is a group deletion notification
-      if (data && data.status === 'deleted' && data.conversationId === conversationId) {
-        console.log('Group deletion notification received, redirecting to HomeScreen');
-        
         // Show alert and navigate to HomeScreen
         Alert.alert('Thông báo', data.message || 'Nhóm đã bị xóa bởi trưởng nhóm', [
           { 
@@ -1804,9 +2142,106 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
             onPress: () => {
               // Navigate to HomeScreen with refresh flag to reload conversations list
               navigation.navigate('HomeScreen', { refreshConversations: true });
-            } 
-          }
+            }          }
         ]);
+      }
+    });    // Listen for reaction updates
+    socket.on('message_reaction_updated', (data) => {
+      console.log('Message reaction updated:', data);
+      if (data && data.messageId && data.reactions) {
+        setDataView(prevMessages => {
+          return prevMessages.map(msg => {
+            if (msg.idMessage === data.messageId) {
+              // Ensure reactions data is properly structured
+              const updatedReactions = data.reactions || {};
+              
+              // Clean up any malformed reaction data
+              Object.keys(updatedReactions).forEach(reactionType => {
+                const reactionData = updatedReactions[reactionType];
+                if (reactionData && reactionData.userReactions && Array.isArray(reactionData.userReactions)) {
+                  // Filter out any null or undefined user reactions with comprehensive validation
+                  reactionData.userReactions = reactionData.userReactions.filter(
+                    ur => ur && 
+                          typeof ur === 'object' && 
+                          ur.user && 
+                          typeof ur.user === 'object' && 
+                          ur.user.id && 
+                          typeof ur.user.id === 'string'
+                  );
+                } else {
+                  // If userReactions is not an array, initialize it as empty array
+                  reactionData.userReactions = [];
+                }
+              });
+
+              return {
+                ...msg,
+                reactions: updatedReactions
+              };
+            }
+            return msg;
+          });
+        });
+      }
+    });
+
+    // Listen for mention notifications
+    socket.on('user_mentioned', (data) => {
+      console.log('User mentioned notification:', data);
+      
+      if (data && data.conversationId && data.sender) {
+        // Show notification or update UI for mention
+        const notificationTitle = data.isGroup 
+          ? `${data.sender.fullname} đã nhắc bạn trong ${data.groupName || 'nhóm'}`
+          : `${data.sender.fullname} đã nhắc bạn`;
+        
+        // You can add notification logic here
+        console.log('Mention notification:', notificationTitle);
+        
+        // If this mention is in the current conversation, you might want to highlight it
+        if (data.conversationId === conversationId) {
+          // Handle in-app mention notification for current conversation
+          // You can add UI feedback here like highlighting the message or showing a badge
+        }
+      }
+    });    // Listen for mention response
+    socket.on('mention_user_response', (data) => {
+      console.log('Mention user response:', data);
+      
+      // More robust response handling
+      if (data) {
+        if (data.success === true) {
+          console.log('Mention sent successfully');
+          // Update the temporary message with actual message ID if needed
+          if (data.messageId) {
+            setDataView(prevMessages => {
+              return prevMessages.map(msg => {
+                if (msg.tempId && msg.tempId === data.messageId) {
+                  return {
+                    ...msg,
+                    idMessage: data.messageId,
+                    mentionedUsers: data.mentionedUsers
+                  };
+                }
+                return msg;
+              });
+            });
+          }
+        }
+        //  else if (data.success === false) {
+        //   // Handle mention error more gracefully
+        //   const errorMessage = data.message || data.error || 'Lỗi khi nhắc người dùng';
+        //   console.error('Mention failed:', errorMessage);
+          
+        //   // Show user-friendly error message
+        //   Alert.alert('Thông báo', errorMessage);
+        // }
+         else {
+          // Handle case where success field is undefined or not boolean
+          console.warn('Mention response format unexpected:', data);
+        }
+      } else {
+        console.error('Empty mention response received');
       }
     });
   };
@@ -1932,6 +2367,78 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       keyboardDidHideListener.remove();
     };
   }, []);
+
+  // Mention handlers
+  const handleTextInputChange = (text: string) => {
+    setMessageText(text);
+    
+    // Check for @ mentions
+    const atIndex = text.lastIndexOf('@');
+    if (atIndex !== -1) {
+      const afterAt = text.substring(atIndex + 1);
+      
+      // If the character before @ is space or start of string, this might be a mention
+      const beforeAt = atIndex > 0 ? text[atIndex - 1] : ' ';
+      if (beforeAt === ' ' || atIndex === 0) {
+        setMentionStartIndex(atIndex);
+        setMentionQuery(afterAt);
+        
+        // Filter group members based on query
+        if (afterAt.length === 0) {
+          // Show all members when just typed @
+          const socketService = SocketService.getInstance();
+          const userData = socketService.getUserData();
+          const members = Object.values(groupMembers).filter(member => 
+            member.id !== userData?.id // Exclude current user
+          );
+          setFilteredMembers(members);
+          setShowMentionSuggestions(true);
+        } else {
+          // Filter members by name
+          const socketService = SocketService.getInstance();
+          const userData = socketService.getUserData();
+          const filtered = Object.values(groupMembers).filter(member => 
+            member.id !== userData?.id &&
+            member.fullname.toLowerCase().includes(afterAt.toLowerCase())
+          );
+          setFilteredMembers(filtered);
+          setShowMentionSuggestions(filtered.length > 0);
+        }
+      }
+    } else {
+      // No @ found, hide suggestions
+      setShowMentionSuggestions(false);
+      setMentionQuery('');
+      setMentionStartIndex(-1);
+    }
+  };
+
+  const handleMentionSelect = (member: GroupUserInfo) => {
+    if (mentionStartIndex === -1) return;
+    
+    // Replace the @query with @username
+    const beforeMention = messageText.substring(0, mentionStartIndex);
+    const afterMention = messageText.substring(mentionStartIndex + mentionQuery.length + 1);
+    const newText = `${beforeMention}@${member.fullname} ${afterMention}`;
+    
+    setMessageText(newText);
+    
+    // Add to selected mentions if not already selected
+    if (!selectedMentions.find(m => m.id === member.id)) {
+      setSelectedMentions(prev => [...prev, member]);
+    }
+    
+    // Hide suggestions
+    setShowMentionSuggestions(false);
+    setMentionQuery('');
+    setMentionStartIndex(-1);
+    
+    // Focus back to input
+    if (textInputRef.current) {
+      textInputRef.current.focus();
+    }
+  };
+
   // Handle sending a message  
   const handleSendMessage = () => {
     if (!messageText.trim()) return;
@@ -1962,38 +2469,49 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
     const currentUserId = userData.id;
 
     // Message content
-    const messageContent = messageText.trim();
-
-    // Create a temporary ID to track the message
+    const messageContent = messageText.trim();    // Create a temporary ID to track the message
     const tempId = `temp-${Date.now()}`;
+
+    // Check if this is a reply message
+    const isReply = replyingToMessage !== null;
+
+    // Extract mentioned user IDs from selected mentions and message text
+    const mentionedUserIds = selectedMentions
+      .filter(mention => messageContent.includes(`@${mention.fullname}`))
+      .map(mention => mention.id);
 
     // Create a temporary message to display immediately
     const tempMessage: Message = {
       _id: tempId,
       idMessage: tempId,
       idSender: currentUserId,
-      idReceiver: "", // Not needed for group messages
       idConversation: idConversationParam,
       type: 'text',
       content: messageContent,
       dateTime: new Date().toISOString(),
       isRead: false,
       isRecall: false,
-      isReply: false,
+      isReply: isReply,
       isForward: false,
       isRemove: false,
-      idMessageReply: null,
+      idMessageReply: isReply ? replyingToMessage!.idMessage : null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       __v: 0,
       sentByMe: true,
-      tempId: tempId, // Add tempId for easy matching later
+      tempId: tempId,
       // Add sender info if available
       senderInfo: {
         id: currentUserId,
         fullname: userData.fullname || "Me",
-        urlavatar: userData.urlavatar
-      }
+        urlavatar: userData.urlavatar || ""
+      },
+      // Add original message if replying
+      originalMessage: isReply ? replyingToMessage : undefined,
+      // Include mention information
+      ...(mentionedUserIds.length > 0 && {
+        mentionedUsers: mentionedUserIds
+      })
     };
 
     // Add temporary message to state for immediate display - add to end of list
@@ -2002,35 +2520,72 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
     // Scroll down to see the new message immediately
     setTimeout(scrollToBottom, 10);
 
-    // Prepare message data for the server in the required format
-    const messageData = {
-      IDSender: currentUserId,
-      IDConversation: idConversationParam,
-      textMessage: messageContent,
-      type: 'text',
-      fileUrl: '',
-      tempId: tempId
-    };
+    if (isReply && replyingToMessage) {
+      // Prepare reply message data for the server
+      const replyMessageData = {
+        IDSender: currentUserId,
+        IDReceiver: "", // For group messages, this might not be needed
+        IDConversation: idConversationParam,
+        IDMessageReply: replyingToMessage.idMessage,
+        textMessage: messageContent,
+        type: 'text',
+        fileUrl: '',
+        tempId: tempId
+      };
 
-    // Check socket connection before sending
-    if (!socket.connected) {
-      console.warn('Socket disconnected. Attempting to reconnect before sending message...');
-      socket.connect();
+      console.log('Sending reply message:', replyMessageData);
+      socket.emit('reply_message', replyMessageData);
 
-      // Register connect event to send message after reconnection
-      socket.once('connect', () => {
-        console.log('Socket reconnected. Sending group message...');
-        socket.emit('send_group_message', messageData);
-        console.log('Group message sent after reconnection:', messageData);
-      });
+      // Clear reply state
+      handleCancelReply();
     } else {
-      // Send message via socket if connection is ready
-      console.log('Sending group message in real-time:', messageData);
-      socket.emit('send_group_message', messageData);
+      // Prepare normal message data for the server
+      const messageData = {
+        IDSender: currentUserId,
+        IDConversation: idConversationParam,
+        textMessage: messageContent,
+        type: 'text',
+        fileUrl: '',
+        tempId: tempId
+      };
+
+      // Check socket connection before sending
+      if (!socket.connected) {
+        console.warn('Socket disconnected. Attempting to reconnect before sending message...');
+        socket.connect();
+
+        // Register connect event to send message after reconnection
+        socket.once('connect', () => {
+          console.log('Socket reconnected. Sending group message...');
+          socket.emit('send_group_message', messageData);
+          console.log('Group message sent after reconnection:', messageData);
+        });
+      } else {
+        // Send message via socket if connection is ready        console.log('Sending group message in real-time:', messageData);
+        socket.emit('send_group_message', messageData);
+      }
+    }    // Handle mentions
+    if (mentionedUserIds.length > 0) {
+      console.log('Sending mention with data:', {
+        IDSender: currentUserId,
+        IDConversation: idConversationParam,
+        mentionedUsers: mentionedUserIds,
+        messageId: tempId
+      });
+      
+      socket.emit('mention_user', {
+        IDSender: currentUserId,
+        IDConversation: idConversationParam,
+        mentionedUsers: mentionedUserIds,
+        messageId: tempId, // Will be updated when message is confirmed
+        messageText: messageContent // Include message content for context
+      });
     }
 
-    // Clear message input
+    // Clear message input and reset states
     setMessageText('');
+    setSelectedMentions([]);
+    setShowMentionSuggestions(false);
   };
 
   // Function to check online status of receiver
@@ -2403,6 +2958,217 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
       </View>
     );
   };
+  // Render reaction picker modal
+  const renderReactionPicker = () => (
+    <Modal
+      visible={showReactionPicker}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowReactionPicker(false)}
+    >
+      <Pressable 
+        style={styles.zaloReactionPickerOverlay}
+        onPress={() => setShowReactionPicker(false)}
+      >
+        <View style={styles.zaloReactionPickerContainer}>
+          {/* Arrow tail pointing down */}
+          <View style={styles.zaloReactionPickerArrow} />
+          
+          {/* Horizontal reaction bar */}
+          <View style={styles.zaloReactionBar}>
+            {availableReactions.map((reaction, index) => (
+              <TouchableOpacity
+                key={reaction}
+                style={[
+                  styles.zaloReactionBarButton,
+                  index === 0 && styles.zaloReactionBarButtonFirst,
+                  index === availableReactions.length - 1 && styles.zaloReactionBarButtonLast
+                ]}
+                onPress={() => handleReactionSelect(reaction)}
+              >
+                <Text style={styles.zaloReactionBarEmoji}>{reaction}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Pressable>
+    </Modal>
+  );
+
+  // Render text with mentions highlighted
+  const renderTextWithMentions = (text: string, mentionedUsers?: string[]) => {
+    if (!mentionedUsers || mentionedUsers.length === 0) {
+      return <Text style={styles.messageText} numberOfLines={0}>{text}</Text>;
+    }
+
+    // Create a pattern to match @mentions
+    const mentionPattern = /@(\w+(?:\s+\w+)*)/g;
+    const parts: Array<{type: 'text' | 'mention', content: string, key: string}> = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = mentionPattern.exec(text)) !== null) {
+      // Add text before mention
+      if (match.index > lastIndex) {
+        parts.push({
+          type: 'text',
+          content: text.slice(lastIndex, match.index),
+          key: `text-${lastIndex}`
+        });
+      }
+
+      // Check if this mention corresponds to a mentioned user
+      const mentionName = match[1];
+      const isMentioned = Object.values(groupMembers).some((member: any) => 
+        mentionedUsers.includes(member.id) && member.fullname === mentionName
+      );
+
+      // Add mention (highlighted if it's a real mention)
+      parts.push({
+        type: isMentioned ? 'mention' : 'text',
+        content: match[0],
+        key: `mention-${match.index}`
+      });
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push({
+        type: 'text',
+        content: text.slice(lastIndex),
+        key: `text-${lastIndex}`
+      });
+    }
+
+    return (
+      <Text style={styles.messageText} numberOfLines={0}>
+        {parts.map((part) => (
+          part.type === 'mention' ? (
+            <Text key={part.key} style={styles.mentionText}>
+              {part.content}
+            </Text>
+          ) : (
+            <Text key={part.key}>{part.content}</Text>
+          )
+        ))}
+      </Text>
+    );
+  };  // Render reactions for a message
+  const renderMessageReactions = (message: Message) => {
+    if (!message.reactions || Object.keys(message.reactions).length === 0) {
+      return null;
+    }
+
+    const userData = socketService.getUserData();
+    const reactionEntries = Object.entries(message.reactions);
+      // Filter out reactions with totalCount = 0 and ensure reactions have valid structure
+    const validReactionEntries = reactionEntries.filter(([emoji, reactionData]) => {
+      if (!reactionData || reactionData.totalCount <= 0) return false;
+      
+      // Ensure userReactions is an array and filter out invalid entries
+      if (reactionData.userReactions && Array.isArray(reactionData.userReactions)) {
+        reactionData.userReactions = reactionData.userReactions.filter(
+          ur => ur && 
+                typeof ur === 'object' && 
+                ur.user && 
+                typeof ur.user === 'object' && 
+                ur.user.id && 
+                typeof ur.user.id === 'string'
+        );
+      } else {
+        // If userReactions is not an array, initialize it as empty array
+        reactionData.userReactions = [];
+      }
+      
+      return true;
+    });
+    
+    if (validReactionEntries.length === 0) {
+      return null;
+    }
+    
+    // Show thumbs up and heart reactions in specific style
+    const thumbsUpReaction = validReactionEntries.find(([emoji]) => emoji === '👍');
+    const heartReaction = validReactionEntries.find(([emoji]) => emoji === '❤️');
+    
+    return (
+      <View style={styles.zaloReactionsContainer}>
+        {thumbsUpReaction && thumbsUpReaction[1].totalCount > 0 && (
+          <TouchableOpacity
+            style={styles.zaloThumbsUpContainer}
+            onPress={() => handleQuickReaction(message, '👍')}
+          >
+            <Text style={styles.zaloThumbsUpEmoji}>👍</Text>
+            <Text style={styles.zaloReactionCount}>{thumbsUpReaction[1].totalCount}</Text>
+          </TouchableOpacity>
+        )}
+        
+        {heartReaction && heartReaction[1].totalCount > 0 && (
+          <TouchableOpacity
+            style={styles.zaloHeartDisplayContainer}
+            onPress={() => handleQuickReaction(message, '❤️')}
+          >
+            <Text style={styles.zaloHeartEmoji}>❤️</Text>
+            <Text style={styles.zaloReactionCount}>{heartReaction[1].totalCount}</Text>
+          </TouchableOpacity>
+        )}
+        
+        {/* Show other reactions in compact form */}
+        {validReactionEntries
+          .filter(([emoji, reactionData]) => 
+            emoji !== '👍' && emoji !== '❤️' && reactionData.totalCount > 0
+          )          .map(([emoji, reactionData]) => {
+            const isUserReacted = reactionData.userReactions.some(ur => 
+              ur && 
+              typeof ur === 'object' && 
+              ur.user && 
+              typeof ur.user === 'object' && 
+              ur.user.id && 
+              typeof ur.user.id === 'string' && 
+              ur.user.id === (userData?.id || '')
+            );
+            return (
+              <TouchableOpacity
+                key={emoji}
+                style={[
+                  styles.zaloOtherReactionChip,
+                  isUserReacted && styles.zaloOtherReactionChipActive
+                ]}
+                onPress={() => handleQuickReaction(message, emoji)}
+              >
+                <Text style={styles.zaloOtherReactionEmoji}>{emoji}</Text>
+                <Text style={[
+                  styles.zaloOtherReactionCount,
+                  { color: isUserReacted ? '#FFFFFF' : '#333333' }
+                ]}>{reactionData.totalCount}</Text>
+              </TouchableOpacity>
+            );
+          })}      </View>
+    );
+  };
+
+  // Render quick reaction button for messages
+  const renderQuickReactionButton = (message: Message) => (
+    <TouchableOpacity
+      style={styles.quickReactionButton}
+      onPress={() => handleShowReactionPicker(message)}
+    >
+      <Ionicons name="add-circle-outline" size={16} color="#666" />
+    </TouchableOpacity>
+  );
+  // Render Zalo-style heart button for messages
+  const renderZaloHeartButton = (message: Message) => (
+    <TouchableOpacity
+      style={styles.zaloHeartButton}
+      onPress={() => handleQuickReaction(message, '❤️')}
+      onLongPress={() => handleShowReactionPicker(message)}
+      delayLongPress={500}
+    >
+      <Ionicons name="heart-outline" size={12} color="#000" />
+    </TouchableOpacity>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -2566,54 +3332,168 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
                           </Text>
                         </View>
                       </View>
-                    )}
-
-                    <View
+                    )}                    <View
                       style={[
                         styles.messageBubble,
                         message.sentByMe ? styles.myMessage : styles.theirMessage,
                         message.type !== 'text' ? styles.fileMessageBubble : null,
                         (message.isRecall || message.isRemove) && styles.recalledMessage
                       ]}
-                    >
+                    >                      {/* Show replied message if this is a reply */}
+                      {message.isReply && message.originalMessage && (
+                        <TouchableOpacity 
+                          style={styles.zaloRepliedMessageContainer}
+                          onPress={() => handleQuotedMessagePress(message.originalMessage)}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.zaloRepliedMessageBar} />
+                          <View style={styles.zaloRepliedMessageContent}>
+                            <Text 
+                              style={styles.zaloRepliedSenderName}
+                              numberOfLines={1}
+                              ellipsizeMode="tail"
+                            >
+                              {message.originalMessage.senderInfo?.fullname || 
+                               groupMembers[message.originalMessage.idSender]?.fullname || 
+                               "Unknown User"}
+                            </Text>
+                            <Text 
+                              style={styles.zaloRepliedMessageText} 
+                              numberOfLines={2} 
+                              ellipsizeMode="tail"
+                            >
+                              {message.originalMessage.type === 'image' ? '📷 Hình ảnh' :
+                               message.originalMessage.type === 'video' ? '🎥 Video' :
+                               message.originalMessage.type === 'document' ? '📄 Tài liệu' :
+                               message.originalMessage.content}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      )}
+
                       {message.isRecall ? (
                         // Recalled message style
-                        <Text style={styles.recalledMessageText}>Tin nhắn đã được thu hồi</Text>
-                      ) : message.type === 'image' ? (
-                        <View>
-                          <Image
-                            source={{ uri: message.content }}
-                            style={styles.messageImage}
-                            resizeMode="cover"
-                          />
-                          <Text style={styles.messageTime}>
-                            {formatMessageTime(message.dateTime)}
-                          </Text>
+                        <Text style={styles.recalledMessageText}>Tin nhắn đã được thu hồi</Text>                      ) : message.type === 'image' ? (
+                        <View style={styles.zaloMessageContentContainer}>
+                          <View style={styles.zaloMessageTextContainer}>
+                            <Image
+                              source={{ uri: message.content }}
+                              style={styles.messageImage}
+                              resizeMode="cover"
+                            />
+                            <Text style={styles.messageTime}>
+                              {formatMessageTime(message.dateTime)}
+                            </Text>
+                          </View>
+                          
+                          {/* Zalo-style interaction buttons */}
+                          <View style={styles.zaloMessageInteractionContainer}>
+                            {renderZaloHeartButton(message)}
+                          </View>
                         </View>
                       ) : message.type === 'video' ? (
-                        <VideoMessage
-                          uri={message.content}
-                          timestamp={formatMessageTime(message.dateTime)}
-                        />
+                        <View style={styles.zaloMessageContentContainer}>
+                          <View style={styles.zaloMessageTextContainer}>
+                            <VideoMessage
+                              uri={message.content}
+                              timestamp={formatMessageTime(message.dateTime)}
+                            />
+                          </View>
+                          
+                          {/* Zalo-style interaction buttons */}
+                          <View style={styles.zaloMessageInteractionContainer}>
+                            {renderZaloHeartButton(message)}
+                          </View>
+                        </View>
                       ) : message.type === 'document' ? (
-                        <DocumentMessage
-                          uri={message.content}
-                          timestamp={formatMessageTime(message.dateTime)}
-                        />
-                      ) : (
-                        <>
-                          <Text style={styles.messageText} numberOfLines={0}>{message.content}</Text>
-                          <Text style={styles.messageTime}>
-                            {formatMessageTime(message.dateTime)}
-                          </Text>
-                        </>
+                        <View style={styles.zaloMessageContentContainer}>
+                          <View style={styles.zaloMessageTextContainer}>
+                            <DocumentMessage
+                              uri={message.content}
+                              timestamp={formatMessageTime(message.dateTime)}
+                            />
+                          </View>
+                          
+                          {/* Zalo-style interaction buttons */}
+                          <View style={styles.zaloMessageInteractionContainer}>
+                            {renderZaloHeartButton(message)}
+                          </View>
+                        </View>) : (
+                        <View style={styles.zaloMessageContentContainer}>
+                          <View style={styles.zaloMessageTextContainer}>
+                            {renderTextWithMentions(message.content, message.mentionedUsers)}
+                            <Text style={styles.messageTime}>
+                              {formatMessageTime(message.dateTime)}
+                            </Text>
+                          </View>
+                          
+                          {/* Zalo-style interaction buttons */}
+                          <View style={styles.zaloMessageInteractionContainer}>
+                            {renderZaloHeartButton(message)}
+                          </View>
+                        </View>
                       )}
+
+                      {/* Render reactions for this message */}
+                      {renderMessageReactions(message)}
                     </View>
                   </View>
                 </TouchableOpacity>
               );
-            }}
-          />
+            }}          />          {/* Reply Bar - Zalo Style */}
+          {showReplyBar && replyingToMessage && (
+            <View style={styles.zaloReplyBarContainer}>
+              <View style={styles.zaloReplyPreviewBox}>
+                <View style={styles.zaloReplyLeftBorder} />
+                <View style={styles.zaloReplyContent}>
+                  <View style={styles.zaloReplyHeader}>
+                    <Text style={styles.zaloReplySenderName}>
+                      {replyingToMessage.senderInfo?.fullname || 
+                       groupMembers[replyingToMessage.idSender]?.fullname || 
+                       "Unknown User"}
+                    </Text>
+                    <TouchableOpacity 
+                      style={styles.zaloReplyCloseButton}
+                      onPress={handleCancelReply}
+                    >
+                      <Ionicons name="close" size={18} color="#666" />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.zaloReplyMessageText} numberOfLines={2}>
+                    {replyingToMessage.type === 'image' ? '📷 Hình ảnh' :
+                     replyingToMessage.type === 'video' ? '🎥 Video' :
+                     replyingToMessage.type === 'document' ? '📄 Tài liệu' :
+                     replyingToMessage.content}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Mention Suggestions */}
+          {showMentionSuggestions && filteredMembers.length > 0 && (
+            <View style={styles.mentionSuggestionsContainer}>              <FlatList
+                data={filteredMembers}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.mentionSuggestionItem}
+                    onPress={() => handleMentionSelect(item)}
+                  >
+                    <Image
+                      source={{ uri: item.urlavatar || 'https://via.placeholder.com/40' }}
+                      style={styles.mentionAvatar}
+                    />
+                    <Text style={styles.mentionName}>{item.fullname}</Text>
+                  </TouchableOpacity>
+                )}
+                horizontal={false}
+                style={styles.mentionSuggestionsList}
+                showsVerticalScrollIndicator={false}
+              />
+            </View>
+          )}
+
           {/* Input area */}
           <View style={styles.inputContainer}>
             <TouchableOpacity
@@ -2639,7 +3519,7 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
                 placeholder="Nhập tin nhắn..."
                 placeholderTextColor="#999999"
                 value={messageText}
-                onChangeText={setMessageText}
+                onChangeText={handleTextInputChange}
                 multiline
                 maxLength={1000}
               />
@@ -2700,9 +3580,7 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
             </View>
           )}
         </KeyboardAvoidingView>
-      )}
-
-      {/* Render file preview */}
+      )}      {/* Render file preview */}
       {renderFilePreview()}
 
       {/* Message Action Menu */}
@@ -2713,8 +3591,13 @@ const GroupChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => {
           onForward={handleForwardMessage}
           onRecall={handleRecallMessage}
           onDelete={handleDeleteMessage}
+          onReply={handleReplyMessage}
+          onReact={handleShowReactionPicker}
         />
       )}
+
+      {/* Render reaction picker modal */}
+      {renderReactionPicker()}
     </SafeAreaView>
   );
 };
@@ -2739,7 +3622,8 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 5,
-  }, headerTitleContainer: {
+  },
+  headerTitleContainer: {
     flex: 1,
     marginLeft: 10,
     justifyContent: 'center',
@@ -2771,13 +3655,15 @@ const styles = StyleSheet.create({
   messagesContent: {
     padding: 10,
     paddingBottom: 20,
-  },
-  messageBubble: {
+  },  messageBubble: {
     borderRadius: 18,
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginVertical: 5,
-    maxWidth: '75%',
+    maxWidth: '88%',
+    minWidth: 130,
+    position: 'relative',
+    minHeight: 35, // Ensure minimum height for heart button
   },
   myMessage: {
     backgroundColor: '#FFFCFC',
@@ -2786,17 +3672,17 @@ const styles = StyleSheet.create({
   theirMessage: {
     backgroundColor: '#FFFFFF',
     alignSelf: 'flex-start',
-  },
-  messageText: {
+  },  messageText: {
     fontSize: 14,
     color: '#000000',
     lineHeight: 20,
-  },
-  messageTime: {
+    flexWrap: 'wrap',
+    flexShrink: 1,
+  },messageTime: {
     fontSize: 10,
-    color: '#645C5C',
-    alignSelf: 'flex-end',
-    marginTop: 2,
+    color: '#999999',
+    alignSelf: 'flex-start',
+    marginTop: 4,
   },
   // File message styles
   fileMessageBubble: {
@@ -3069,11 +3955,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 12,
     fontStyle: 'italic',
-  },
-  // New styles for message sender info
+  },  // New styles for message sender info
   messageBubbleWithSender: {
     marginTop: 10,
     marginBottom: 2,
+    width: '100%',
   },
   // System message styles
   systemMessageContainer: {
@@ -3094,32 +3980,457 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     textAlign: 'center',
   },
-  senderInfoContainer: {
-    flexDirection:
-      'row',
+  reactionPickerOverlay: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 2,
-    marginLeft: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  senderAvatar: {
-    width: 24,
-    height: 24,
+  reactionPickerContainer: {
+    width: 300,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 15,
+    alignItems: 'center',
+  },
+  reactionPickerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  reactionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  reactionButton: {
+    padding: 10,
+  },  reactionEmoji: {
+    fontSize: 24,
+  },  // Zalo-style message content styles
+  zaloMessageContentContainer: {
+    flexDirection: 'column',
+    width: '100%',
+  },
+  zaloMessageTextContainer: {
+    width: '100%',
+    paddingRight: 35, // Give space for heart button
+  },
+  zaloMessageInteractionContainer: {
+    position: 'absolute',
+    right: 5,
+    bottom: 5,
+    zIndex: 1,
+  },  // Zalo-style heart button
+  zaloHeartButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 1,
+    elevation: 2,
+  },// Zalo-style reactions container
+  zaloReactionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+    marginBottom: 5,
+    alignSelf: 'flex-end',
+    maxWidth: '100%',
+  },  // Zalo-style thumbs up container
+  zaloThumbsUpContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 12,
-    marginRight: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    marginRight: 4,
+    marginBottom: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  zaloThumbsUpEmoji: {
+    fontSize: 12,
+  },
+  zaloReactionCount: {
+    fontSize: 10,
+    color: '#000',
+    fontWeight: '600',
+    marginLeft: 3,
+  },
+  // Zalo-style heart display container
+  zaloHeartDisplayContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    marginRight: 4,
+    marginBottom: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  zaloHeartEmoji: {
+    fontSize: 12,
+  },  // Other reactions in compact style
+  zaloOtherReactionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F0F0',
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    marginRight: 3,
+    marginBottom: 2,
+  },
+  zaloOtherReactionChipActive: {
+    backgroundColor: '#1FAEEB',
+  },
+  zaloOtherReactionEmoji: {
+    fontSize: 10,
+  },
+  zaloOtherReactionCount: {
+    fontSize: 9,
+    marginLeft: 2,
+    fontWeight: '600',
+  },
+  // Zalo-style reaction picker
+  zaloReactionPickerOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  zaloReactionPickerContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  zaloReactionPickerArrow: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#FFFFFF',
+    marginBottom: -1,
+    zIndex: 2,
+  },
+  zaloReactionBar: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 25,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  zaloReactionBarButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 40,
+  },
+  zaloReactionBarButtonFirst: {
+    borderTopLeftRadius: 25,
+    borderBottomLeftRadius: 25,
+  },
+  zaloReactionBarButtonLast: {
+    borderTopRightRadius: 25,
+    borderBottomRightRadius: 25,
+  },
+  zaloReactionBarEmoji: {
+    fontSize: 20,
+  },
+  reactionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 5,
+  },  reactionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F0F0',
+    borderRadius: 20,
+    padding: 5,
+    margin: 2,
+  },
+  reactionChipActive: {
+    backgroundColor: '#1FAEEB',
+  },
+  reactionChipEmoji: {
+    fontSize: 16,
+  },
+  reactionChipCount: {
+    fontSize: 12,
+    marginLeft: 5,
+    fontWeight: '600',
+  },  quickReactionButton: {
+    padding: 5,
+  },  // Sender info styles
+  senderInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+    width: '100%',
+    paddingHorizontal: 2,
   },
   senderAvatarContainer: {
     position: 'relative',
+    marginRight: 8,
+    flexShrink: 0,
+  },
+  senderAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   keyIcon: {
     position: 'absolute',
     bottom: -2,
-    right: 2,
-    width: 12,
-    height: 12,
-    zIndex: 1,
+    right: -2,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 1,
+  },  senderNameContainer: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+  },
+  senderName: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 2,
+    flexShrink: 1,
+    flexWrap: 'nowrap',
+  },
+  // Reply message styles
+  repliedMessageContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 8,
+  },
+  repliedMessageBar: {
+    width: 3,
+    backgroundColor: '#1FAEEB',
+    borderRadius: 1.5,
+    marginRight: 8,
+  },
+  repliedMessageContent: {
+    flex: 1,
+  },
+  repliedSenderName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1FAEEB',
+    marginBottom: 2,
+  },
+  repliedMessageText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  // Reply bar styles
+  replyBarContainer: {
+    backgroundColor: '#F8F8F8',
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    padding: 10,
+  },
+  replyBar: {
+    width: 3,
+    backgroundColor: '#1FAEEB',
+    borderRadius: 1.5,
+    marginRight: 8,
+  },
+  replyContent: {
+    flex: 1,
+  },
+  replyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  replyToText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1FAEEB',
+  },
+  replySenderName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 2,
+  },  replyMessageText: {
+    fontSize: 12,
+    color: '#999',
+  },
+  // Zalo-style Reply Bar styles
+  zaloReplyBarContainer: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  zaloReplyPreviewBox: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    position: 'relative',
+  },
+  zaloReplyLeftBorder: {
+    width: 3,
+    backgroundColor: '#1FAEEB',
+    borderRadius: 1.5,
+    alignSelf: 'stretch',
+    marginRight: 10,
+  },
+  zaloReplyContent: {
+    flex: 1,
+  },
+  zaloReplyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  zaloReplySenderName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#000000',
+    flex: 1,
+  },
+  zaloReplyCloseButton: {
+    padding: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    marginLeft: 8,
+  },  zaloReplyMessageText: {
+    fontSize: 13,
+    color: '#666666',
+    lineHeight: 18,
+  },  // Zalo-style Replied Message in Bubble styles
+  zaloRepliedMessageContainer: {
+    backgroundColor: 'rgba(31, 174, 235, 0.1)',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    minWidth: 160,
+    maxWidth: '100%',
+    alignSelf: 'stretch',
+  },
+  zaloRepliedMessageBar: {
+    width: 3,
+    backgroundColor: '#1FAEEB',
+    borderRadius: 1.5,
+    alignSelf: 'stretch',
+    marginRight: 12,
+    flexShrink: 0,
+  },
+  zaloRepliedMessageContent: {
+    flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+  },
+  zaloRepliedSenderName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1FAEEB',
+    marginBottom: 4,
+    flexWrap: 'nowrap',
+    flexShrink: 1,
+  },
+  zaloRepliedMessageText: {
+    fontSize: 12,
+    color: '#666666',
+    lineHeight: 16,
+    flexWrap: 'nowrap',
+    flexShrink: 1,
+  },
+  // Mention styles
+  mentionText: {
+    color: '#1FAEEB',
+    fontWeight: '600',
+    backgroundColor: 'rgba(31, 174, 235, 0.1)',
+    borderRadius: 4,
+    paddingHorizontal: 2,
+  },
+  mentionSuggestionsContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    maxHeight: 150,
+    paddingVertical: 8,
+  },
+  mentionSuggestionsList: {
+    paddingHorizontal: 10,
+  },
+  mentionSuggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  mentionAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 10,
+  },
+  mentionName: {
+    fontSize: 14,
+    color: '#000000',
+    fontWeight: '500',
   },
 });
-
 export default GroupChatScreen;
 
 

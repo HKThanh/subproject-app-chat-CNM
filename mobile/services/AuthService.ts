@@ -26,7 +26,14 @@ export interface UserData {
   id: string;
   fullname?: string;
   email?: string;
-  // ...
+  urlavatar?: string;
+  phone?: string;
+  bio?: string;
+  coverPhoto?: string;
+  birthday?: string;
+  ismale?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 class AuthService {
