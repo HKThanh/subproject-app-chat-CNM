@@ -1036,7 +1036,7 @@ export const useChat = (userId: string) => {
     Items: Conversation[];
     LastEvaluatedKey: number;
   }) => {
-    console.log("Nhận danh sách cuộc trò chuyện:", data);
+    // console.log("Nhận danh sách cuộc trò chuyện:", data);
     dispatch({ type: 'SET_CONVERSATIONS', payload: data.Items });
     dispatch({ type: 'SET_LOADING', payload: false });
   }, []); // Không cần dependencies vì dispatch luôn ổn định
@@ -1050,7 +1050,7 @@ export const useChat = (userId: string) => {
 
   // Tải danh sách cuộc trò chuyện - tối ưu dependencies
   const loadConversations = useCallback(() => {
-    console.log("=== loadConversations được gọi ===>");
+    // console.log("=== loadConversations được gọi ===>");
 
     // Nếu đang loading, không gọi lại
     if (loading) {
@@ -1088,7 +1088,7 @@ export const useChat = (userId: string) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
 
-    console.log("Tải danh sách cuộc trò chuyện cho người dùng:", userId);
+    // console.log("Tải danh sách cuộc trò chuyện cho người dùng:", userId);
     socket.emit("load_conversations", {
       IDUser: userId,
       lastEvaluatedKey: 0,
@@ -1152,7 +1152,7 @@ export const useChat = (userId: string) => {
     Items: Conversation[];
     LastEvaluatedKey: number;
   }) => {
-    console.log("Nhận danh sách cuộc trò chuyện nhóm:", data);
+    // console.log("Nhận danh sách cuộc trò chuyện nhóm:", data);
 
     // Xử lý tin nhắn mới nhất đã bị xóa
     if (data.Items && Array.isArray(data.Items)) {
@@ -3658,7 +3658,7 @@ export const useChat = (userId: string) => {
 
     // Lắng nghe sự kiện kết nối thành công
     const handleConnectionSuccess = (data: any) => {
-      console.log("Kết nối socket thành công:", data);
+      // console.log("Kết nối socket thành công:", data);
       dispatch({ type: 'SET_USER_CONNECTED', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
@@ -3792,7 +3792,7 @@ export const useChat = (userId: string) => {
 
   // Xử lý phản hồi tải tin nhắn - tối ưu dependencies
   const handleLoadMessagesResponse = useCallback((data: any) => {
-    console.log("Phản hồi tải tin nhắn (raw):", JSON.stringify(data, null, 2));
+    // console.log("Phản hồi tải tin nhắn (raw):", JSON.stringify(data, null, 2));
 
     try {
       // Kiểm tra cấu trúc dữ liệu phản hồi
@@ -3821,7 +3821,7 @@ export const useChat = (userId: string) => {
         return;
       }
 
-      console.log(`Nhận ${messages.length} tin nhắn cho cuộc trò chuyện ${conversationId}`);
+      // console.log(`Nhận ${messages.length} tin nhắn cho cuộc trò chuyện ${conversationId}`);
 
       if (messages.length === 0) {
         console.log(`Không có tin nhắn nào cho cuộc trò chuyện ${conversationId}`);

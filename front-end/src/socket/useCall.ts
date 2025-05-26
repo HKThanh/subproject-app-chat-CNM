@@ -169,7 +169,6 @@ export const useCall = (userId: string) => {
 
     // Xử lý lỗi cuộc gọi
     const handleCallError = useCallback((data: any) => {
-        console.error('Call error:', data);
         toast.error(data.message || 'Đã xảy ra lỗi trong cuộc gọi');
         dispatch({ type: 'RESET_CALL' });
     }, []);

@@ -127,13 +127,13 @@ export default function TabNavigation({
   useEffect(() => {
     if (socket && currentUser?.id) {
       if (activeTab === "DIRECT") {
-        console.log("Switching to DIRECT tab, loading direct conversations");
+        // console.log("Switching to DIRECT tab, loading direct conversations");
         socket.emit("load_conversations", {
           IDUser: currentUser.id,
           lastEvaluatedKey: 0,
         });
       } else if (activeTab === "GROUPS") {
-        console.log("Switching to GROUPS tab, loading group conversations");
+        // console.log("Switching to GROUPS tab, loading group conversations");
         socket.emit("load_group_conversations", {
           IDUser: currentUser.id,
           lastEvaluatedKey: 0,
