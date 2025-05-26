@@ -186,6 +186,10 @@ export const useCall = (userId: string) => {
 
     // Xử lý khi cuộc gọi kết thúc
     const handleCallEnded = useCallback((data: any) => {
+        if (ringtoneRef.current) {
+            ringtoneRef.current.pause();
+            ringtoneRef.current.currentTime = 0;
+        }
         console.log('Call ended:', data);
         dispatch({ type: 'CALL_ENDED', payload: data });
         toast.info('Cuộc gọi đã kết thúc');
