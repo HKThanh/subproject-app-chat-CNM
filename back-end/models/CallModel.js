@@ -46,7 +46,7 @@ const callSchema = new mongoose.Schema({
     },
     endReason: {
         type: String,
-        enum: ['normal', 'rejected', 'missed', 'disconnected', 'error'],
+        enum: ['normal', 'rejected', 'missed', 'disconnected', 'error', 'force_cleanup', 'auto_disconnect'],
         default: 'normal'
     }
 }, {

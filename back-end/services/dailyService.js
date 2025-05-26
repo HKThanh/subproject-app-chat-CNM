@@ -78,18 +78,22 @@ const getRoomInfo = async (roomName) => {
 const getRoomParticipants = async (roomName) => {
     try {
         const response = await axios.get(
-            `${config.dailyApiUrl}/${roomName}/participants`,
+            `${config.dailyApiUrl}/${roomName}/presence`,
             {
                 headers: {
                     Authorization: `Bearer ${config.dailyApiKey}`,
                 },
             }
         );
+        console.log("response get room participants: ",response.data);
         return response.data;
     } catch (error) {
+        if (error.response && error.response.status === 404) {
+            console.log(`Room ${roomName} not found, assuming no participants`);
+            return { data: [] }; // Trả về mảng rỗng nếu phòng không tồn tại
+        }
         console.error("Error getting room participants:", error.message);
         throw error;
     }
 };
-
 module.exports = { createDailyRoom, deleteRoom, getRoomInfo, getRoomParticipants };
