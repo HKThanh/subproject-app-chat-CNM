@@ -178,8 +178,9 @@ type ChatAction =
   | { type: 'CALL_ENDED' } // xử lý khi cuộc gọi kết thúc
   | { type: 'SET_LOCAL_STREAM', payload: MediaStream } // thiết lập luồng media của người dùng hiện tại
   | { type: 'SET_REMOTE_STREAM', payload: MediaStream } // thiết lập luồng media của người dùng được gọi
-  | { type: 'RESET_CALL_STATE' }; // đặt trạng thái cuộc gọi về ban đầu
-;
+  | { type: 'RESET_CALL_STATE' } // đặt trạng thái cuộc gọi về ban đầu
+  | { type: 'UPDATE_MESSAGEREPLY', payload: { conversationId: string, messageId: string, updatedMessageReply: Partial<Message['messageReply']> } }
+  ;
 
 const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
   switch (action.type) {
@@ -449,6 +450,47 @@ const chatReducer = (state: ChatState, action: ChatAction): ChatState => {
         }
       };
     }
+    case 'UPDATE_MESSAGEREPLY': {
+      const { conversationId, messageId, updatedMessageReply } = action.payload;
+      
+      // Update in current messages
+      const updatedMessages = state.messages[conversationId]?.map(msg => 
+        msg.idMessage === messageId 
+          ? { 
+              ...msg, 
+              messageReply: { 
+                ...(msg.messageReply || {}), 
+                ...updatedMessageReply 
+              } 
+            } 
+          : msg
+      ) || [];
+      
+      // Update in older messages if present
+      const updatedOlderMessages = state.olderMessages[conversationId]?.map(msg => 
+        msg.idMessage === messageId 
+          ? { 
+              ...msg, 
+              messageReply: { 
+                ...(msg.messageReply || {}), 
+                ...updatedMessageReply 
+              } 
+            } 
+          : msg
+      ) || [];
+      
+      return {
+        ...state,
+        messages: {
+          ...state.messages,
+          [conversationId]: updatedMessages
+        },
+        olderMessages: {
+          ...state.olderMessages,
+          [conversationId]: updatedOlderMessages
+        }
+      };
+    }
     case 'CALL_INCOMING': {
       return {
         ...state,
@@ -608,10 +650,10 @@ export const useChat = (userId: string) => {
       ],
       iceCandidatePoolSize: 10
     };
-  
+
     const pc = new RTCPeerConnection(configuration);
     console.log("Kết nối WebRTC đã được khởi tạo.");
-  
+
     pc.onicecandidate = (event) => {
       if (event.candidate && socket && state.call.remoteSocketId) {
         socket.emit('webRTC-signaling', {
@@ -623,7 +665,7 @@ export const useChat = (userId: string) => {
         });
       }
     };
-  
+
     pc.oniceconnectionstatechange = () => {
       console.log("ICE connection state:", pc.iceConnectionState);
       if (pc.iceConnectionState === 'failed') {
@@ -634,17 +676,17 @@ export const useChat = (userId: string) => {
         });
       }
     };
-  
+
     pc.onicegatheringstatechange = () => {
       console.log("ICE gathering state:", pc.iceGatheringState);
     };
-  
+
     pc.ontrack = (event) => {
       if (event.streams.length > 0) {
         dispatch({ type: 'SET_REMOTE_STREAM', payload: event.streams[0] });
       }
     };
-  
+
     // Đóng kết nối cũ nếu tồn tại
     if (peerConnection.current) {
       peerConnection.current.close();
@@ -655,61 +697,61 @@ export const useChat = (userId: string) => {
 
   // Hàm bắt đầu cuộc gọi
   const startCall = useCallback(async (receiverId: string, callType: 'audio' | 'video' = 'audio') => {
-  if (!socket || !isConnected || !userId) {
-    console.error("Không thể bắt đầu cuộc gọi: Socket chưa kết nối hoặc chưa đăng nhập");
-    return;
-  }
-
-  try {
-    // Kiểm tra quyền
-    const micPermission = await navigator.permissions.query({ name: 'microphone' });
-    const camPermission = callType === 'video' ? await navigator.permissions.query({ name: 'camera' }) : { state: 'granted' };
-    if (micPermission.state === 'denied') {
-      throw new Error('Quyền truy cập microphone bị từ chối.');
-    }
-    if (callType === 'video' && camPermission.state === 'denied') {
-      throw new Error('Quyền truy cập camera bị từ chối.');
+    if (!socket || !isConnected || !userId) {
+      console.error("Không thể bắt đầu cuộc gọi: Socket chưa kết nối hoặc chưa đăng nhập");
+      return;
     }
 
-    const constraints = { audio: true, video: callType === 'video' };
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    dispatch({ type: 'SET_LOCAL_STREAM', payload: stream });
+    try {
+      // Kiểm tra quyền
+      const micPermission = await navigator.permissions.query({ name: 'microphone' });
+      const camPermission = callType === 'video' ? await navigator.permissions.query({ name: 'camera' }) : { state: 'granted' };
+      if (micPermission.state === 'denied') {
+        throw new Error('Quyền truy cập microphone bị từ chối.');
+      }
+      if (callType === 'video' && camPermission.state === 'denied') {
+        throw new Error('Quyền truy cập camera bị từ chối.');
+      }
 
-    socket.emit('pre-offer-single', {
-      IDCaller: userId,
-      IDCallee: receiverId,
-      callType
-    });
+      const constraints = { audio: true, video: callType === 'video' };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      dispatch({ type: 'SET_LOCAL_STREAM', payload: stream });
 
-    dispatch({
-      type: 'CALL_OUTGOING',
-      payload: {
-        remoteUserId: receiverId,
-        remoteSocketId: '',
+      socket.emit('pre-offer-single', {
+        IDCaller: userId,
+        IDCallee: receiverId,
         callType
-      }
-    });
+      });
 
-    // Thêm timeout cho cuộc gọi
-    const timeout = setTimeout(() => {
-      if (!state.call.isCallInProgress) {
-        socket.emit('end-call', {
-          connectedUserSocketId: state.call.remoteSocketId,
-          callLogId: state.call.callLogId
-        });
-        dispatch({ type: 'CALL_ENDED' });
-      }
-    }, 30000); // Hủy sau 30 giây nếu không được trả lời
+      dispatch({
+        type: 'CALL_OUTGOING',
+        payload: {
+          remoteUserId: receiverId,
+          remoteSocketId: '',
+          callType
+        }
+      });
 
-    return () => clearTimeout(timeout);
-  } catch (error) {
-    console.error("Lỗi khi bắt đầu cuộc gọi:", error);
-    import('sonner').then(({ toast }) => {
-      toast.error(error.message, { duration: 5000 });
-    });
-    dispatch({ type: 'RESET_CALL_STATE' });
-  }
-}, [socket, isConnected, userId, state.call]);
+      // Thêm timeout cho cuộc gọi
+      const timeout = setTimeout(() => {
+        if (!state.call.isCallInProgress) {
+          socket.emit('end-call', {
+            connectedUserSocketId: state.call.remoteSocketId,
+            callLogId: state.call.callLogId
+          });
+          dispatch({ type: 'CALL_ENDED' });
+        }
+      }, 30000); // Hủy sau 30 giây nếu không được trả lời
+
+      return () => clearTimeout(timeout);
+    } catch (error) {
+      console.error("Lỗi khi bắt đầu cuộc gọi:", error);
+      import('sonner').then(({ toast }) => {
+        toast.error(error.message, { duration: 5000 });
+      });
+      dispatch({ type: 'RESET_CALL_STATE' });
+    }
+  }, [socket, isConnected, userId, state.call]);
 
   // Hàm trả lời cuộc gọi
   const answerCall = useCallback(async (accept: boolean) => {
@@ -717,7 +759,7 @@ export const useChat = (userId: string) => {
       console.error("Không thể trả lời cuộc gọi: Không có cuộc gọi đến hoặc thiếu thông tin");
       return;
     }
-  
+
     if (!accept) {
       socket.emit('pre-offer-single-answer', {
         IDCaller: state.call.remoteUserId,
@@ -730,7 +772,7 @@ export const useChat = (userId: string) => {
       dispatch({ type: 'CALL_REJECTED' });
       return;
     }
-  
+
     try {
       const micPermission = await navigator.permissions.query({ name: 'microphone' });
       const camPermission = state.call.callType === 'video' ? await navigator.permissions.query({ name: 'camera' }) : { state: 'granted' };
@@ -740,16 +782,16 @@ export const useChat = (userId: string) => {
       if (state.call.callType === 'video' && camPermission.state === 'denied') {
         throw new Error('Quyền truy cập camera bị từ chối.');
       }
-  
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: state.call.callType === 'video'
       });
       dispatch({ type: 'SET_LOCAL_STREAM', payload: stream });
-  
+
       const pc = initializePeerConnection();
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
-  
+
       socket.emit('pre-offer-single-answer', {
         IDCaller: state.call.remoteUserId,
         socketIDCaller: state.call.remoteSocketId,
@@ -758,7 +800,7 @@ export const useChat = (userId: string) => {
         preOfferAnswer: 'CALL_ACCEPTED',
         callLogId: state.call.callLogId
       });
-  
+
       dispatch({
         type: 'CALL_ACCEPTED',
         payload: { callLogId: state.call.callLogId || '' }
@@ -1137,7 +1179,7 @@ export const useChat = (userId: string) => {
   useEffect(() => {
     if (!socket) return;
     const handleLoadMessagesResponse = (data: any) => {
-      console.log("Nhận danh sách tin nhắn:", data); 
+      console.log("Nhận danh sách tin nhắn:", data);
       if (data.messages && data.conversationId) {
         dispatch({
           type: 'LOAD_MORE_MESSAGES',
@@ -3586,10 +3628,10 @@ export const useChat = (userId: string) => {
     // Xử lý sự kiện xóa tin nhắn thành công
     const handleDeleteMessageSuccess = (data: { messageId: string, updatedMessage: Message }) => {
       console.log("Tin nhắn đã được xóa:", data);
-  
+
       if (data.updatedMessage && data.updatedMessage.idConversation) {
         const conversationId = data.updatedMessage.idConversation;
-        
+
         // Cập nhật tin nhắn trong state
         dispatch({
           type: 'UPDATE_MESSAGE',
@@ -3599,7 +3641,7 @@ export const useChat = (userId: string) => {
             updates: { isRemove: true }
           }
         });
-        
+
         // Kiểm tra xem tin nhắn bị xóa có phải là tin nhắn mới nhất không
         const conversation = state.conversations.find(conv => conv.idConversation === conversationId);
         if (conversation && conversation.latestMessage && conversation.latestMessage.idMessage === data.messageId) {
@@ -3608,7 +3650,7 @@ export const useChat = (userId: string) => {
           const nextLatestMessage = conversationMessages
             .filter(msg => msg.idMessage !== data.messageId && !msg.isRemove)
             .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())[0];
-          
+
           // Cập nhật tin nhắn mới nhất của cuộc trò chuyện
           if (nextLatestMessage) {
             dispatch({
@@ -3713,9 +3755,25 @@ export const useChat = (userId: string) => {
         });
       });
     };
-    socket.on("receive_message", handleReceiveMessage);
     socket.on('users_status', handleUsersStatus);
+    // Handle message updated event (for reply messages when original is recalled)
+    const handleMessageUpdated = (data: any) => {
+      console.log("Message updated:", data);
+      const { messageId, updatedMessage, conversationId } = data;
 
+      if (messageId && conversationId) {
+        dispatch({
+          type: 'UPDATE_MESSAGE',
+          payload: {
+            conversationId,
+            messageId,
+            updates: updatedMessage
+          }
+        });
+      }
+    };
+
+    socket.on("message_updated", handleMessageUpdated);
     return () => {
       // Hủy đăng ký tất cả sự kiện khi unmount
       socket.off('message_reaction_updated', handleMessageReactionUpdated);
@@ -3760,7 +3818,8 @@ export const useChat = (userId: string) => {
       socket.off("group_info_updated", handleGroupInfoUpdated);
 
       socket.off("receive_message", handleReceiveMessage);
-      socket.offAny();
+      socket.off("message_updated", handleMessageUpdated);
+      // socket.offAny();
     };
   }, [socket, userId, messages, conversations, loadConversations, handleGroupDeletedResponse, handleGroupDeletedNotification,
     handleDemoteMemberResponse, handleMemberDemoted, handleMemberDemotedNotification]);
@@ -4179,7 +4238,53 @@ export const useChat = (userId: string) => {
       console.log("Nhận phản hồi thu hồi tin nhắn:", data);
 
       if (data.success) {
-        // Cập nhật tin nhắn trong state đã được thực hiện trong optimistic update
+        if (data.updatedMessage && data.messageId && data.conversationId) {
+          dispatch({
+            type: 'UPDATE_MESSAGE',
+            payload: {
+              conversationId: data.conversationId,
+              messageId: data.messageId,
+              updates: data.updatedMessage
+            }
+          });
+        }
+         // Cập nhật tất cả tin nhắn reply liên quan đến tin nhắn bị thu hồi
+         const conversationMessages = [
+          ...(messages[data.conversationId] || []), 
+          ...(state?.olderMessages?.[data.conversationId] || [])
+        ];
+        console.log("hasMoreMessages:", state.hasMoreMessages);
+        console.log("state.olderMessages:", state?.messages);
+        console.log("data.conversationId:", data.conversationId);
+         const replyMessages = conversationMessages.filter(msg => 
+          msg.isReply === true && 
+          msg.messageReply && 
+          msg.messageReply.idMessage === data.messageId
+        );
+         
+         console.log(`Tìm thấy ${replyMessages.length} tin nhắn reply đến tin nhắn bị thu hồi`);
+         
+         // Cập nhật từng tin nhắn reply
+         replyMessages.forEach(replyMsg => {
+          if (replyMsg.messageReply) {
+            const updatedMessageReply = {
+              ...replyMsg.messageReply,  // Đặt các thuộc tính gốc trước
+              content: "Tin nhắn đã được thu hồi",  // Sau đó ghi đè các thuộc tính cần thay đổi
+              isRecall: true
+            };
+            
+            dispatch({
+              type: 'UPDATE_MESSAGE',
+              payload: {
+                conversationId: data.conversationId,
+                messageId: replyMsg.idMessage,
+                updates: {
+                  messageReply: updatedMessageReply
+                }
+              }
+            });
+          }
+        });
         console.log(`Tin nhắn ${data.messageId} đã được thu hồi thành công`);
         if (data.conversationId && data.isLatestMessage) {
           dispatch({
@@ -4206,7 +4311,7 @@ export const useChat = (userId: string) => {
           // Khôi phục tin nhắn về trạng thái ban đầu
           const conversationMessages = messages[data.conversationId] || [];
           const originalMessage = conversationMessages.find(msg => msg.idMessage === data.messageId);
-          
+
           if (originalMessage) {
             dispatch({
               type: 'UPDATE_MESSAGE',
@@ -4241,7 +4346,8 @@ export const useChat = (userId: string) => {
             messageId: data.messageId,
             updates: {
               isRecall: true,
-              content: "Tin nhắn đã được thu hồi"
+              content: "Tin nhắn đã được thu hồi",
+              ...data.updatedMessage
             }
           }
         });

@@ -174,18 +174,17 @@ const handleLoadConversation = (io, socket) => {
 
           const messagePreview = latestMessage
             ? {
-                ...latestMessage.toObject(),
-                preview:
-                  latestMessage.type !== "text"
-                    ? `Đã gửi một ${
-                        latestMessage.type === "image"
-                          ? "hình ảnh"
-                          : latestMessage.type === "video"
-                            ? "video"
-                            : "tệp đính kèm"
-                      }`
-                    : latestMessage.content,
-              }
+              ...latestMessage.toObject(),
+              preview:
+                latestMessage.type !== "text"
+                  ? `Đã gửi một ${latestMessage.type === "image"
+                    ? "hình ảnh"
+                    : latestMessage.type === "video"
+                      ? "video"
+                      : "tệp đính kèm"
+                  }`
+                  : latestMessage.content,
+            }
             : null
 
           // Đếm số tin nhắn chưa đọc
@@ -485,6 +484,43 @@ const handleRecallMessage = async (io, socket) => {
         throw new Error("Không tìm thấy tin nhắn")
       }
 
+      let updatedReplyMessages = null;
+      // Tìm và cập nhật tất cả các tin nhắn reply đến tin nhắn này
+      const replyMessages = await MessageDetail.find({
+        "messageReply.idMessage": idMessage,
+        isReply: true
+      });
+      console.log(`Found ${replyMessages.length} reply messages for recalled message ${idMessage}`);
+      // Cập nhật thông tin messageReply cho tất cả tin nhắn reply
+      if (replyMessages && replyMessages.length > 0) {
+        console.log(`Updating ${replyMessages.length} reply messages for recalled message ${idMessage}`);
+
+        const updatePromises = replyMessages.map(replyMsg =>
+          MessageDetail.findOneAndUpdate(
+            { idMessage: replyMsg.idMessage },
+            {
+              messageReply: {
+                ...replyMsg.messageReply,
+                content: "Tin nhắn đã được thu hồi",
+                isRecall: true
+              }
+            },
+            { new: true }
+          )
+        );
+
+        updatedReplyMessages = await Promise.all(updatePromises);
+
+        // Gửi thông báo cập nhật cho tất cả các tin nhắn reply
+        updatedReplyMessages.forEach(replyMsg => {
+          console.log(`Emitting message_updated for message ${replyMsg.content} to room ${idConversation}`);
+          io.to(idConversation).emit("message_updated", {
+            messageId: replyMsg.idMessage,
+            updatedMessage: replyMsg,
+            conversationId: idConversation,
+          });
+        });
+      }
       // Cập nhật tin nhắn
       const updatedMessage = await MessageDetail.findOneAndUpdate(
         { idMessage },
@@ -494,18 +530,17 @@ const handleRecallMessage = async (io, socket) => {
         },
         { new: true },
       )
-
       // Tìm conversation để lấy thông tin người nhận
       const conversation = await Conversation.findOne({ idConversation })
       if (!conversation) {
         throw new Error("Không tìm thấy cuộc hội thoại")
       }
-      console.log("Conversation của tin nhắn bị thu hồi: ", conversation)
+      // console.log("Conversation của tin nhắn bị thu hồi: ", conversation)
 
       // Xử lý khác nhau cho nhóm và cuộc trò chuyện 1-1
       if (conversation.isGroup) {
         // Đối với nhóm, gửi thông báo đến tất cả thành viên trong nhóm
-        console.log("Sending recall notification to group conversation:", idConversation)
+        // console.log("Sending recall notification to group conversation:", idConversation)
 
         // Gửi thông báo đến tất cả thành viên trong room của cuộc trò chuyện
         io.to(idConversation).emit("message_recalled", {
@@ -546,12 +581,14 @@ const handleRecallMessage = async (io, socket) => {
           })
         }
       }
-
+      console.log("replyMessages: ", replyMessages)
       // Gửi thông báo thành công cho người gửi
       socket.emit("recall_message_success", {
         messageId: idMessage,
         success: true,
         conversationId: idConversation,
+        updatedMessage: updatedMessage,
+        isLatestMessage: conversation.lastChange === idMessage
       })
 
       console.log("Recall message notification sent")
@@ -728,12 +765,12 @@ const handleLoadMessages = (io, socket) => {
       const messages = await MessageDetail.find(query)
         .sort({ dateTime: -1 })
         .limit(limit);
-      
+
       // Get all user IDs from messages and reactions
       const userIds = new Set();
       messages.forEach(message => {
         if (message.idSender) userIds.add(message.idSender);
-        
+
         // Add users who reacted to messages
         if (message.reactions) {
           for (const [_, data] of message.reactions.entries()) {
@@ -741,11 +778,11 @@ const handleLoadMessages = (io, socket) => {
           }
         }
       });
-      
+
       // Get user information
       const users = await User.find({ id: { $in: Array.from(userIds) } })
         .select("id fullname urlavatar");
-      
+
       // Create user map for easy access
       const userMap = {};
       users.forEach(user => {
@@ -755,21 +792,21 @@ const handleLoadMessages = (io, socket) => {
           urlavatar: user.urlavatar
         };
       });
-      
+
       // Process messages with user info and reactions
       const processedMessages = messages.map(message => {
         const messageObj = message.toObject();
-        
+
         // Add sender info
-        messageObj.senderInfo = userMap[message.idSender] || { 
-          id: message.idSender, 
-          fullname: "Unknown User" 
+        messageObj.senderInfo = userMap[message.idSender] || {
+          id: message.idSender,
+          fullname: "Unknown User"
         };
-        
+
         // Process reactions if they exist
         if (message.reactions && message.reactions.size > 0) {
           const reactionSummary = {};
-          
+
           for (const [key, data] of message.reactions.entries()) {
             if (data.totalCount > 0) {
               reactionSummary[key] = {
@@ -782,15 +819,15 @@ const handleLoadMessages = (io, socket) => {
               };
             }
           }
-          
+
           messageObj.reactions = reactionSummary;
         } else {
           messageObj.reactions = {};
         }
-        
+
         return messageObj;
       });
-      
+
       socket.emit("load_messages_response", {
         messages: processedMessages,
         hasMore: messages.length === limit,
@@ -1088,7 +1125,7 @@ const handleCreatGroupConversation = (io, socket) => {
     // groupMembers phải có cả IDOwner
     console.log("create_group_conversation payload:>>> ", payload);
     const { IDOwner, groupName, groupMembers, groupAvatarUrl } = payload;
-    const groupAvatar = groupAvatarUrl ||null;
+    const groupAvatar = groupAvatarUrl || null;
 
     if (groupMembers.length < 2) {
       socket.emit("create_group_conversation_response", {
@@ -1366,15 +1403,15 @@ const handleAddMemberToGroup = async (io, socket) => {
         }
       }),
     )
-    ;[...existingMembers, ...newMembers].forEach(async (memberId) => {
-      const userSocket = getUser(memberId)
-      if (userSocket?.socketId) {
-        io.to(userSocket.socketId).emit("receive_message", {
-          conversationId: IDConversation,
-          message: systemMessage,
-        })
-      }
-    })
+      ;[...existingMembers, ...newMembers].forEach(async (memberId) => {
+        const userSocket = getUser(memberId)
+        if (userSocket?.socketId) {
+          io.to(userSocket.socketId).emit("receive_message", {
+            conversationId: IDConversation,
+            message: systemMessage,
+          })
+        }
+      })
     // Gửi thông báo cho các thành viên mới
     newMembers.forEach(async (member) => {
       const allMembersInfo = await Promise.all(
@@ -1398,12 +1435,12 @@ const handleAddMemberToGroup = async (io, socket) => {
           },
           owner: ownerInfo
             ? {
-                id: ownerInfo.id,
-                fullname: ownerInfo.fullname,
-                urlavatar: ownerInfo.urlavatar,
-                phone: ownerInfo.phone,
-                email: ownerInfo.email,
-              }
+              id: ownerInfo.id,
+              fullname: ownerInfo.fullname,
+              urlavatar: ownerInfo.urlavatar,
+              phone: ownerInfo.phone,
+              email: ownerInfo.email,
+            }
             : null,
           coOwners: coOwnersInfo,
           members: allMembersInfo,
@@ -2240,9 +2277,8 @@ const handlePromoteMemberToAdmin = (io, socket) => {
         idSender: "system",
         idConversation: IDConversation,
         type: "system",
-        content: `${promoter.fullname || IDUser} đã thăng cấp ${
-          promoted.fullname || IDMemberToPromote
-        } làm quản trị viên`,
+        content: `${promoter.fullname || IDUser} đã thăng cấp ${promoted.fullname || IDMemberToPromote
+          } làm quản trị viên`,
         dateTime: new Date().toISOString(),
         isRead: false,
       })
@@ -2376,9 +2412,8 @@ const handleDemoteMember = (io, socket) => {
         idSender: "system",
         idConversation: IDConversation,
         type: "system",
-        content: `${demoter.fullname || IDUser} đã thu hồi quyền quản trị viên của ${
-          demoted.fullname || IDMemberToDemote
-        }`,
+        content: `${demoter.fullname || IDUser} đã thu hồi quyền quản trị viên của ${demoted.fullname || IDMemberToDemote
+          }`,
         dateTime: new Date().toISOString(),
         isRead: false,
       })
@@ -2529,33 +2564,33 @@ const handleSearchMessagesInGroup = (io, socket) => {
 const handleReplyMessage = async (io, socket) => {
   socket.on("reply_message", async (payload) => {
     try {
-      const { 
-        IDSender, 
-        IDReceiver, 
-        IDConversation, 
-        IDMessageReply, 
-        textMessage, 
-        type = "text", 
-        fileUrl 
+      const {
+        IDSender,
+        IDReceiver,
+        IDConversation,
+        IDMessageReply,
+        textMessage,
+        type = "text",
+        fileUrl
       } = payload;
-      
+
       console.log("Received reply message:", payload);
-      
+
       // Tìm tin nhắn gốc để reply
       const originalMessage = await MessageDetail.findOne({ idMessage: IDMessageReply });
       if (!originalMessage) {
         throw new Error("Không tìm thấy tin nhắn gốc");
       }
-      
+
       // Tìm conversation
       let conversation = await Conversation.findOne({ idConversation: IDConversation });
-      
+
       // Tạo message detail dựa vào type
       let messageContent = textMessage;
       if (type !== "text") {
         messageContent = fileUrl;
       }
-      
+
       // Tạo tin nhắn reply
       const messageDetail = await MessageDetail.create({
         idMessage: uuidv4(),
@@ -2580,13 +2615,13 @@ const handleReplyMessage = async (io, socket) => {
           }
         }
       });
-      
+
       // Cập nhật conversation
       const updateFields = {
         lastChange: new Date().toISOString(),
         idNewestMessage: messageDetail.idMessage,
       };
-      
+
       // Tự động lưu vào danh sách tương ứng dựa vào type
       if (type === "image") {
         updateFields.$push = { listImage: messageContent };
@@ -2596,30 +2631,30 @@ const handleReplyMessage = async (io, socket) => {
       } else if (type === "file" || type === "document") {
         updateFields.$push = { listFile: messageContent };
       }
-      
+
       const updatedConversation = await Conversation.findOneAndUpdate(
         { idConversation: IDConversation },
         updateFields,
         { new: true }
       );
-      
+
       await updateLastChangeConversation(IDConversation, messageDetail.idMessage);
-      
+
       // Lấy thông tin người gửi
       const sender = await User.findOne({ id: IDSender }).select("id fullname urlavatar");
-      
+
       // Thêm thông tin người gửi và tin nhắn gốc vào tin nhắn
       const messageWithUsers = {
-...messageDetail.toObject(),
+        ...messageDetail.toObject(),
         senderInfo: sender,
         originalMessage: originalMessage
       };
-      
+
       // Xử lý gửi tin nhắn dựa vào loại conversation (nhóm hoặc đơn)
       if (conversation.isGroup) {
         // Nếu là nhóm, gửi tới tất cả thành viên trong nhóm
         const groupMembers = conversation.groupMembers || [];
-        
+
         groupMembers.forEach((member) => {
           if (member !== IDSender) {
             const receiverOnline = getUser(member);
@@ -2653,7 +2688,7 @@ const handleReplyMessage = async (io, socket) => {
           });
         }
       }
-      
+
       // Emit success cho sender
       socket.emit("send_message_success", {
         conversationId: IDConversation,
@@ -2665,7 +2700,7 @@ const handleReplyMessage = async (io, socket) => {
           lastChange: updatedConversation.lastChange
         }
       });
-      
+
     } catch (error) {
       console.error("Error replying to message:", error);
       socket.emit("error", {
@@ -2949,18 +2984,17 @@ const handleLoadGroupConversation = (io, socket) => {
 
           const messagePreview = latestMessage
             ? {
-                ...latestMessage.toObject(),
-                preview:
-                  latestMessage.type !== "text"
-                    ? `Đã gửi một ${
-                        latestMessage.type === "image"
-                          ? "hình ảnh"
-                          : latestMessage.type === "video"
-                            ? "video"
-                            : "tệp đính kèm"
-                      }`
-                    : latestMessage.content,
-              }
+              ...latestMessage.toObject(),
+              preview:
+                latestMessage.type !== "text"
+                  ? `Đã gửi một ${latestMessage.type === "image"
+                    ? "hình ảnh"
+                    : latestMessage.type === "video"
+                      ? "video"
+                      : "tệp đính kèm"
+                  }`
+                  : latestMessage.content,
+            }
             : null
 
           // Count unread messages for this user
@@ -3074,7 +3108,7 @@ const handleMessageReaction = (io, socket) => {
         if (count > 0) {
           // Tăng số lượng reaction lên 1 mỗi khi người dùng thả cùng emoji
           userReaction.count += 1;
-          
+
           // Cập nhật lại tổng số reaction - chỉ cần tăng thêm 1 đơn vị
           reactionData.totalCount += 1;
         } else {
