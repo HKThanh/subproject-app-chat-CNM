@@ -1,16 +1,16 @@
 const axios = require("axios");
 const config = require("../config/daily_co");
 
-const createDailyRoom = async (roomName) => {
+const createDailyRoom = async (roomName, callType) => {
     try {
         const roomConfig = {
             properties: {
-                enable_chat: true,
-                enable_screenshare: true,
+                enable_chat: false,
+                enable_screenshare: false,
                 enable_recording: false, // Tắt recording theo yêu cầu
-                start_video_off: false,
+                start_video_off: callType === "audio" ? true : false,
                 start_audio_off: false,
-                max_participants: 2,
+                enable_prejoin_ui: false,
             },
         };
 

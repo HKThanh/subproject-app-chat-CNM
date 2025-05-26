@@ -1,4 +1,4 @@
-const { createDailyRoom } = require('../services/dailyService');
+const { createDailyRoom, deleteRoom } = require('../services/dailyService');
 const Call = require('../models/CallModel');
 const User = require('../models/UserModel');
 const MessageDetail = require('../models/MessageDetailModel');
@@ -27,10 +27,10 @@ class CallController {
 
             // Tạo room Daily.co
             const roomName = `call-${callerId}-${receiverId}-${Date.now()}`;
-            const room = await createDailyRoom(roomName);
-            
+            const room = await createDailyRoom(roomName, callType);
+
             const callId = uuidv4();
-            
+
             // Lưu thông tin call vào database
             const callData = await Call.create({
                 idCall: callId,
@@ -68,8 +68,9 @@ class CallController {
                 throw new Error('Unauthorized to accept this call');
             }
 
-            // Cập nhật status
+            // Cập nhật status và startTime
             callData.status = 'active';
+            callData.startTime = new Date(); // Thêm dòng này
             await callData.save();
 
             // Cập nhật cache
@@ -77,10 +78,10 @@ class CallController {
 
             // Tạo message detail cho việc chấp nhận cuộc gọi
             await this.createCallMessage(
-                callData.callerId, 
-                callData.receiverId, 
-                callData.callType, 
-                'accepted', 
+                callData.callerId,
+                callData.receiverId,
+                callData.callType,
+                'accepted',
                 callId
             );
 
@@ -123,7 +124,7 @@ class CallController {
 
             // Tính thời gian cuộc gọi
             const endTime = new Date();
-            const duration = Math.floor((endTime - callData.startTime) / 1000);
+            const duration = callData.startTime ? Math.floor((endTime - callData.startTime) / 1000) : 0;
 
             // Cập nhật call data
             callData.status = 'ended';
@@ -132,17 +133,40 @@ class CallController {
             callData.endReason = reason;
             await callData.save();
 
+            // Kiểm tra số thành viên trong room TRƯỚC KHI xóa khỏi cache
+            const otherUserId = callData.callerId === userId ? callData.receiverId : callData.callerId;
+            const isOtherUserStillInCall = this.userCalls.has(otherUserId);
+
             // Xóa khỏi cache
             this.activeCalls.delete(callId);
             this.userCalls.delete(callData.callerId);
             this.userCalls.delete(callData.receiverId);
 
+            // Xóa room Daily.co trong các trường hợp:
+            // - Không còn ai trong cuộc gọi
+            // - Cuộc gọi bị từ chối hoặc nhỡ
+            // - Một trong hai người disconnect
+            const shouldDeleteRoom = !isOtherUserStillInCall ||
+                reason === 'rejected' ||
+                reason === 'missed' ||
+                reason === 'disconnected';
+
+            if (shouldDeleteRoom) {
+                try {
+                    await deleteRoom(callData.roomName);
+                    console.log(`Room ${callData.roomName} deleted successfully`);
+                } catch (deleteError) {
+                    console.error('Error deleting Daily.co room:', deleteError.message);
+                    // Không throw error để không ảnh hưởng đến flow chính
+                }
+            }
+
             // Tạo message detail cho việc kết thúc cuộc gọi
             await this.createCallMessage(
-                callData.callerId, 
-                callData.receiverId, 
-                callData.callType, 
-                'ended', 
+                callData.callerId,
+                callData.receiverId,
+                callData.callType,
+                'ended',
                 callId,
                 { duration, reason }
             );
@@ -151,6 +175,61 @@ class CallController {
         } catch (error) {
             console.error('Error ending call:', error);
             throw error;
+        }
+    }
+
+    // Thêm method mới để kiểm tra và cleanup room
+    async checkAndCleanupRoom(callId) {
+        try {
+            const callData = await Call.findOne({ idCall: callId });
+            if (!callData || callData.status === 'ended') {
+                return;
+            }
+
+            // Kiểm tra xem còn user nào trong cuộc gọi không
+            const activeCall = this.activeCalls.get(callId);
+            if (!activeCall) {
+                return;
+            }
+
+            const callerInCall = this.userCalls.has(callData.callerId);
+            const receiverInCall = this.userCalls.has(callData.receiverId);
+
+            // Nếu chỉ còn một người hoặc không còn ai, cleanup trực tiếp
+            if (!callerInCall || !receiverInCall) {
+                // Cleanup trực tiếp mà không gọi endCall để tránh đệ quy
+                callData.status = 'ended';
+                callData.endTime = new Date();
+                callData.endReason = 'disconnected';
+                const duration = callData.startTime ? Math.floor((new Date() - callData.startTime) / 1000) : 0;
+                callData.duration = duration;
+                await callData.save();
+
+                // Xóa khỏi cache
+                this.activeCalls.delete(callId);
+                this.userCalls.delete(callData.callerId);
+                this.userCalls.delete(callData.receiverId);
+
+                // Xóa room Daily.co
+                try {
+                    await deleteRoom(callData.roomName);
+                    console.log(`Room ${callData.roomName} deleted due to user disconnect`);
+                } catch (deleteError) {
+                    console.error('Error deleting Daily.co room:', deleteError.message);
+                }
+
+                // Tạo call message cho cleanup
+                await this.createCallMessage(
+                    callData.callerId,
+                    callData.receiverId,
+                    callData.callType,
+                    'ended',
+                    callId,
+                    { duration, reason: 'disconnected' }
+                );
+            }
+        } catch (error) {
+            console.error('Error checking and cleaning up room:', error);
         }
     }
 
@@ -188,8 +267,8 @@ class CallController {
                     break;
                 case 'ended':
                     const { duration = 0, reason = 'normal' } = additionalData;
-                    const durationText = duration > 0 ? 
-                        `Thời gian: ${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}` : 
+                    const durationText = duration > 0 ?
+                        `Thời gian: ${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}` :
                         'Cuộc gọi đã kết thúc';
                     content = `${durationText} - ${this.getEndReasonText(reason)}`;
                     break;
@@ -256,9 +335,9 @@ class CallController {
                     { receiverId: userId }
                 ]
             })
-            .sort({ startTime: -1 })
-            .limit(limit)
-            .skip(skip);
+                .sort({ startTime: -1 })
+                .limit(limit)
+                .skip(skip);
 
             return calls;
         } catch (error) {
@@ -281,16 +360,16 @@ class CallController {
         try {
             const { callId } = payload;
             const status = await this.getCallStatus(callId);
-            
+
             socket.emit("call_status_response", {
                 success: true,
                 callId: callId,
                 status: status
             });
         } catch (error) {
-            socket.emit("call_error", { 
+            socket.emit("call_error", {
                 success: false,
-                message: error.message 
+                message: error.message
             });
         }
     }
@@ -299,7 +378,7 @@ class CallController {
     async handleInitiateCall(io, socket, payload) {
         try {
             const { IDCaller, IDReceiver, callType = 'video' } = payload;
-            
+
             // Lấy thông tin caller
             const caller = await User.findOne({ id: IDCaller }).select('id fullname urlavatar');
             if (!caller) {
@@ -307,12 +386,12 @@ class CallController {
             }
 
             const receiver = await User.findOne({ id: IDReceiver }).select('id fullname urlavatar');
-            if (!receiver) { 
+            if (!receiver) {
                 throw new Error('Receiver not found');
             }
 
             const call = await this.initiateCall(IDCaller, IDReceiver, callType);
-            
+
             // Emit tới người gọi
             socket.emit("call_initiated", {
                 success: true,
@@ -351,9 +430,9 @@ class CallController {
                 });
             }
         } catch (error) {
-            socket.emit("call_error", { 
+            socket.emit("call_error", {
                 success: false,
-                message: error.message 
+                message: error.message
             });
         }
     }
@@ -369,10 +448,10 @@ class CallController {
             }
 
             const receiver = await User.findOne({ id: call.receiverId }).select('id fullname urlavatar');
-            if (!receiver) { 
+            if (!receiver) {
                 throw new Error('Receiver not found');
             }
-            
+
             socket.emit("call_accepted_confirmed", {
                 success: true,
                 call: call,
@@ -399,9 +478,9 @@ class CallController {
                 });
             }
         } catch (error) {
-            socket.emit("call_error", { 
+            socket.emit("call_error", {
                 success: false,
-                message: error.message 
+                message: error.message
             });
         }
     }
@@ -410,7 +489,7 @@ class CallController {
         try {
             const { callId, userId } = payload;
             await this.rejectCall(callId, userId);
-            
+
             socket.emit("call_rejected_confirmed", {
                 success: true,
                 message: "Call rejected"
@@ -445,9 +524,9 @@ class CallController {
                 }
             }
         } catch (error) {
-            socket.emit("call_error", { 
+            socket.emit("call_error", {
                 success: false,
-                message: error.message 
+                message: error.message
             });
         }
     }
@@ -456,7 +535,7 @@ class CallController {
         try {
             const { callId, userId, reason = 'normal' } = payload;
             const call = await this.endCall(callId, userId, reason);
-            
+
             socket.emit("call_ended_confirmed", {
                 success: true,
                 call: call,
@@ -473,10 +552,11 @@ class CallController {
                     duration: call.duration
                 });
             }
+
         } catch (error) {
-            socket.emit("call_error", { 
+            socket.emit("call_error", {
                 success: false,
-                message: error.message 
+                message: error.message
             });
         }
     }
@@ -485,15 +565,15 @@ class CallController {
         try {
             const { userId } = payload;
             const activeCall = this.getActiveCall(userId);
-            
+
             socket.emit("active_call_response", {
                 success: true,
                 activeCall: activeCall
             });
         } catch (error) {
-            socket.emit("call_error", { 
+            socket.emit("call_error", {
                 success: false,
-                message: error.message 
+                message: error.message
             });
         }
     }
@@ -502,7 +582,7 @@ class CallController {
         try {
             const { callId, userId } = payload;
             const call = await this.endCall(callId, userId, 'missed');
-            
+
             socket.emit("call_timeout_confirmed", {
                 success: true,
                 call: call
@@ -519,9 +599,9 @@ class CallController {
                 });
             }
         } catch (error) {
-            socket.emit("call_error", { 
+            socket.emit("call_error", {
                 success: false,
-                message: error.message 
+                message: error.message
             });
         }
     }
