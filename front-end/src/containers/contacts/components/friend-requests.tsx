@@ -102,6 +102,11 @@ export default function FriendRequests() {
       );
       const sentData = await sentResponse.json();
       if (sentData.success) {
+        // setSentRequests((prev) =>
+        //   prev.filter((req) => req.id !== sentData.data.requestId)
+        // );
+        // console.log("danh sách lời mời đã gửi: ", sentData.data);
+        // console.log("danh sách lời mời đã nhận: ", sentRequests);
         setSentRequests(sentData.data);
       }
     } catch (error) {
@@ -445,9 +450,9 @@ export default function FriendRequests() {
             {!Array.isArray(sentRequests) || sentRequests.length === 0 ? (
               <p className="text-gray-500 text-center">Chưa gửi lời mời nào</p>
             ) : (
-              sentRequests.map((request) => (
+              sentRequests.map((request, index) => (
                 <div
-                  key={request.id}
+                  key={`${request.id}-${index}`}
                   className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg"
                 >
                   <Avatar className="w-10 h-10">

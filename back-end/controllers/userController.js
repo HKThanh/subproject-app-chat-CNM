@@ -263,12 +263,10 @@ userController.sendFriendRequest = async (req, res, io) => {
 
   console.log(existing);
 
-  if (existing.status === "PENDING") {
-    return res.json({
-      code: 0,
-      message: "Yêu cầu đã được gửi",
-      data: existing,
-    });
+  if(existing) {
+    if(existing.status === "PENDING") {
+      return res.json({ code: 0, message: "Yêu cầu kết bạn đã được gửi" });
+    }
   }
 
   const sender = await UserModel.get(senderId);
@@ -303,7 +301,7 @@ userController.sendFriendRequest = async (req, res, io) => {
   return res.json({
     code: 1,
     message: "Request sent",
-    data: { senderId, receiverId },
+    data: { senderId, receiverId, requestId: newRequest.id },
   });
 };
 
@@ -387,6 +385,8 @@ userController.handleFriendRequest = async (req, res, io) => {
         data: {
           requestId: request.id,
           userId: request.senderId,
+          senderId: request.senderId,
+          receiverId: request.receiverId,
         },
         error: null,
       });
@@ -407,6 +407,8 @@ userController.handleFriendRequest = async (req, res, io) => {
         message: "Yêu cầu kết bạn đã bị từ chối",
         data: {
           requestId: request.id,
+          senderId: request.senderId,
+          receiverId: request.receiverId,
         },
         error: null,
       });
@@ -760,7 +762,7 @@ userController.findUserByText = async (req, res) => {
         ],
         id: { $ne: currentUserId }, // Loại bỏ người dùng hiện tại
       },
-      { _id: 0, id: 1, fullname: 1, urlavatar: 1, phone: 1, email: 1 }
+      { _id: 0, id: 1, fullname: 1, urlavatar: 1, phone: 1, email: 1, bio: 1, coverPhoto: 1, ismale: 1, birthday: 1 }
     );
 
     if (!users || users.length === 0) {

@@ -4,7 +4,7 @@ import { useInView } from 'react-intersection-observer';
 import ChatInput from "./chat-input";
 import ChatMessage from "./chat-message";
 import { Conversation, Message, useChat } from "@/socket/useChat";
-import { Info, Loader2, Phone } from "lucide-react";
+import { Info, Loader2, Phone, Video } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSocketContext } from "@/socket/SocketContext";
 import {
@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
 import useUserStore from '@/stores/useUserStoree';
+import { useCallContext } from '@/context/CallContext';
 
 interface ChatDetailProps {
   onToggleInfo: () => void;
@@ -64,7 +65,7 @@ export default function ChatDetail({
   loading,
 }: ChatDetailProps) {
   const { user } = useUserStore();
-  const { startCall } = useChat(user?.id || '');
+  const { startCall } = useCallContext();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { socket } = useSocketContext();
 
@@ -216,6 +217,7 @@ export default function ChatDetail({
   };
 
   const handleDelete = (messageId: string) => {
+    console.log("check delete message:", messageId);
     setDeletingMessage(messageId);
     setShowDeleteDialog(true);
   };
@@ -287,12 +289,17 @@ export default function ChatDetail({
   };
   const handleVoiceCall = () => {
     if (!activeConversation.isGroup && activeConversation.otherUser?.id) {
-      console.log("Gọi thoại với người dùng:", activeConversation.otherUser.id);
       startCall(activeConversation.otherUser.id, 'audio');
     } else {
-      // Hiển thị thông báo không hỗ trợ gọi nhóm nếu cần
       console.log("Cuộc gọi nhóm chưa được hỗ trợ");
-      // Có thể thêm toast notification ở đây
+    }
+  };
+
+  const handleVideoCall = () => {
+    if (!activeConversation.isGroup && activeConversation.otherUser?.id) {
+      startCall(activeConversation.otherUser.id, 'video');
+    } else {
+      console.log("Cuộc gọi nhóm chưa được hỗ trợ");
     }
   };
 
@@ -344,22 +351,36 @@ export default function ChatDetail({
           </div>
         </div>
         <div className="flex items-center">
-        <button 
-          className="p-2 rounded-full hover:bg-gray-200"
-          onClick={handleVoiceCall}
-          disabled={activeConversation.isGroup || !activeConversation.otherUser?.isOnline}
-          title={activeConversation.isGroup 
-            ? "Cuộc gọi nhóm chưa được hỗ trợ" 
-            : !activeConversation.otherUser?.isOnline 
-              ? "Người dùng không trực tuyến" 
-              : "Gọi thoại"}
-        >
-          <Phone className={`w-5 h-5 ${
-            (activeConversation.isGroup || !activeConversation.otherUser?.isOnline) 
-              ? "text-gray-400" 
+          <button
+            className="p-2 rounded-full hover:bg-gray-200"
+            onClick={handleVoiceCall}
+            disabled={activeConversation.isGroup || !activeConversation.otherUser?.isOnline}
+            title={activeConversation.isGroup
+              ? "Cuộc gọi nhóm chưa được hỗ trợ"
+              : !activeConversation.otherUser?.isOnline
+                ? "Người dùng không trực tuyến"
+                : "Gọi thoại"}
+          >
+            <Phone className={`w-5 h-5 ${(activeConversation.isGroup || !activeConversation.otherUser?.isOnline)
+              ? "text-gray-400"
               : "text-gray-700"
-          }`} />
-        </button>
+              }`} />
+          </button>
+          <button
+            className="p-2 rounded-full hover:bg-gray-200"
+            onClick={handleVideoCall}
+            disabled={activeConversation.isGroup || !activeConversation.otherUser?.isOnline}
+            title={activeConversation.isGroup
+              ? "Cuộc gọi nhóm chưa được hỗ trợ"
+              : !activeConversation.otherUser?.isOnline
+                ? "Người dùng không trực tuyến"
+                : "Gọi video"}
+          >
+            <Video className={`w-5 h-5 ${(activeConversation.isGroup || !activeConversation.otherUser?.isOnline)
+              ? "text-gray-400"
+              : "text-gray-700"
+              }`} />
+          </button>
           <button
             className="p-2 rounded-full hover:bg-gray-100"
             onClick={onToggleInfo}
@@ -471,39 +492,15 @@ export default function ChatDetail({
                   }
                   // Xử lý thông tin tin nhắn reply
                   let replyInfo = null;
-                  if (msg.isReply && msg.idMessageReply) {
-                    // Tìm tin nhắn gốc từ danh sách tin nhắn hiện có
-                    const originalMessage = displayMessages.find(
-                      (m) => m.idMessage === msg.idMessageReply
-                    );
-
-                    if (originalMessage) {
-                      // Tìm thông tin người gửi tin nhắn gốc
-                      let originalSenderName = "";
-
-                      if (originalMessage.senderInfo?.fullname) {
-                        originalSenderName = originalMessage.senderInfo.fullname;
-                      } else if (activeConversation?.isGroup && originalMessage.idSender) {
-                        const originalMember = activeConversation.regularMembers?.find(
-                          (member) => member.id === originalMessage.idSender
-                        );
-
-                        if (originalMember) {
-                          originalSenderName = originalMember.fullname || originalMessage.idSender;
-                        } else if (activeConversation.owner?.id === originalMessage.idSender) {
-                          originalSenderName = activeConversation.owner.fullname || originalMessage.idSender;
-                        } else {
-                          originalSenderName = originalMessage.idSender;
-                        }
-                      } else if (!activeConversation?.isGroup) {
-                        originalSenderName = originalMessage.idSender === msg.idSender
-                          ? activeConversation?.otherUser?.fullname || "Người dùng"
-                          : "Bạn";
-                      }
+                  if (msg.isReply) {
+                    // Sử dụng thông tin từ messageReply nếu có
+                    if (msg.messageReply) {
+                      // Lấy thông tin người gửi tin nhắn gốc từ messageReply
+                      let originalSenderName = msg.messageReply.senderInfo?.fullname || "Người dùng";
 
                       // Chuẩn bị nội dung tin nhắn gốc để hiển thị
-                      let originalContent = originalMessage.content || "";
-                      let originalType = originalMessage.type || "text";
+                      let originalContent = msg.messageReply.content || "";
+                      let originalType = msg.messageReply.type || "text";
 
                       if (originalType !== "text" && originalContent.includes("http")) {
                         const urlMatch = originalContent.match(/(https?:\/\/[^\s]+)/g);
@@ -529,13 +526,73 @@ export default function ChatDetail({
                         content: originalContent,
                         type: originalType
                       };
-                    } else {
-                      // Nếu không tìm thấy tin nhắn gốc, hiển thị thông tin mặc định
-                      replyInfo = {
-                        name: "Người dùng",
-                        content: "Tin nhắn gốc không còn tồn tại",
-                        type: "text"
-                      };
+                    }
+                    else if (msg.idMessageReply) {
+                      // Fallback: Tìm tin nhắn gốc từ danh sách tin nhắn hiện có nếu không có messageReply
+                      const originalMessage = displayMessages.find(
+                        (m) => m.idMessage === msg.idMessageReply
+                      );
+
+                      if (originalMessage) {
+                        // Tìm thông tin người gửi tin nhắn gốc
+                        let originalSenderName = "";
+
+                        if (originalMessage.senderInfo?.fullname) {
+                          originalSenderName = originalMessage.senderInfo.fullname;
+                        } else if (activeConversation?.isGroup && originalMessage.idSender) {
+                          const originalMember = activeConversation.regularMembers?.find(
+                            (member) => member.id === originalMessage.idSender
+                          );
+
+                          if (originalMember) {
+                            originalSenderName = originalMember.fullname || originalMessage.idSender;
+                          } else if (activeConversation.owner?.id === originalMessage.idSender) {
+                            originalSenderName = activeConversation.owner.fullname || originalMessage.idSender;
+                          } else {
+                            originalSenderName = originalMessage.idSender;
+                          }
+                        } else if (!activeConversation?.isGroup) {
+                          originalSenderName = originalMessage.idSender === msg.idSender
+                            ? activeConversation?.otherUser?.fullname || "Người dùng"
+                            : "Bạn";
+                        }
+
+                        // Chuẩn bị nội dung tin nhắn gốc để hiển thị
+                        let originalContent = originalMessage.content || "";
+                        let originalType = originalMessage.type || "text";
+
+                        if (originalType !== "text" && originalContent.includes("http")) {
+                          const urlMatch = originalContent.match(/(https?:\/\/[^\s]+)/g);
+                          const fileUrl = urlMatch ? urlMatch[0] : undefined;
+
+                          if (fileUrl) {
+                            originalContent = originalContent.replace(fileUrl, "").trim();
+
+                            if (!originalContent) {
+                              if (originalType === "image") {
+                                originalContent = "Hình ảnh";
+                              } else if (originalType === "video") {
+                                originalContent = "Video";
+                              } else {
+                                originalContent = "Tệp đính kèm";
+                              }
+                            }
+                          }
+                        }
+
+                        replyInfo = {
+                          name: originalSenderName,
+                          content: originalContent,
+                          type: originalType
+                        };
+                      } else {
+                        // Nếu không tìm thấy tin nhắn gốc, hiển thị thông tin mặc định
+                        replyInfo = {
+                          name: "Người dùng",
+                          content: "Tin nhắn gốc không còn tồn tại",
+                          type: "text"
+                        };
+                      }
                     }
                   }
                   return (
@@ -657,92 +714,26 @@ export default function ChatDetail({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showForwardDialog} onOpenChange={setShowForwardDialog}>
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Chuyển tiếp tin nhắn</DialogTitle>
+            <DialogTitle>Xóa tin nhắn</DialogTitle>
             <DialogDescription>
-              Chọn cuộc trò chuyện để chuyển tiếp tin nhắn này
+              Bạn có chắc chắn muốn xóa tin nhắn này? Hành động này không thể hoàn tác.
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-4">
-            <ScrollArea className="h-[300px] pr-4">
-              {availableConversations.length > 0 ? (
-                availableConversations.map((conv) => (
-                  <div
-                    key={conv.idConversation}
-                    className="flex items-center space-x-2 py-2 border-b border-gray-100"
-                  >
-                    <Checkbox
-                      id={conv.idConversation}
-                      checked={selectedConversations.includes(
-                        conv.idConversation
-                      )}
-                      onCheckedChange={() =>
-                        toggleConversationSelection(conv.idConversation)
-                      }
-                    />
-                    <div className="w-8 h-8 rounded-full overflow-hidden">
-                      <Image
-                        src={
-                          conv.isGroup
-                            ? conv.groupAvatar ||
-                            "https://danhgiaxe.edu.vn/upload/2024/12/99-mau-avatar-nhom-dep-nhat-danh-cho-team-dong-nguoi-30.webp"
-                            : conv.otherUser?.urlavatar ||
-                            `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                              conv.otherUser?.fullname || "User"
-                            )}`
-                        }
-                        alt={
-                          conv.isGroup
-                            ? conv.groupName || "Group"
-                            : conv.otherUser?.fullname || "User"
-                        }
-                        width={32}
-                        height={32}
-                        className="object-cover"
-                      />
-                    </div>
-                    <Label
-                      htmlFor={conv.idConversation}
-                      className="flex-1 cursor-pointer"
-                    >
-                      <div className="font-medium">
-                        {conv.isGroup
-                          ? conv.groupName
-                          : conv.otherUser?.fullname || "Người dùng"}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {conv.isGroup
-                          ? `${conv.groupMembers?.length || 0} thành viên`
-                          : "Chat trực tiếp"}
-                      </div>
-                    </Label>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-4 text-gray-500">
-                  Không có cuộc trò chuyện nào khác
-                </div>
-              )}
-            </ScrollArea>
-          </div>
           <DialogFooter>
             <Button
               variant="outline"
               onClick={() => {
-                setShowForwardDialog(false);
-                setForwardingMessage(null);
-                setSelectedConversations([]);
+                setShowDeleteDialog(false);
+                setDeletingMessage(null);
               }}
             >
               Hủy
             </Button>
-            <Button
-              onClick={confirmForward}
-              disabled={selectedConversations.length === 0}
-            >
-              Chuyển tiếp
+            <Button variant="destructive" onClick={confirmDelete}>
+              Xóa
             </Button>
           </DialogFooter>
         </DialogContent>

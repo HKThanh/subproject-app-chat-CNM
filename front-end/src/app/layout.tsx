@@ -9,7 +9,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import useUserStore from "@/stores/useUserStoree";
-import CallUI from "@/components/call/CallUI";
+import { CallProvider } from "@/context/CallContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -21,22 +21,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const router = useRouter();
-
   useEffect(() => {
     const handleAuthError = async (event: PromiseRejectionEvent): Promise<void> => {
       if (event?.reason?.message?.includes('SESSION_EXPIRED')) {
         console.log('Session expired, redirecting to login');
-        
+
         try {
           // Clear any stored auth data
           const userStore = useUserStore.getState();
           userStore.clearUser();
-          
+
           // Sign out and redirect
-          await signOut({ 
+          await signOut({
             redirect: false,
           });
-          
+
           // Force navigation to login
           router.push('/auth/login');
         } catch (error) {
@@ -58,7 +57,6 @@ export default function RootLayout({
       <body className={inter.className}>
         <SessionProvider>
           <AuthSync />
-          <CallUI />
           <Toaster richColors position="top-right" />
           {children}
         </SessionProvider>

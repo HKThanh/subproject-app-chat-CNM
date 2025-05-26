@@ -13,7 +13,7 @@ const MessageDetailSchema = new Schema({
     idConversation: String,
     type: {
         type: String,
-        enum: ['text', 'image', 'video', 'file', 'sticker', 'link', 'audio', 'document', 'system'],
+        enum: ['text', 'image', 'video', 'file', 'sticker', 'link', 'audio', 'document', 'system', 'call'],
         default: 'text'
     },
     content: String,
@@ -41,8 +41,8 @@ const MessageDetailSchema = new Schema({
         type: Boolean,
         default: false
     },
-    idMessageReply: {
-        type: String,
+    messageReply: {
+        type: Schema.Types.Mixed, // Có thể là một đối tượng hoặc null
         default: null
     },
     isPinned: {

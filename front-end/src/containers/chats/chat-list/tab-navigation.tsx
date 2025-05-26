@@ -127,13 +127,13 @@ export default function TabNavigation({
   useEffect(() => {
     if (socket && currentUser?.id) {
       if (activeTab === "DIRECT") {
-        console.log("Switching to DIRECT tab, loading direct conversations");
+        // console.log("Switching to DIRECT tab, loading direct conversations");
         socket.emit("load_conversations", {
           IDUser: currentUser.id,
           lastEvaluatedKey: 0,
         });
       } else if (activeTab === "GROUPS") {
-        console.log("Switching to GROUPS tab, loading group conversations");
+        // console.log("Switching to GROUPS tab, loading group conversations");
         socket.emit("load_group_conversations", {
           IDUser: currentUser.id,
           lastEvaluatedKey: 0,
@@ -305,20 +305,38 @@ export default function TabNavigation({
       return;
     }
 
+    // Hiển thị trạng thái đang tải
+    toast.loading("Đang mở cuộc trò chuyện...");
+
     // Emit sự kiện tạo conversation
     socket.emit("create_conversation", {
       IDSender: currentUserId,
       IDReceiver: friend.id,
     });
 
-    // Chuyển hướng đến trang chat
-    router.push("/chat");
+    // Lắng nghe phản hồi từ server
+    socket.once("create_conversation_response", (response) => {
+      toast.dismiss(); // Đóng toast loading
+
+      if (response.success) {
+        // Lưu ID cuộc trò chuyện vào localStorage
+        localStorage.setItem(
+          "selectedConversationId",
+          response.conversation.idConversation
+        );
+
+        // Chuyển hướng đến trang chat
+        router.push("/chat");
+      } else {
+        toast.error(response.message || "Không thể tạo cuộc trò chuyện");
+      }
+    });
   };
 
   return (
     <div className="flex flex-col h-full bg-gray-200">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-        <h2 className="text-xl font-bold text-gray-900">Chats</h2>
+        <h2 className="text-xl font-bold text-gray-900">Tin nhắn</h2>
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -345,7 +363,7 @@ export default function TabNavigation({
           }`}
           onClick={() => setActiveTab("DIRECT")}
         >
-          DIRECT
+          Chat đơn
         </button>
         {/* Fixed duplicate button */}
         <button
@@ -356,7 +374,7 @@ export default function TabNavigation({
           }`}
           onClick={() => setActiveTab("GROUPS")}
         >
-          GROUPS
+          Chat nhóm
         </button>
       </div>
 

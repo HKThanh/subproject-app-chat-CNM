@@ -93,11 +93,17 @@ const initSocket = (server) => {
 
         // Đăng ký các sự kiện WebRTC
         webRTCController.handleCall(io, socket);
+
+        const callController = require('../controllers/callController');
+        callController.handleCallEvents(io, socket);
         socket.on("disconnect", () => {
             console.log("Client disconnected: " + socket.id);
             const user = socketController.getUserBySocketId(socket.id);
             if (user) {
                 console.log("User disconnected:", user.phone);
+
+                // Kết thúc cuộc gọi nếu user disconnect
+                callController.handleUserDisconnect(user.id);
             }
         });
     });

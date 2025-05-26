@@ -163,6 +163,7 @@ authController.registerForWeb = async (req, res) => {
                 fullname: fullname,
                 email: email,
                 isVerified: true,
+                urlavatar: "https://test-9-4.s3.ap-southeast-1.amazonaws.com/hw8q-1748087377359-avatar-default.jpg"
             });
             await redisClient.del(email); // Remove OTP from Redis after successful verification
 

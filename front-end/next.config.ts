@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
       '*'
     ],
     dangerouslyAllowSVG: true,
-    contentDispositionType: 'attachment',
+    contentDispositionType: "attachment",
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     remotePatterns: [
       {
@@ -25,8 +25,8 @@ const nextConfig: NextConfig = {
     ],
   },
   env: {
-    PORT: "3001" // Convert number to string to fix type error
-  }
+    PORT: "3001", // Convert number to string to fix type error
+  },
 };
 
 export default nextConfig;

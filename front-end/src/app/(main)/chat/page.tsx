@@ -40,7 +40,17 @@ export default function Home() {
     replyMessage,
     addReaction
   } = useChatContext();
+  useEffect(() => {
+    const pendingConversation = sessionStorage.getItem('pendingConversation');
 
+    if (pendingConversation && isConnected) {
+      // Đặt cuộc trò chuyện đang chờ làm cuộc trò chuyện hiện tại
+      setActiveConversation(pendingConversation);
+
+      // Xóa cuộc trò chuyện đang chờ khỏi sessionStorage
+      sessionStorage.removeItem('pendingConversation');
+    }
+  }, [isConnected]);
   // Tải danh sách cuộc trò chuyện khi component được mount
   useEffect(() => {
     let hasLoadedConversations = false;
@@ -50,7 +60,7 @@ export default function Home() {
       loadConversations();
       hasLoadedConversations = true;
     }
-  }, [isConnected, loadConversations, ]);
+  }, [isConnected, loadConversations,]);
 
   // Tải tin nhắn khi chọn cuộc trò chuyện
   useEffect(() => {
@@ -94,6 +104,37 @@ export default function Home() {
     }
   }, [activeConversation, messages, markMessagesAsRead]);
 
+  // Thêm useEffect để kiểm tra và mở cuộc trò chuyện đã được chọn từ localStorage
+  useEffect(() => {
+    const checkSavedConversation = () => {
+      const savedConversationId = localStorage.getItem(
+        "selectedConversationId"
+      );
+      if (savedConversationId && conversations.length > 0) {
+        const conversation = conversations.find(
+          (conv) => conv.idConversation === savedConversationId
+        );
+
+        if (conversation) {
+          // Mở cuộc trò chuyện
+          setActiveConversation(savedConversationId);
+          loadMessages(savedConversationId);
+
+          // Xóa ID đã lưu để tránh mở lại cuộc trò chuyện này khi người dùng quay lại trang
+          localStorage.removeItem("selectedConversationId");
+        } else {
+          // Nếu không tìm thấy cuộc trò chuyện, xóa ID đã lưu
+          localStorage.removeItem("selectedConversationId");
+        }
+      }
+    };
+
+    // Kiểm tra khi conversations thay đổi
+    if (isConnected && conversations.length > 0) {
+      checkSavedConversation();
+    }
+  }, [isConnected, conversations, loadMessages, setActiveConversation]);
+
   // Xử lý khi chọn một cuộc trò chuyện
   const handleSelectConversation = (conversationId: string) => {
     setActiveConversation(conversationId);
@@ -119,16 +160,18 @@ export default function Home() {
     text: string,
     type: string = "text",
     fileUrl?: string,
-    replyingTo?: {name: string;
+    replyingTo?: {
+      name: string;
       messageId: string;
       content: string;
-      type: string;}
+      type: string;
+    }
   ) => {
     if (activeConversation) {
       console.log("check send message:", type, fileUrl, text, replyingTo);
       if (replyingTo) {
         replyMessage(activeConversation, replyingTo.messageId, text, type, fileUrl);
-      } 
+      }
       else if (type === "text") {
         sendMessage(activeConversation, text);
       } else {
@@ -144,11 +187,12 @@ export default function Home() {
 
   // Xử lý xóa tin nhắn
   const handleDeleteMessage = (messageId: string) => {
+    console.log("check delete mId:", messageId);
     if (activeConversation) {
       const conversation = conversations.find(
         (conv) => conv.idConversation === activeConversation
       );
-
+      console.log("check delete message:", conversation);
       if (conversation) {
         const receiverId =
           conversation.idSender === conversation.otherUser?.id

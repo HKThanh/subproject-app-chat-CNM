@@ -174,18 +174,17 @@ const handleLoadConversation = (io, socket) => {
 
           const messagePreview = latestMessage
             ? {
-                ...latestMessage.toObject(),
-                preview:
-                  latestMessage.type !== "text"
-                    ? `Đã gửi một ${
-                        latestMessage.type === "image"
-                          ? "hình ảnh"
-                          : latestMessage.type === "video"
-                            ? "video"
-                            : "tệp đính kèm"
-                      }`
-                    : latestMessage.content,
-              }
+              ...latestMessage.toObject(),
+              preview:
+                latestMessage.type !== "text"
+                  ? `Đã gửi một ${latestMessage.type === "image"
+                    ? "hình ảnh"
+                    : latestMessage.type === "video"
+                      ? "video"
+                      : "tệp đính kèm"
+                  }`
+                  : latestMessage.content,
+            }
             : null
 
           // Đếm số tin nhắn chưa đọc
@@ -485,6 +484,43 @@ const handleRecallMessage = async (io, socket) => {
         throw new Error("Không tìm thấy tin nhắn")
       }
 
+      let updatedReplyMessages = null;
+      // Tìm và cập nhật tất cả các tin nhắn reply đến tin nhắn này
+      const replyMessages = await MessageDetail.find({
+        "messageReply.idMessage": idMessage,
+        isReply: true
+      });
+      console.log(`Found ${replyMessages.length} reply messages for recalled message ${idMessage}`);
+      // Cập nhật thông tin messageReply cho tất cả tin nhắn reply
+      if (replyMessages && replyMessages.length > 0) {
+        console.log(`Updating ${replyMessages.length} reply messages for recalled message ${idMessage}`);
+
+        const updatePromises = replyMessages.map(replyMsg =>
+          MessageDetail.findOneAndUpdate(
+            { idMessage: replyMsg.idMessage },
+            {
+              messageReply: {
+                ...replyMsg.messageReply,
+                content: "Tin nhắn đã được thu hồi",
+                isRecall: true
+              }
+            },
+            { new: true }
+          )
+        );
+
+        updatedReplyMessages = await Promise.all(updatePromises);
+
+        // Gửi thông báo cập nhật cho tất cả các tin nhắn reply
+        updatedReplyMessages.forEach(replyMsg => {
+          console.log(`Emitting message_updated for message ${replyMsg.content} to room ${idConversation}`);
+          io.to(idConversation).emit("message_updated", {
+            messageId: replyMsg.idMessage,
+            updatedMessage: replyMsg,
+            conversationId: idConversation,
+          });
+        });
+      }
       // Cập nhật tin nhắn
       const updatedMessage = await MessageDetail.findOneAndUpdate(
         { idMessage },
@@ -494,18 +530,17 @@ const handleRecallMessage = async (io, socket) => {
         },
         { new: true },
       )
-
       // Tìm conversation để lấy thông tin người nhận
       const conversation = await Conversation.findOne({ idConversation })
       if (!conversation) {
         throw new Error("Không tìm thấy cuộc hội thoại")
       }
-      console.log("Conversation của tin nhắn bị thu hồi: ", conversation)
+      // console.log("Conversation của tin nhắn bị thu hồi: ", conversation)
 
       // Xử lý khác nhau cho nhóm và cuộc trò chuyện 1-1
       if (conversation.isGroup) {
         // Đối với nhóm, gửi thông báo đến tất cả thành viên trong nhóm
-        console.log("Sending recall notification to group conversation:", idConversation)
+        // console.log("Sending recall notification to group conversation:", idConversation)
 
         // Gửi thông báo đến tất cả thành viên trong room của cuộc trò chuyện
         io.to(idConversation).emit("message_recalled", {
@@ -546,12 +581,14 @@ const handleRecallMessage = async (io, socket) => {
           })
         }
       }
-
+      console.log("replyMessages: ", replyMessages)
       // Gửi thông báo thành công cho người gửi
       socket.emit("recall_message_success", {
         messageId: idMessage,
         success: true,
         conversationId: idConversation,
+        updatedMessage: updatedMessage,
+        isLatestMessage: conversation.lastChange === idMessage
       })
 
       console.log("Recall message notification sent")
@@ -714,6 +751,7 @@ const handleLoadMessages = (io, socket) => {
         if (lastMessage) {
           query.dateTime = { $lt: lastMessage.dateTime }
         }
+
       } else if (firstMessageId) {
         const firstMessage = await MessageDetail.findOne({
           idMessage: firstMessageId,
@@ -723,53 +761,76 @@ const handleLoadMessages = (io, socket) => {
         }
       }
 
+      // Find messages
       const messages = await MessageDetail.find(query)
-        .sort({ dateTime: firstMessageId ? 1 : -1 })
-        .limit(limit)
+        .sort({ dateTime: -1 })
+        .limit(limit);
 
-      // Lấy thông tin người gửi cho mỗi tin nhắn
-      const senderIds = [...new Set(messages.map((msg) => msg.idSender))]
-      const senders = await User.find({ id: { $in: senderIds } }).select("id fullname urlavatar phone status")
+      // Get all user IDs from messages and reactions
+      const userIds = new Set();
+      messages.forEach(message => {
+        if (message.idSender) userIds.add(message.idSender);
 
-      const senderMap = senders.reduce((map, sender) => {
-        map[sender.id] = sender
-        return map
-      }, {})
+        // Add users who reacted to messages
+        if (message.reactions) {
+          for (const [_, data] of message.reactions.entries()) {
+            data.userReactions.forEach(ur => userIds.add(ur.userId));
+          }
+        }
+      });
 
-      // Format tin nhắn với thông tin người gửi
-      let processedMessages = messages.map((msg) => ({
-        ...msg.toJSON(),
-        dateTime: moment.tz(msg.dateTime, "Asia/Ho_Chi_Minh").format(),
-        senderInfo: senderMap[msg.idSender] || {
-          id: msg.idSender,
-          fullname: "Unknown User",
-        },
-      }))
+      // Get user information
+      const users = await User.find({ id: { $in: Array.from(userIds) } })
+        .select("id fullname urlavatar");
 
-      // Sắp xếp lại nếu load tin nhắn mới
-      if (firstMessageId) {
-        processedMessages = processedMessages.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime))
-      }
+      // Create user map for easy access
+      const userMap = {};
+      users.forEach(user => {
+        userMap[user.id] = {
+          id: user.id,
+          fullname: user.fullname,
+          urlavatar: user.urlavatar
+        };
+      });
 
-      // Kiểm tra xem còn tin nhắn cũ hơn không
-      const hasMoreOlder = lastMessageId
-        ? await MessageDetail.exists({
-            idConversation: IDConversation,
-            dateTime: { $lt: messages[messages.length - 1]?.dateTime },
-          })
-        : false
+      // Process messages with user info and reactions
+      const processedMessages = messages.map(message => {
+        const messageObj = message.toObject();
 
-      // Kiểm tra xem còn tin nhắn mới hơn không
-      const hasMoreNewer = firstMessageId
-        ? await MessageDetail.exists({
-            idConversation: IDConversation,
-            dateTime: { $gt: messages[0]?.dateTime },
-          })
-        : false
+        // Add sender info
+        messageObj.senderInfo = userMap[message.idSender] || {
+          id: message.idSender,
+          fullname: "Unknown User"
+        };
+
+        // Process reactions if they exist
+        if (message.reactions && message.reactions.size > 0) {
+          const reactionSummary = {};
+
+          for (const [key, data] of message.reactions.entries()) {
+            if (data.totalCount > 0) {
+              reactionSummary[key] = {
+                reaction: data.reaction,
+                totalCount: data.totalCount,
+                userReactions: data.userReactions.map(ur => ({
+                  user: userMap[ur.userId] || { id: ur.userId, fullname: "Unknown User" },
+                  count: ur.count
+                }))
+              };
+            }
+          }
+
+          messageObj.reactions = reactionSummary;
+        } else {
+          messageObj.reactions = {};
+        }
+
+        return messageObj;
+      });
 
       socket.emit("load_messages_response", {
         messages: processedMessages,
-        hasMore: messages.length === limit || (lastMessageId ? hasMoreOlder : hasMoreNewer),
+        hasMore: messages.length === limit,
         conversationId: IDConversation,
         direction: lastMessageId ? "older" : "newer",
       })
@@ -1064,7 +1125,7 @@ const handleCreatGroupConversation = (io, socket) => {
     // groupMembers phải có cả IDOwner
     console.log("create_group_conversation payload:>>> ", payload);
     const { IDOwner, groupName, groupMembers, groupAvatarUrl } = payload;
-    const groupAvatar = groupAvatarUrl ||null;
+    const groupAvatar = groupAvatarUrl || null;
 
     if (groupMembers.length < 2) {
       socket.emit("create_group_conversation_response", {
@@ -1342,15 +1403,15 @@ const handleAddMemberToGroup = async (io, socket) => {
         }
       }),
     )
-    ;[...existingMembers, ...newMembers].forEach(async (memberId) => {
-      const userSocket = getUser(memberId)
-      if (userSocket?.socketId) {
-        io.to(userSocket.socketId).emit("receive_message", {
-          conversationId: IDConversation,
-          message: systemMessage,
-        })
-      }
-    })
+      ;[...existingMembers, ...newMembers].forEach(async (memberId) => {
+        const userSocket = getUser(memberId)
+        if (userSocket?.socketId) {
+          io.to(userSocket.socketId).emit("receive_message", {
+            conversationId: IDConversation,
+            message: systemMessage,
+          })
+        }
+      })
     // Gửi thông báo cho các thành viên mới
     newMembers.forEach(async (member) => {
       const allMembersInfo = await Promise.all(
@@ -1374,17 +1435,19 @@ const handleAddMemberToGroup = async (io, socket) => {
           },
           owner: ownerInfo
             ? {
-                id: ownerInfo.id,
-                fullname: ownerInfo.fullname,
-                urlavatar: ownerInfo.urlavatar,
-                phone: ownerInfo.phone,
-                email: ownerInfo.email,
-              }
+              id: ownerInfo.id,
+              fullname: ownerInfo.fullname,
+              urlavatar: ownerInfo.urlavatar,
+              phone: ownerInfo.phone,
+              email: ownerInfo.email,
+            }
             : null,
           coOwners: coOwnersInfo,
           members: allMembersInfo,
-          message: "Bạn đã được thêm vào nhóm",
+          // allMembersInfo: allMembersInfo,
+          message: "Bạn đã được thêm vào nhómmm",
           systemMessage,
+          // members: dataNewMembers,
         })
       }
     })
@@ -1400,6 +1463,7 @@ const handleAddMemberToGroup = async (io, socket) => {
             conversation: updatedConversation,
             message: `${newMembersInfo.join(", ")} đã được thêm vào nhóm`,
             systemMessage,
+            members: dataNewMembers,
           })
         }
       }
@@ -2213,9 +2277,8 @@ const handlePromoteMemberToAdmin = (io, socket) => {
         idSender: "system",
         idConversation: IDConversation,
         type: "system",
-        content: `${promoter.fullname || IDUser} đã thăng cấp ${
-          promoted.fullname || IDMemberToPromote
-        } làm quản trị viên`,
+        content: `${promoter.fullname || IDUser} đã thăng cấp ${promoted.fullname || IDMemberToPromote
+          } làm quản trị viên`,
         dateTime: new Date().toISOString(),
         isRead: false,
       })
@@ -2349,9 +2412,8 @@ const handleDemoteMember = (io, socket) => {
         idSender: "system",
         idConversation: IDConversation,
         type: "system",
-        content: `${demoter.fullname || IDUser} đã thu hồi quyền quản trị viên của ${
-          demoted.fullname || IDMemberToDemote
-        }`,
+        content: `${demoter.fullname || IDUser} đã thu hồi quyền quản trị viên của ${demoted.fullname || IDMemberToDemote
+          }`,
         dateTime: new Date().toISOString(),
         isRead: false,
       })
@@ -2502,23 +2564,31 @@ const handleSearchMessagesInGroup = (io, socket) => {
 const handleReplyMessage = async (io, socket) => {
   socket.on("reply_message", async (payload) => {
     try {
-      const { IDSender, IDReceiver, IDConversation, IDMessageReply, textMessage, type = "text", fileUrl } = payload
+      const {
+        IDSender,
+        IDReceiver,
+        IDConversation,
+        IDMessageReply,
+        textMessage,
+        type = "text",
+        fileUrl
+      } = payload;
 
-      console.log("Received reply message:", payload)
+      console.log("Received reply message:", payload);
 
       // Tìm tin nhắn gốc để reply
-      const originalMessage = await MessageDetail.findOne({ idMessage: IDMessageReply })
+      const originalMessage = await MessageDetail.findOne({ idMessage: IDMessageReply });
       if (!originalMessage) {
-        throw new Error("Không tìm thấy tin nhắn gốc")
+        throw new Error("Không tìm thấy tin nhắn gốc");
       }
 
       // Tìm conversation
-      const conversation = await Conversation.findOne({ idConversation: IDConversation })
+      let conversation = await Conversation.findOne({ idConversation: IDConversation });
 
       // Tạo message detail dựa vào type
-      let messageContent = textMessage
+      let messageContent = textMessage;
       if (type !== "text") {
-        messageContent = fileUrl
+        messageContent = fileUrl;
       }
 
       // Tạo tin nhắn reply
@@ -2532,79 +2602,90 @@ const handleReplyMessage = async (io, socket) => {
         dateTime: new Date().toISOString(),
         isRead: false,
         isReply: true,
-        idMessageReply: IDMessageReply,
-      })
+        messageReply: {
+          idMessage: IDMessageReply,
+          content: originalMessage.content,
+          idSender: originalMessage.idSender,
+          dateTime: originalMessage.dateTime,
+          type: originalMessage.type,
+          senderInfo: {
+            id: originalMessage.idSender,
+            fullname: (await User.findOne({ id: originalMessage.idSender }).select("fullname")).fullname || "Unknown",
+            urlavatar: (await User.findOne({ id: originalMessage.idSender }).select("urlavatar")).urlavatar || ""
+          }
+        }
+      });
 
       // Cập nhật conversation
       const updateFields = {
         lastChange: new Date().toISOString(),
         idNewestMessage: messageDetail.idMessage,
-      }
+      };
 
       // Tự động lưu vào danh sách tương ứng dựa vào type
       if (type === "image") {
-        updateFields.$push = { listImage: messageContent }
+        updateFields.$push = { listImage: messageContent };
       } else if (type === "video" || type === "audio") {
         // Lưu vào listVideo (bao gồm cả audio)
-        updateFields.$push = { listVideo: messageContent }
+        updateFields.$push = { listVideo: messageContent };
       } else if (type === "file" || type === "document") {
-        updateFields.$push = { listFile: messageContent }
+        updateFields.$push = { listFile: messageContent };
       }
 
       const updatedConversation = await Conversation.findOneAndUpdate(
         { idConversation: IDConversation },
         updateFields,
-        { new: true },
-      )
+        { new: true }
+      );
 
-      await updateLastChangeConversation(IDConversation, messageDetail.idMessage)
+      await updateLastChangeConversation(IDConversation, messageDetail.idMessage);
 
       // Lấy thông tin người gửi
-      const sender = await User.findOne({ id: IDSender }).select("id fullname urlavatar")
+      const sender = await User.findOne({ id: IDSender }).select("id fullname urlavatar");
 
       // Thêm thông tin người gửi và tin nhắn gốc vào tin nhắn
       const messageWithUsers = {
         ...messageDetail.toObject(),
         senderInfo: sender,
-        originalMessage: originalMessage,
-      }
+        originalMessage: originalMessage
+      };
 
       // Xử lý gửi tin nhắn dựa vào loại conversation (nhóm hoặc đơn)
       if (conversation.isGroup) {
         // Nếu là nhóm, gửi tới tất cả thành viên trong nhóm
-        const groupMembers = conversation.groupMembers || []
+        const groupMembers = conversation.groupMembers || [];
 
         groupMembers.forEach((member) => {
           if (member !== IDSender) {
-            const receiverOnline = getUser(member)
+            const receiverOnline = getUser(member);
             if (receiverOnline) {
-              io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers)
+              io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers);
               io.to(receiverOnline.socketId).emit("conversation_updated", {
                 conversationId: IDConversation,
                 updates: {
                   listImage: updatedConversation.listImage || [],
                   listFile: updatedConversation.listFile || [],
                   listVideo: updatedConversation.listVideo || [],
-                  lastChange: updatedConversation.lastChange,
-                },
-              })
+                  lastChange: updatedConversation.lastChange
+                }
+              });
             }
           }
-        })
+        });
       } else {
         // Nếu là chat đơn, gửi tới người nhận
-        const receiverOnline = getUser(IDReceiver)
+        const receiverOnline = getUser(IDReceiver);
         if (receiverOnline) {
-          io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers)
+          io.to(receiverOnline.socketId).emit("receive_message", messageWithUsers);
           io.to(receiverOnline.socketId).emit("conversation_updated", {
             conversationId: IDConversation,
             updates: {
               listImage: updatedConversation.listImage || [],
               listFile: updatedConversation.listFile || [],
               listVideo: updatedConversation.listVideo || [],
-              lastChange: updatedConversation.lastChange,
-            },
-          })
+              lastChange: updatedConversation.lastChange
+            }
+          });
         }
       }
 
@@ -2616,18 +2697,19 @@ const handleReplyMessage = async (io, socket) => {
           listImage: updatedConversation.listImage || [],
           listFile: updatedConversation.listFile || [],
           listVideo: updatedConversation.listVideo || [],
-          lastChange: updatedConversation.lastChange,
-        },
-      })
+          lastChange: updatedConversation.lastChange
+        }
+      });
+
     } catch (error) {
-      console.error("Error replying to message:", error)
+      console.error("Error replying to message:", error);
       socket.emit("error", {
         message: "Lỗi khi trả lời tin nhắn",
         error: error.message,
-      })
+      });
     }
-  })
-}
+  });
+};
 
 // Thêm vào socketController.js
 const handlePinGroupMessage = (io, socket) => {
@@ -2902,18 +2984,17 @@ const handleLoadGroupConversation = (io, socket) => {
 
           const messagePreview = latestMessage
             ? {
-                ...latestMessage.toObject(),
-                preview:
-                  latestMessage.type !== "text"
-                    ? `Đã gửi một ${
-                        latestMessage.type === "image"
-                          ? "hình ảnh"
-                          : latestMessage.type === "video"
-                            ? "video"
-                            : "tệp đính kèm"
-                      }`
-                    : latestMessage.content,
-              }
+              ...latestMessage.toObject(),
+              preview:
+                latestMessage.type !== "text"
+                  ? `Đã gửi một ${latestMessage.type === "image"
+                    ? "hình ảnh"
+                    : latestMessage.type === "video"
+                      ? "video"
+                      : "tệp đính kèm"
+                  }`
+                  : latestMessage.content,
+            }
             : null
 
           // Count unread messages for this user
@@ -3023,14 +3104,17 @@ const handleMessageReaction = (io, socket) => {
         const userReaction = reactionData.userReactions[userReactionIndex]
         const oldCount = userReaction.count
 
-        // Update total count
-        reactionData.totalCount = reactionData.totalCount - oldCount + count
-
         // Update user's reaction count or remove if count is 0
         if (count > 0) {
-          userReaction.count = count
+          // Tăng số lượng reaction lên 1 mỗi khi người dùng thả cùng emoji
+          userReaction.count += 1;
+
+          // Cập nhật lại tổng số reaction - chỉ cần tăng thêm 1 đơn vị
+          reactionData.totalCount += 1;
         } else {
           reactionData.userReactions.splice(userReactionIndex, 1)
+          // Giảm tổng số reaction khi xóa reaction
+          reactionData.totalCount -= oldCount;
         }
       } else if (count > 0) {
         // User doesn't have this reaction yet
